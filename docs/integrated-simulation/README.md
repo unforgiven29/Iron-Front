@@ -46,8 +46,10 @@ A dependency is only real when a change in the upstream state can be traced thro
 | Engine family physics | `physics/propulsion/` | aircraft tank inventory |
 | Shared resource network | core resource service + owning system adapters | direct cross-system field mutation |
 | Radar physics/equipment | `physics/radar/` + `sensors/Radar/` | perfect world contacts |
+| RWR/ESM equipment and processing | `sensors/RWR/` | radar target tracks or campaign truth |
+| Shared RF emission/path environment | existing `physics/radar/` propagation owner, extended for direct interception paths | RWR classification or threat display |
 | IRST equipment/processing | `sensors/IRST/` | target true range/identity |
-| RWR/ESM, EO/FLIR, IFF | their sensor modules | generic perfect detection |
+| EO/FLIR, IFF | their sensor modules | generic perfect detection |
 | Aircraft definition/installation | `game/modules/planes/<aircraft-id>/` | duplicated copies of shared solvers |
 | Cockpit commands/displays | aircraft cockpit + owning subsystem contracts | direct mutation of hidden internals |
 | Rendering/assets | `game/graphics-engine/` | physics, damage, detection or campaign truth |
@@ -69,7 +71,7 @@ Use one authoritative simulation clock and fixed/controlled physics timestep. Re
 8. Integrate 6-DoF rigid-body state.
 9. Update wake/vortex emission and query encounter state using a documented previous/current policy.
 10. Update damage/failures and emit domain events; define whether newly caused failures affect current or next tick.
-11. Update sensors: antenna/optics orientation, propagation/thermal scene, measurements, detections and tracks.
+11. Update sensor emissions and receiving systems: publish time-bounded transmitter events; evaluate propagation and antenna orientation; create measurements, detections and tracks.
 12. Update AI using only observations available to that entity, not hidden world truth.
 13. Publish immutable snapshots and events for cockpit, UI, audio and graphics.
 
@@ -106,6 +108,7 @@ Build a declarative dependency/resource graph. Examples of providers and consume
 - Damage can sever lines, jam mechanisms, degrade sensors, leak fuel, reduce structural strength or alter aerodynamic geometry.
 - Stores and pylons affect mass, inertia, drag, radar/IR signature and weapon interfaces.
 - Sensor reports feed avionics, AI and datalink with age/uncertainty/source preserved.
+- Radar transmitters publish actual emissions; RWR/ESM intercepts only the received RF energy after antenna, propagation and receiver limitations. Radar detection/track state is not an RWR input.
 - Cockpit displays consume actual subsystem outputs and reflect power, cooling, failure and stale data.
 
 Do not model all resources as one boolean `powered`. Use capacity, demand, priority, voltage/pressure/flow/temperature limits, allocation, transient response and failure states appropriate to the domain. The system must explain why a consumer is unavailable.
@@ -116,7 +119,7 @@ Every aircraft is a modular package loaded by a common aircraft runtime. An airc
 - Identity, variant, block/lot and data baseline.
 - Geometry, reference dimensions, hardpoints and attachment transforms.
 - Mass, empty mass, fuel distribution, CG and inertia model.
-- Aerodynamic surface layout and coefficient datasets.
+- Aero surface layout and coefficient datasets.
 - Flight-control architecture, control laws, actuator maps and trim.
 - Engine fit, inlet/nozzle installation and engine control interface.
 - Electrical, hydraulic, fuel, environmental and other aircraft systems.
@@ -158,7 +161,9 @@ Required integration scenarios include:
 - Engine/inlet damage changes thrust, vibration, temperature and asymmetric moments.
 - Icing changes local aero behavior and may affect probes/sensors.
 - Stores change drag/mass/CG and radar/IR signature assumptions.
-- Radar emission can create an RWR observation after propagation and processing.
+- Radar emission can create an RWR observation after propagation and processing, without requiring radar to track the RWR aircraft.
+- Silent/receive-only radar creates no emission-based RWR detection.
+- RWR bearing-only tracks do not invent range; emitter identity, hostile status, tracking evidence and launch warning remain separate assessments.
 - IRST can miss a target due to aspect/background/atmosphere and can provide angular-only tracks.
 - Weather simultaneously affects aircraft performance and the distinct radar/IR/visibility models.
 - Damage to an antenna/optical window/cooling circuit degrades the corresponding sensor.

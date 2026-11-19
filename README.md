@@ -27,6 +27,9 @@ The repository contains an evolving code skeleton, subsystem architecture docume
 - Sensor implementation guide: docs/sensors/CLAUDE_IMPLEMENTATION_GUIDE.md
 - Radar architecture: docs/radar/README.md
 - Radar implementation guide: docs/radar/CLAUDE_IMPLEMENTATION_GUIDE.md
+- **RWR/ESM architecture:** sensors/RWR/README.md
+- **RWR/ESM implementation guide:** sensors/RWR/CLAUDE_IMPLEMENTATION_GUIDE.md
+- **RWR validation and data standard:** docs/sensors/RWR_VALIDATION_AND_DATA_STANDARD.md
 - IRST architecture: docs/irst/README.md
 - IRST implementation guide: docs/irst/CLAUDE_IMPLEMENTATION_GUIDE.md
 

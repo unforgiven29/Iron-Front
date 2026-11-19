@@ -6,7 +6,7 @@ Iron-Front sensors must be independent equipment simulations that produce uncert
 
 - **Radar:** active RF transmission/reception, propagation, scattering, signal processing, detection and tracking. See [radar architecture](../radar/README.md).
 - **IRST:** passive infrared detection and angular tracking. See [IRST architecture](../irst/README.md).
-- **RWR/ESM:** passive RF emitter detection, parameter measurement, emitter association and threat warning. Must not be a radar receiver with perfect emitter identity.
+- **RWR/ESM:** passive RF interception, pulse/parameter measurement, emitter deinterleaving, probabilistic identification, bearing-only emitter tracking and threat warning. See [RWR architecture](../../sensors/RWR/README.md).
 - **EO/FLIR:** optical/thermal imaging and image-based observation; distinct from an IRST search/track chain.
 - **Datalink:** transports remote reports with source, timestamp, age and uncertainty; it is not a sensor and does not turn remote reports into onboard detections.
 - **IFF:** cooperative identification interrogation/response where fitted; identification is not detection.
@@ -21,6 +21,8 @@ Sensor fusion must handle time alignment, coordinate transformations, uncertaint
 ## System interactions
 
 Power, cooling, hydraulics, vibration, temperature, damage, alignment, software baseline and operator mode affect sensor availability and quality. Radar emissions may be observed by RWR/ESM; radar and IRST may cue one another; datalink can share tracks; weather/terrain can affect multiple sensor types differently. Each interaction must pass through explicit contracts and must not bypass the physical chain.
+
+RWR and radar are different RF systems: radar normally processes returns from its own illumination, while RWR intercepts another emitter's direct signal. RWR must not consume radar detections, target RCS or hidden tracking state. Radar transmitters must publish actual time-bounded emissions through the shared RF environment; RWR receives only the energy its installed antennas and receiver can process. RWR bearing is not range, and emitter identity/hostility/lock/launch status must remain separate uncertain assessments.
 
 ## Implementation order
 
