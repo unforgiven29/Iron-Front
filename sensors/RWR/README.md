@@ -159,3 +159,88 @@ A feature is not complete because a threat ring or audio tone appears. It is com
 ## Data provenance
 
 Every equipment and emitter parameter must record units, source/document/page where available, variant/software applicability, confidence, uncertainty and status: publicly sourced, estimated, synthetic, unknown or gameplay-tuned. Keep classified or unavailable values unknown rather than filling gaps with invented precision.
+
+
+## Shared dynamic engine and aircraft-specific configuration
+
+The intended implementation is **one shared, dynamic RWR runtime**, not a separate simulator for every aircraft or receiver. Equipment differences are supplied by immutable, validated configuration profiles and aircraft installation adapters. This repository currently contains architecture and folder scaffolding only; these folders do not imply working runtime code or historically validated equipment data.
+
+### Intended source layout
+
+| Path | Owns |
+|---|---|
+| `core/` | Runtime orchestration, lifecycle, receiver-to-display processing sequence and state transitions |
+| `hardware/` | Reusable hardware models and interfaces for receiver/processor assemblies; aircraft apertures remain in the existing `antennas/` area |
+| `display/` | Generic display-state and audio-output adapters, with equipment-specific presentation rules |
+| `equipment/AN-ALR-67/V2/` | AN/ALR-67(V)2 capability/configuration profile |
+| `equipment/AN-ALR-67/V3/` | AN/ALR-67(V)3 capability/configuration profile |
+| `equipment/SPO-15LM/` | SPO-15LM capability/configuration profile and its characteristic channel/lamp/CW logic |
+| `installations/F-16/` | Aircraft-specific RWR fit, aperture transforms, airframe masking, wiring, resource connections and cockpit mapping |
+| `installations/MiG-29A/` | MiG-29A-specific RWR fit and cockpit/airframe integration |
+| `libraries/emitter-library/` | Versioned emitter signature data with source, confidence, uncertainty and applicability |
+| `interfaces/` | Typed contracts for configuration, received observations, emitter contacts, commands and display snapshots |
+| `validation/scenarios/` | Repeatable RF/RWR interaction scenarios |
+| `validation/tests/` | Unit, integration, regression and deterministic replay tests |
+
+The existing `receiver/`, `antennas/`, `channelization/`, `measurements/`, `pulse-descriptors/`, `deinterleaving/`, `emitter-association/`, `classification/`, `tracking/`, `threat-evaluation/`, `cockpit/`, `health/`, `data/`, `integration/`, `diagnostics/` and `lab/` directories remain in place. Do not create duplicate owners for those responsibilities.
+
+### Configuration layers
+
+1. **Equipment profile:** receiver architecture, supported bands, sensitivity, instantaneous bandwidth, channel capacity, measurement accuracy, direction-finding method, processing limits, threat logic, BIT/fault behaviour and supported display/audio features.
+2. **Aircraft installation:** equipment selected for the exact aircraft variant, antenna count and local transforms, airframe/store masking, cable/installation losses, electrical bus and cooling dependencies, self-interference paths, damage zones and cockpit wiring/mapping.
+3. **Emitter library:** observable signature ranges/distributions and mode characteristics, each versioned and labelled with provenance. The library is not a source of hidden emitter state.
+4. **Runtime state:** warm-up/BIT, receiver health, live measurements, candidate identities, tracks, uncertainty, warning states and display snapshots. Runtime state must never be written back into immutable configuration.
+
+Do not fill ALR-67 or SPO-15LM profiles with invented precise performance values. Unknown values remain explicitly unknown; estimated or synthetic values carry labels and uncertainty. A named equipment profile is not evidence that a particular aircraft/operator/variant actually carried it. Validate the exact installation before selecting it.
+
+### Cross-system interaction contracts
+
+| Connected system | Data entering/leaving the RWR | Required behaviour |
+|---|---|---|
+| Radar equipment | Time-stamped emission events containing waveform/pulse timing, frequency, power/EIRP, antenna pattern/beam direction, scan schedule, mode evidence and transmitter health | Radar publishes emissions; RWR never reads radar target tracks, lock booleans or private target lists |
+| Shared RF environment in `physics/radar/` | Propagated direct-path RF at the receiver location, including path loss, terrain/LOS, atmosphere, polarization and interference | This is the sole shared RF propagation owner; RWR does not create a second propagation world or use radar echo/two-way range equations |
+| Aircraft pose and geometry | Position, attitude, angular motion, antenna transforms and fitted store/gear configuration | Recompute line-of-sight and antenna response in the correct frames; include airframe masking and installation effects |
+| Electrical and cooling systems | Allocated bus power, voltage/quality, cooling availability and fault events | Warm-up, degraded operation, shutdown and recovery follow the actual installation profile; avoid a universal `powered` boolean |
+| Electronic warfare / jammers | Jammer emissions, own-jammer schedule, blanking/look-through timing and interference | Jamming affects the received signal and receiver processing. Own-jammer leakage/blanking is installation-specific; do not apply a generic detection-range multiplier |
+| Damage and maintenance | Antenna/receiver/cable/processor/display damage, calibration state, repair and BIT results | Degrade only the affected channels/functions and preserve fault causes in diagnostics |
+| Avionics and cockpit | Operator mode/sensitivity/declutter/handoff commands; immutable RWR display and audio snapshots | Cockpit consumes RWR outputs and sends typed commands; it must not create detections or mutate receiver internals |
+| Datalink / cooperative ESM | Remote emitter reports with source platform, timestamp, age, coordinate frame and uncertainty | Remote reports remain distinguishable from local intercepts and age naturally when updates stop |
+| Radar, IRST and other sensors | Independent tracks/measurements with source, time and uncertainty for optional correlation | Fusion may associate observations, but must not upgrade an RWR bearing into an exact range or identity without supporting evidence |
+| MAWS / missile warning | Independent missile-warning observations and confidence | MAWS remains a separate sensor. Correlation may combine warnings; RWR must not pretend to detect an infrared/UV missile plume as RF |
+| AI and campaign systems | Only published RWR reports and confidence/age metadata | AI decisions use the same imperfect observations available to the aircraft, not hidden campaign truth |
+
+### Causal update sequence
+
+At each scheduled sensor update, the shared runtime should:
+
+1. Read validated equipment and installation configuration plus current resource/health snapshots.
+2. Consume only RF emission events published by transmitter-owning systems.
+3. Ask the shared RF environment for the signal arriving at each installed antenna aperture.
+4. Apply antenna pattern, installation masking, cable loss, receiver bandwidth/sensitivity, blanking, saturation and channel availability.
+5. Produce timestamped measurements/PDWs with uncertainty and quality flags.
+6. Deinterleave and associate observations into emitter candidates.
+7. Compare candidates against the loaded library and preserve ambiguity/unknown classifications.
+8. Update bearing-only emitter tracks and their covariance/age.
+9. Evaluate equipment-specific search/track/launch evidence and threat priority without reading hidden radar or missile state.
+10. Publish an immutable equipment-specific display/audio snapshot and diagnostic trace.
+
+The simulation clock owns update order. Rendering is not the sensor clock. Expensive pulse/event work should be event-driven and bounded by receiver/processor capacity.
+
+### Equipment-specific behaviour without duplicate engines
+
+The common runtime owns the physical and signal-processing pipeline. Equipment profiles provide capability flags, parameter curves, limits and replaceable strategy implementations only where the real equipment architecture requires a different method. For example, an SPO-15LM profile can use its own programmed type-lamp recognition, azimuth-channel priority, power-scale, CW-channel and own-radar-interlock behaviour; an ALR-67 profile can use its configured receiver/channelization, emitter-processing and display capabilities. Do not give either system features unsupported by its selected variant.
+
+The installation profile binds an equipment profile to an aircraft. A MiG-29A installation must not inherit F-16 antenna geometry or cockpit mapping. Aircraft variants resolve an explicit equipment + installation pair; no automatic fallback to a more capable RWR is permitted.
+
+### First integration scenarios
+
+- A search radar emits while scanning away from the aircraft: the RWR may receive sidelobe energy or nothing, depending on geometry and receiver limits.
+- The radar turns its beam toward the aircraft and changes mode: measured pulse/scan evidence can change the RWR assessment after processing delay.
+- The radar stops transmitting: the RWR track coasts, ages and eventually drops; it does not remain permanently locked.
+- Two emitters overlap in frequency/time: channel and processor limits can cause missed, merged or ambiguous observations.
+- Own radar or jammer transmits: only the configured bands/sectors/timing are desensitized or blanked.
+- Antenna damage, bus loss or cooling failure: only affected functions degrade, with corresponding BIT/diagnostic state.
+- A remote wingman shares an ESM report: the cockpit can show it as a datalinked report, not a local antenna detection.
+- Radar/IRST correlation adds context: source provenance and uncertainty remain visible and no unsupported range is invented.
+
+A vertical slice is complete only when the same runtime can load two materially different equipment profiles and two different aircraft installations, receive the same controlled emission scenario, produce observably different but causally valid results, and pass deterministic integration tests. Folder creation and configuration placeholders alone are not implementation.
