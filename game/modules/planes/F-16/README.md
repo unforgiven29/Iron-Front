@@ -90,3 +90,8 @@ Maintain an F-16 validation matrix for:
 - Deterministic replay and browser performance.
 
 The F-16 is complete only when the shared runtime consumes its variant data, the above causal dependencies are tested, and its supported envelope and limitations are documented.
+
+
+## Research library
+
+The selected project baseline is the **F-16C Block 50**. Read the aircraft-specific [technical reference library](docs/README.md) before implementation. It contains separate flight-model, APG-68(V)5 radar, ALR-56M RWR, sensor/EW, propulsion, avionics, cockpit, airframe-systems, weapons/stores, source and image briefs. Variant and date discipline is mandatory.

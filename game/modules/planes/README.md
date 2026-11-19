@@ -49,3 +49,11 @@ The F-16 is the first integrated reference module. The MiG-29A package is an int
 - Every adapter declares dependencies and failure behavior.
 - Runtime state is not stored in static configuration or asset metadata.
 - A model is not complete until its validation matrix and cross-system tests pass.
+
+
+## Aircraft-specific research libraries
+
+- [F-16C Block 50 documentation](F-16/docs/README.md)
+- [MiG-29 product 9.13 documentation](MiG-29A/docs/README.md)
+
+Read the variant baseline and source caveats before implementing any aircraft-specific system. These research packs do not imply that runtime systems are implemented.

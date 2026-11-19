@@ -81,3 +81,8 @@ Each test must assert both the initiating change and at least one downstream eff
 - Do not expose hidden target truth to F-16 sensors or avionics.
 - Do not fake startup, engine response, sensor modes or failures with booleans.
 - Do not mark the F-16 complete until tests, sources and limitations are documented.
+
+
+## Required aircraft reference pack
+
+Before implementing F-16-specific behavior, read [`docs/README.md`](docs/README.md) and its variant baseline. The current selected baseline is F-16C Block 50 / F110-GE-129 / APG-68(V)5 / ALR-56M. Do not mix APG-68(V)9, APG-83, Block 52 engine data or later modernization fits into this configuration. Treat linked BMS/DCS publications as simulation references and preserve source/variant caveats.
