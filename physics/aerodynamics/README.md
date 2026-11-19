@@ -1,5 +1,17 @@
-# Aerodynamics
+# Aerodynamics — PFM Surface Model
 
-**Empty source placeholders; no aerodynamic solver exists yet.** Own aerodynamic forces and moments, not rigid-body integration or engine thermodynamics.
+**Empty source placeholders. No aerodynamic solver is implemented yet.**
 
-Planned areas: air-relative/local surface flow; airfoil polars and coefficient interpolation; wing/tail/control-surface geometry; lift, profile/induced/wave drag and moments; downwash/interference; nonlinear stall and high-AoA behavior; compressibility and Mach/Reynolds validity; stability derivatives, damping and trim; ground effect; external stores; icing and damage effects; data provenance, uncertainty and validation. Do not use one arcade lift curve for every aircraft. See [flight model architecture](../../docs/flight-model/README.md).
+This subsystem owns aircraft geometry and aerodynamic force/moment generation. It does not own 6-DoF integration, global weather or engine thermodynamics.
+
+Planned architecture:
+- **Geometry:** aircraft reference frames, wings, panels/strips, tails, fins, control surfaces and aerodynamic stations.
+- **Local flow:** surface-local velocity, angular-rate effects, AoA/sideslip, dynamic pressure and induced flow.
+- **Coefficient data:** aircraft-specific lift/drag/moment maps, stability/control derivatives, Mach/AoA/configuration ranges, interpolation, uncertainty and provenance.
+- **Loads:** lift, profile/induced/wave drag, pitching/rolling/yawing moments and force application points.
+- **Flow interaction:** downwash, sidewash, wing/tail interference, vortex effects, propwash/jet interaction where appropriate.
+- **Nonlinear behavior:** stall, separation, post-stall response, dynamic lag/hysteresis and high-AoA behavior where supported.
+- **Configuration:** flaps/slats, speed brakes, stores, fuel state, icing and damage effects.
+- **Validation:** trim, coefficient comparisons, stability, maneuvers, stall and regression cases.
+
+Every surface must use its own local air sample; one aircraft-wide AoA/q value is insufficient. Use aircraft-specific data and explicit validity envelopes. Do not approximate the entire aircraft with one lift curve or arbitrary multipliers. See [PFM architecture](../../docs/flight-model/README.md).
