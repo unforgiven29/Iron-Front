@@ -58,6 +58,8 @@ The module selects installed radar, RWR/ESM, IRST (only if actually fitted in th
 
 Each equipment record identifies exact model/variant/software baseline, controls, scan limits, modes, power/cooling requirements, cockpit presentation, source provenance and limitations. Sensor physics executes in shared sensor modules. Aircraft avionics sends commands and receives reports.
 
+For the RWR, define the actual installed receiver, antenna apertures/locations, frequency coverage, direction-finding method, processing/software/library baseline, warning logic, audio/display mapping, electrical/cooling dependencies and damage paths. Do not assume a universal F-16 RWR fit or copy capabilities from another block/operator. Follow the [RWR implementation guide](../../../../sensors/RWR/CLAUDE_IMPLEMENTATION_GUIDE.md). RWR output must be based on intercepted emissions and uncertain measurements; it must not read radar tracks or hidden target state.
+
 ## 7. Stores and configuration
 
 Represent each station with allowed store definitions, mass, geometry, attachment transform, drag contribution, release interface and relevant electrical/data connection where supported. A loaded configuration changes mass/CG/inertia, aerodynamic drag, performance, handling and signatures. Jettison/release updates all dependent state through events.

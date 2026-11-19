@@ -1,6 +1,6 @@
 # Claude Implementation Guide — F-16 First Integrated Aircraft
 
-Read this guide with [integrated simulation architecture](../../../docs/integrated-simulation/README.md), [integration implementation brief](../../../docs/integrated-simulation/CLAUDE_IMPLEMENTATION_GUIDE.md), flight-model, propulsion, radar, IRST, sensors, graphics and core-system guides.
+Read this guide with [integrated simulation architecture](../../../docs/integrated-simulation/README.md), [integration implementation brief](../../../docs/integrated-simulation/CLAUDE_IMPLEMENTATION_GUIDE.md), flight-model, propulsion, radar, IRST, sensors and graphics guides.
 
 ## Goal
 
@@ -67,6 +67,8 @@ Do not add dozens of cockpit switches before the physical data path works.
 ## Step 5 — test cross-system consequences
 
 Add reproducible scenarios for fuel burn/CG shift; asymmetric stores; hydraulic leak and control degradation; electrical bus failure; generator/engine accessory loss; engine surge/damage; afterburner/fuel/thermal signature; inlet distortion; icing; radar emission to RWR; IRST aspect/background misses; antenna/window/cooling damage; datalink track aging; gear/brake failure; and save/load/replay.
+
+For RWR specifically, test actual transmitter emissions through propagation, antenna and receiver; no radar track dependency; silent/receive-only cases; bearing uncertainty and no invented range; unknown emitters; channel/dynamic-range limits; power/cooling/antenna damage; and stale remote ESM reports.
 
 Each test must assert both the initiating change and at least one downstream effect. Add negative tests proving unrelated systems are not incorrectly affected.
 

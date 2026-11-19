@@ -10,10 +10,14 @@ Audit existing radar, IRST, RWR/ESM, EO/FLIR, IFF, datalink, navigation, cockpit
 4. Remote/datalink reports remain distinguishable from onboard observations.
 5. Sensor fusion must account for time alignment, uncertainty and correlated information.
 6. Hardware readiness, power, cooling, alignment, damage and software limits affect capability.
-7. A sensor's physical mechanism must remain distinct: radar is active RF, IRST passive IR, RWR/ESM passive RF, EO/FLIR optical imaging.
+7. A sensor's physical mechanism must remain distinct: radar is active RF, IRST passive IR, RWR/ESM passive RF interception, EO/FLIR optical imaging.
 8. Graphics visualizes sensor output; it never determines it.
 9. Use aircraft-specific equipment fits and variant baselines; never grant a capability merely because another aircraft has it.
 10. Do not invent classified performance data. Mark estimated/synthetic values.
+
+## RWR/ESM implementation
+
+Use [the dedicated RWR implementation guide](../../sensors/RWR/CLAUDE_IMPLEMENTATION_GUIDE.md) and [validation/data standard](../../sensors/RWR/README.md). The RWR must intercept actual time-bounded radar/RF emissions through the shared RF environment. It must not read radar tracks or campaign truth. Model antenna installation, receiver sensitivity/bandwidth/dynamic range, scan/channel dwell, pulse measurements, deinterleaving, probabilistic library matching, bearing uncertainty, emitter tracks and separate threat assessment. A single bearing does not provide range. A detection does not prove hostile identity, lock or launch.
 
 ## Implementation workflow
 
