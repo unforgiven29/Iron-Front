@@ -1,53 +1,98 @@
-# Claude Implementation Guide — Flight Model
+# Claude Implementation Guide — DCS-Style Professional Flight Model
 
-These are planned boundaries, not completed code. Audit the repository and preserve existing behavior before implementation.
+This guide supersedes any interpretation of the flight model as an arcade flight controller. Target a DCS-inspired PFM architecture: aircraft-specific nonlinear aerodynamics, coupled aircraft systems, a simulated 3D atmosphere and local air interaction.
 
-## Before coding
-Inspect all source files, script tags, build/deployment configuration and GitHub Pages base paths. Search for existing aircraft movement, collision, weapons, inputs and physics. Do not create a second flight engine beside existing code. Propose a staged migration before replacing anything.
+**Do not claim DCS parity.** Implement and validate the physical model progressively. The new folders are placeholders; no solver is supplied by this documentation change.
 
-## Aircraft definition contract
-Each aircraft/variant should reference:
-- Geometry: wing/tail planform, reference area/chord, control surfaces, stations and datum.
-- Mass: empty/basic mass, fuel/store mass, CG envelope, inertia tensor and changing-mass rules.
-- Aerodynamics: lift/drag/moment curves, stability derivatives, control effectiveness, Mach/Reynolds range, high-lift and stall data.
-- Propulsion: engine family/count, position/orientation, thrust maps, spool response, fuel use, limits, inlet/nozzle and failure modes.
-- Flight controls: direct/hydraulic/electric actuation, mixing, rate/position limits, trim, stability augmentation, autopilot and flight-control laws.
-- Systems: electrical, hydraulic, pneumatic, fuel, oxygen, gear, brakes, pressurization, anti-ice and sensors.
-- Stores: mass, drag, station, release state and asymmetric load effects.
-- Damage: component locations, structural limits and subsystem-specific failure effects.
-- Cockpit: controls, bindings, instrument inputs, warnings and startup dependencies.
+## First: audit and architecture proposal
+Inspect the current repository and identify existing flight movement, aircraft data, environment/weather, collision, rendering and simulation loops. Do not create parallel systems. Produce a diagram of data ownership and propose a staged migration. Preserve the existing game until replacement components pass tests.
 
-## Physics requirements
-### Rigid body
-Use a 6-DoF state with world position/velocity, attitude, body angular velocity, mass and inertia. Define frame conventions. Sum forces/moments consistently. Update mass, CG and inertia as fuel/stores change. Use a stable integrator and document timestep limits.
+## Required top-level ownership
+- `physics/rigidbody/`: 6-DoF state and integration.
+- `physics/aerodynamics/`: aircraft geometry, surface-level flow and aerodynamic loads.
+- `physics/atmosphere/` or the existing environment owner: ambient 3D air state, thermodynamics, wind and weather. Avoid duplicate atmosphere implementations; choose one canonical owner and document migration.
+- `physics/wake/`: aircraft-generated wake/vortices and wake encounter sampling.
+- `physics/propulsion/`: engine-family and installation models.
+- `physics/ground/`: landing gear, runway contact and ground effect ownership (coordinate with aerodynamics).
+- `game/core/simulation/`: clock, deterministic update order and scheduling.
+- `game/modules/planes/<variant>/`: unique aircraft geometry/data, engine fit, control laws, systems, cockpit and damage.
 
-### Aerodynamics
-Derive air-relative velocity from aircraft motion and wind; compute dynamic pressure, Mach, Reynolds, AoA and sideslip. Calculate local flow at each surface, including angular-rate contributions. Use coefficient curves with explicit interpolation/extrapolation behavior. Include lift, profile/induced/wave drag where supported, moments, downwash, interference and control effectiveness. Stall is nonlinear; avoid a binary on/off threshold and arbitrary lift multipliers.
+## Non-negotiable simulation rules
+1. Aircraft state is 6-DoF and authoritative; render transforms are outputs.
+2. The atmosphere is a world-space field queried by position and simulation time, not a single global wind constant.
+3. Aircraft aerodynamic response uses air-relative velocity, not ground velocity.
+4. Every lifting/control surface receives local airflow based on its position, aircraft angular velocity, ambient wind and modeled induced flow.
+5. Forces and moments are integrated; do not set aircraft velocity/rotation to achieve desired handling.
+6. Pilot and AI use the same actuator/control-law path.
+7. Aircraft variants have distinct, sourced aerodynamic and propulsion data.
+8. Failures and damage affect the responsible physical subsystem and propagate through explicit dependencies.
+9. Physics runs on deterministic fixed/controlled timesteps independent of rendering.
+10. Never read hidden world truth to provide perfect sensor/AI knowledge.
 
-### Propulsion
-Separate throttle command from engine response. Model spool up/down, altitude/Mach/temperature thrust lapse, fuel flow, thermal/pressure limits, startup/shutdown, relight/flameout where appropriate, afterburner where fitted, nozzle/propeller effects, inlet distortion and damage. Turbofan, turbojet, turboprop, piston and turboshaft behavior must not be collapsed into one fake engine.
+## Air simulation contract
+An atmosphere query takes world position and simulation time and returns pressure, temperature, density, speed of sound, humidity/moisture if supported, mean wind vector, gust/turbulence contribution and weather metadata. Include field identity/configuration and validity. Interpolate spatially/vertically without discontinuities. Wind conventions and units must be explicit.
 
-### Controls and ground handling
-Distinguish commanded, actual and measured surface positions. Include actuator rate/position limits, power availability, saturation, jams and reversion modes. Ground handling includes gear geometry, suspension, tire contact, friction, steering, braking, runway slope/roughness, weight-on-wheels and brake/gear damage.
+Separate:
+- Baseline atmosphere (standard atmosphere and mission weather profile).
+- Mean wind field (altitude/position/time dependent).
+- Wind shear and gust events.
+- Turbulence (seeded, bounded stochastic or spectral model; never unseeded per-frame noise).
+- Thermals/downdrafts and terrain-induced flow.
+- Precipitation/icing/weather state.
+- Aircraft wake/vortex fields.
 
-### Coupling
-Electrical power can limit avionics, pumps and actuators. Hydraulic pressure limits controls, brakes and gear. Fuel transfer changes CG and engine feed. Bleed air affects pressurization/anti-ice when applicable. Icing and temperature affect performance. Damage cascades only through explicit dependencies, not unrelated random penalties.
+Do not create independent random turbulence for every surface. Nearby surfaces and nearby aircraft must sample correlated air motion from the same underlying field.
 
-## Test gates
-Unit/dimensional and frame tests; trimmed level flight; steady turns; stall entry/recovery; compressibility; control saturation; engine spool/start/failure/fuel burn; takeoff/landing/bounce/braking; gear failures; store release/asymmetry/CG; deterministic replay across frame rates; many-aircraft performance.
+## Surface airflow contract
+For each aerodynamic element at body offset r, calculate local rigid-body velocity contribution using angular velocity cross r. Transform to world coordinates, subtract the local air velocity to obtain air-relative flow, then include only physically justified induced-flow contributions. Derive local dynamic pressure, AoA, sideslip and supported Mach/Reynolds values.
 
-## Implementation order
-1. Units, frames, simulation clock and 6-DoF state.
-2. Rigid-body integration, gravity and force interfaces.
-3. Atmosphere and air-relative flow.
-4. One test airframe with documented coefficients.
-5. Lift/drag/moments and trim validation.
-6. Per-surface flow, actuators and nonlinear stall.
-7. Engine spool/thrust/fuel and installation.
-8. Gear, ground handling and stores.
-9. Electrical/hydraulic/fuel/oxygen/pressurization coupling.
-10. Damage, failures, cockpit instruments and AI controls.
-11. Additional aircraft/variants and higher fidelity.
-12. Profiling, replay and regression suite.
+Wing panels, horizontal tail, vertical tail, control surfaces and other lifting surfaces need separate local conditions. Model downwash/sidewash and interference. Surface loads are integrated into aircraft force/moment totals at the appropriate reference point.
 
-At every stage state what works, what is approximate, sources, tests and unsupported behavior. A cockpit mesh or animation is not a completed subsystem.
+## Aerodynamic model
+Use aircraft-specific geometry and coefficient data. Define lift/drag/moment coefficient maps across AoA, sideslip, Mach, control deflection and configuration. Include validity envelope, provenance, uncertainty, interpolation and extrapolation behavior. Implement nonlinear stall/separation and post-stall response only to the fidelity supported by the data. No binary stall toggle or arbitrary speed-based lift multiplier.
+
+Add unsteady behavior (lag, dynamic stall, hysteresis) as explicit stateful models with validation, not decorative random oscillation. Include compressibility and transonic effects with clear applicability limits.
+
+## Wake and vortex model
+Aircraft emit wake from a documented lift/circulation estimate. Represent wake as a sparse set of vortex elements/segments or another validated reduced-order model. Wake is convected by aircraft motion and ambient wind, evolves/decays with age and atmospheric conditions, and is queried at receiving aircraft surface locations. The receiving aircraft experiences induced velocity; its own aero solver produces forces and response. Include spatial indexing, maximum element count, core radius, decay and deterministic ordering. Never script a random upset.
+
+## Solver architecture and performance
+Use a hybrid reduced-order model rather than full-world CFD:
+- Analytic/layered atmospheric fields.
+- Surface/panel/strip aerodynamic evaluation.
+- Induced-flow and vortex approximations.
+- Stateful unsteady models where justified.
+- Sparse wake fields with bounded lifetime and spatial queries.
+- Optional expensive research/test-lab models behind explicit fidelity settings.
+
+Document update rate, accuracy, spatial scope, memory/performance budget and degradation policy for each model. The player aircraft must not silently downgrade to arcade behavior. Distant AI can use lower update rates only if state transitions remain physically coherent and validated.
+
+## Aircraft-specific PFM package
+For each aircraft variant provide geometry, mass/CG/inertia, aerodynamic datasets, control surface geometry, flight-control architecture, engine model/installation, stores, damage, system dependencies and cockpit instrumentation. Do not assume F-16 and MiG-29 share aerodynamic curves or control laws. Different blocks/variants can differ.
+
+## Validation required before calling it PFM
+- Atmosphere reference profiles and continuity.
+- Air-relative flow and wind shear.
+- Surface local-flow and angular-rate checks.
+- Trim and stability across speed/altitude/configuration.
+- Lift/drag/moment data comparison.
+- Climb, acceleration, turn and energy performance.
+- Stall/departure/recovery within known data envelope.
+- Engine transients and control response.
+- Ground effect, landing and crosswind.
+- Stores, fuel burn, CG and asymmetric damage.
+- Wake encounter and formation tests.
+- Deterministic replay, timestep convergence and stress profiling.
+
+Keep a per-aircraft validation matrix. Mark every result as measured, sourced, estimated or synthetic. Unknown data must remain unknown rather than be filled with false precision.
+
+## Suggested implementation stages
+1. Contracts and atmosphere.
+2. 6-DoF state/integration.
+3. One test aircraft and surface-level aerodynamics.
+4. Engine/control/aircraft systems coupling.
+5. Weather, turbulence, terrain flow and wake.
+6. Aircraft-specific tuning and validation.
+7. More aircraft and optimized multirate execution.
+
+At each stage report code actually implemented, tests run, data sources, limitations and next blockers. Do not add placeholder code that merely looks sophisticated.
