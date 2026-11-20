@@ -2,7 +2,7 @@
 
 **Internal baseline:** single-seat product 9.13; the folder label MiG-29A is for repository organization only. **Status:** research outline, with important applicability gaps; no functional aircraft system runtime exists.
 
-The GAF flight manual below is a detailed source for a Luftwaffe-operated MiG-29 installation, but its cover/title does not identify the selected product 9.13 clearly enough to treat every value and circuit detail as authoritative for the enlarged-spine aircraft. Use it as an architecture reference and mark all transfer to product 9.13 provisional until supported by exact 9.13 documentation.
+The [GAF T.O. 1F-MIG29-1 flight manual](https://www.airwar.ru/other/manuals/%5Baviation%5D%20-%20%5Bmanuals%5D%20-%20MiG-29%20Flight%20Manual.pdf), dated 30 September 1994 with Change 4 dated 20 September 2001, is a detailed source for a Luftwaffe-operated MiG-29 installation. Its cover/title does not identify the selected product 9.13 clearly enough to treat every circuit detail as authoritative for the enlarged-spine aircraft. Use it as a source-described architecture reference and mark all transfer to product 9.13 provisional until supported by exact 9.13 documentation. This is an online mirror, not a repository-owned controlled publication.
 
 ## Focused guides
 
@@ -11,7 +11,7 @@ The GAF flight manual below is a detailed source for a Luftwaffe-operated MiG-29
 - [Pneumatic stored-gas systems](pneumatics.md)
 - [Auxiliary, environmental and cooling interfaces](auxiliary-environmental.md)
 
-## Distinctive system composition described in GAF T.O. 1F-MIG29-1
+## Distinctive system composition described in the GAF manual
 
 The source describes a different arrangement from the F-16:
 - One primary three-phase AC generator with a hydrodynamic constant-speed drive, one DC generator, a PTO DC/AC converter, two silver-zinc batteries and a distribution network.
