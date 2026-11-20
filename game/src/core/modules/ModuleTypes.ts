@@ -12,6 +12,7 @@ export interface RequiredModuleDependency {
   readonly versionRange: string;
   readonly optional: false;
   readonly providerModuleId?: string;
+  readonly degradedBehavior?: never;
 }
 export interface OptionalModuleDependency {
   readonly capabilityId: string;
