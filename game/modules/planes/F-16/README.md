@@ -32,4 +32,6 @@ The selected Block 50/GE fit must be verified independently from manuals coverin
 
 ## Acceptance
 
+The detailed aircraft acceptance suite is [F-16C Block 50 first vertical slice](../../../tests/acceptance/F16-first-vertical-slice.md), including electrical source transfer/load shedding, dedicated FLCS power, A/B hydraulic circuit failure, accumulators, coupled EPU output and pneumatic emergency gear extension.
+
 No aircraft handling multiplier. Fuel/stores alter mass properties; hydraulic/electrical/cooling loss follows connected topology; sensors obey signal/observation contracts; cockpit controls real systems; each dataset has exact applicability and source uncertainty. Unknowns stay unknown.
