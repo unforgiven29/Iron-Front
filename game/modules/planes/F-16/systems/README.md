@@ -10,6 +10,10 @@ These guides define the installation boundary for this exact aircraft package. T
 - [Hydraulic circuits and flight-control/utility supply](hydraulics.md)
 - [Pneumatic and emergency gear functions](pneumatics.md)
 
+## Acceptance suite
+
+See [F-16C Block 50 first vertical-slice acceptance](../../../../tests/acceptance/F16-first-vertical-slice.md) for the detailed system, backup, failure, indication and cross-domain scenarios.
+
 ## Integration map
 
 The aircraft installation must connect these domains as a causal network:
