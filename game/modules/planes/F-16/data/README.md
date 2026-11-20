@@ -1,7 +1,15 @@
-# F-16 variant data
+# F-16C Block 50 variant data
 
-This directory owns machine-readable, variant-applicable F-16C Block 50 configuration and technical parameter records. Shared engines and algorithms do not belong here.
+**Owner:** this directory owns machine-readable F-16C Block 50 variant/equipment parameter records. It does not own shared algorithms or runtime state. **Status:** selected baseline and research indexes exist; this is not yet a complete validated parameter database.
 
-Before adding values, use the common technical-parameter schema and provenance workflow; record exact block/operator/date/equipment/software applicability; use SI units and named frames; distinguish sourced, measured, estimated, synthetic, gameplay-tuned and unknown values; include uncertainty and validity envelopes; never silently mix Block 40/42/52 or export configurations.
+## Data classes
+Variant metadata and exact applicability; geometry/datum; structural reference dimensions; mass/CG/inertia and mass contributions; aero tables and validity envelopes; engine fit; system topology/configuration; equipment and software fit; stores and attachment transforms. Separate exact Block 50 from Block 52, export, modernization and software baselines.
 
-The selected baseline is F-16C Block 50. Refer to docs/variant-baseline.md and docs/technical-data-ingestion/README.md. This folder is not yet a complete or validated parameter database.
+## Parameter record rules
+Use common technical-parameter schema. Record stable parameter ID/name, numeric value or explicit unknown, SI unit, platform/block/operator/equipment/software/date applicability, source document/revision/page/table/figure, source units, conversion/derivation, confidence/uncertainty/range and review status. Sourced/derived/estimated/synthetic/gameplay-tuned/unknown remain distinct.
+
+## Prohibited shortcuts
+Do not derive detailed aero/engine/radar maps from one headline performance number. Do not silently inherit data from another block. Do not use a visual model as authoritative dimensions or mass. Never invent precise classified/undocumented values.
+
+## Review and validation
+Cross-check independent sources where possible, identify conflicts, attach exact conditions and define operating envelope. Validate unit/range/cross-field consistency and regression cases before data is consumed by runtime.

@@ -1,13 +1,7 @@
-# RWR — aircraft installation
+# MiG-29 product 9.13 RWR installation
 
-MiG-29 product 9.13-specific RWR installation and source caveats. Keep exact equipment designation provisional until verified; store antenna placement, receiver/configuration, library, power, controls and cockpit mapping here. Shared processing remains in sensors/RWR.
+Own installation/configuration for the selected aircraft, not shared RWR algorithms. Exact RWR designation remains provisional where public sources conflict (L006LM/SPO-15LM nomenclature and fit must not be asserted without evidence).
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+Record antenna count/location/orientation, aperture pattern, receiver frequency/band/sensitivity, channel/scan behavior, direction finding, processor/library/software revision, display/audio/warning logic, power/cooling, control/BIT, damage and cockpit mapping. Unknown capabilities remain unknown.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+The shared RWR consumes actual received emissions through RF propagation and receiver processing; it must not query N019 target tracks, lock flags or campaign state. Validate fit uncertainty, antenna bearing, overlapping/intermittent emitters, warning ambiguity, power loss, damage and library confidence.

@@ -1,13 +1,12 @@
-# radar — aircraft installation
+# MiG-29 product 9.13 radar installation
 
-MiG-29 product 9.13 radar fit and installation data for the N019 family baseline, with explicit variant and upgrade caveats. Shared radar simulation remains in sensors/Radar and physics/radar.
+**Working equipment family:** N019/RLPK-29 for product 9.13, with exact radar hardware/software and operator baseline requiring source confirmation. This directory owns the aircraft-specific fit/installation only. Shared simulation lives in sensors/Radar and physics/radar.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+## Required installation data
+Antenna geometry/boresight, mounting frame, gimbal/mechanical scan limits, stabilization/navigation inputs, operating modes, receiver/transmitter hardware revision, cockpit control/display interfaces, power/cooling, BIT/startup, maintenance and damage paths. Label every capability as confirmed, provisional or unknown.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+## Variant separation
+Do not transfer MiG-29S 9.13S N019M/TWS2/R-77 or later MiG-29M/SMT capabilities into product 9.13 without evidence. Generic N019 family resemblance is not sufficient to assume software/mode parity.
+
+## Integration and tests
+Commands from avionics; uncertain reports to cockpit/fusion; actual resource grants; shared physical RF chain. Test configuration, stabilization, power/cooling, mode/control mapping, startup, aperture/antenna damage and no hidden-world target input.
