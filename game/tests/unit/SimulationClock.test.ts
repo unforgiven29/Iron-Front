@@ -12,7 +12,11 @@ describe("SimulationClock", () => {
   });
 
   it("preserves catch-up backlog when the per-frame cap is reached", () => {
-    const clock = new SimulationClock({ stepSeconds: 0.1, maxStepsPerFrame: 2 });
+    const clock = new SimulationClock({
+      stepSeconds: 0.1,
+      maxFrameDeltaSeconds: 0.5,
+      maxStepsPerFrame: 2
+    });
     const first = clock.advanceFrame(0.5);
 
     expect(first.stepsExecuted).toBe(2);
