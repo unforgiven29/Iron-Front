@@ -27,8 +27,10 @@ For each equipment/system item include stable component ID, manufacturer/type wh
 
 Required records include generator and drive source details; bus/branch single-line diagram; contactors and protection; battery and FLCS dedicated power branches; pump models, reservoirs, circuit/return-line diagram and pressure/flow characteristics; accumulator type/precharge; actuator port map; EPU source/trigger/outputs/endurance; emergency gear deployment sequence; and load-shed priorities.
 
-## Source discipline
+## Source documents and applicability
 
-The HAF F-16C/D Block 50 and 52+ flight manual (T.O. GR1F16CJ1, 15 October 2002 with Change 1 dated 15 June 2003) describes a two-system 3000-psi hydraulic installation, A/B consumer split, FLCS accumulators, brake/JFS accumulators, pneumatic landing-gear extension and an EPU that supplies emergency electricity and System A hydraulic pressure. It is a strong architecture reference, but it spans Blocks 50/52+ and must not automatically be treated as exact proof of every value or accessory detail for the selected GE-powered Block 50. Verify exact applicability against the aircraft's engine fit and operator configuration before making values authoritative.
+- [HAF T.O. GR1F16CJ1 — F-16C/D Flight Manual, Blocks 50 and 52+](https://studylib.net/doc/26036763/block-50), dated 15 October 2002, Change 1 dated 15 June 2003. This is an online mirror, not a repository-owned controlled publication.
+- The cited manual describes a two-system 3000-psi hydraulic installation, A/B consumer split, FLCS accumulators, brake/JFS accumulators, pneumatic landing-gear extension and an EPU that supplies emergency electricity and System A hydraulic pressure. It is a strong architecture reference, but it spans Blocks 50/52+ and must not automatically be treated as exact proof of every value or accessory detail for the selected GE-powered Block 50.
+- Verify exact applicability against the aircraft's engine fit, operator configuration and source revision before making ratings, wiring, pump part numbers or load tables authoritative.
 
 No system rating or bus assignment should be silently inherited from an F-16A, Block 40/42, Block 52, export modification or later modernization.
