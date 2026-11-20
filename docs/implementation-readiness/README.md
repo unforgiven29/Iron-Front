@@ -15,7 +15,8 @@ This gate separates a repository that is organized from one that is safe to exte
 - [x] CI run green on main using the committed lockfile (lint, type, schema, unit, build and browser smoke checks).
 - [ ] Repository Pages setting changed to Settings > Pages > Source > GitHub Actions and deployment verified.
 - [ ] Renderer comparison prototype measured and ADR accepted.
-- [ ] Stage 0.5 foundation hardening changes merged and CI-verified.\n- [ ] Stage 1 module registry and dependency resolver implemented and tested.
+- [ ] Stage 0.5 foundation hardening changes merged and CI-verified.
+- [ ] Stage 1 module registry and dependency resolver implemented and tested.
 
 ## What Claude may start
 
