@@ -1,14 +1,11 @@
-# electrical
+# Electrical generation, distribution and loads
 
-Electrical buses, generators, batteries, breakers, consumers, voltage/current limits, priority allocation, transients and faults.
+**Owner:** game/systems/electrical. **Status:** architecture only; no network solver.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Platform packages provide generators, batteries, buses, breakers, contactors, converters, wiring topology and consumer connections. This system owns electrical state and distribution; core/resources arbitrates typed offers/demands; consumers own their response.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Track voltage/current/power/energy, source state, bus topology, line loss/resistance where supported, transient response, protection and thermal constraints. Do not replace electrical behavior with a powered boolean. Loads include engine controls, avionics, radar, RWR, displays, pumps, actuators, lights and environmental systems. Each declares demand, priority and minimum viable supply.
+
+Failures: generator trip, battery depletion, bus short, breaker trip, converter failure, wiring damage, overload and intermittent connection. Backup/source transfer is platform-specific; never invent universal redundancy. Publish bus/source state, actual delivered/denied loads, faults and reason.
+
+Validate load/capacity accounting, voltage sag, source transfer, battery discharge, breaker trip/reset, essential load priority, connected-only fault propagation and topology-specific redundancy.

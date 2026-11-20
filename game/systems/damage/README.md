@@ -1,14 +1,11 @@
-# damage
+# Damage state, propagation and repair interfaces
 
-Shared damage propagation, component health, failure effects and repair state. Each platform supplies its own damage zones and dependency graph.
+**Owner:** game/systems/damage for generic component damage state/orchestration. physics/armour and ballistics evaluate impacts; platform packages define zones/routing; crew and campaign own their records. **Status:** architecture only.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+An impact/effect report is not a vehicle-wide health percentage. Use platform geometry to map location/effect to structural zones, components, lines, buses, controls, sensors, crew spaces and fuel/ammunition. Track component health/degradation, functional state, damage type/severity, location/time, repairability, leak/fire/short/structural state and uncertainty.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Propagate only through connected dependency paths: hydraulic leak reduces supplied actuators; bus damage affects connected consumers; fuel leak affects inventory/feed/fire risk; sensor aperture damage changes pattern/coverage; structure/control-surface damage alters aero. Do not disable unrelated components.
+
+Repair consumes time, skill, spare parts, tools, safe conditions and maintenance policy. Partial field repair may restore limited capability but not original calibration/strength.
+
+Validate zone mapping, connected-only cascades, fault isolation, leaks/fire, repair eligibility/partial repair, uncertainty and save/replay.
