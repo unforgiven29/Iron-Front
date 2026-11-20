@@ -1,14 +1,7 @@
-# infantry
+# Infantry module architecture
 
-Infantry and squad modules with configurable equipment, movement, posture, load, morale, injury and behaviour. Use shared entity, collision, damage and AI contracts.
+Infantry are independent entities with equipment, movement, posture, health, suppression, morale, training/behavior profiles, team relationships and limited perception. Equipment/weapons are data-driven; shared ballistics, collision, damage and world queries remain shared services.
 
-## Claude implementation rules
-- Treat this as a replaceable module boundary, not a second copy of a shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Mark unknown or estimated technical values with provenance. Never invent authoritative specifications.
-- Include normal, degraded, failed and boundary validation cases when implementation begins.
+AI uses observations, orders, communications and local knowledge—not hidden enemy positions. Model incapacitation, casualty care, evacuation, surrender/retreat and civilian interaction as explicit states/events. Visual animation is separate from authoritative movement/health.
 
-**Status:** Architecture/documentation only. This README does not claim that runtime code or validated data exists.
+**Status:** Architecture and folder documentation only.

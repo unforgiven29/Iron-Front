@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iron-front.local/schemas/technical-parameter.schema.json",
+  "title": "Iron-Front Technical Parameter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "status", "applicability", "provenance"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["publicly-sourced", "measured", "estimated", "synthetic", "gameplay-tuned", "unknown"] },
+    "value": { "type": ["number", "string", "null"] },
+    "unit": { "type": ["string", "null"] },
+    "uncertainty": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["absolute", "relative", "range", "standard-deviation", "covariance", "qualitative"] },
+        "value": {},
+        "lower": { "type": "number" },
+        "upper": { "type": "number" },
+        "notes": { "type": "string" }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "required": ["platform"],
+      "properties": {
+        "platform": { "type": "string" },
+        "variant": { "type": "string" },
+        "equipment": { "type": "string" },
+        "software": { "type": "string" },
+        "operator": { "type": "string" },
+        "dateRange": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["sourceType"],
+      "properties": {
+        "sourceType": { "enum": ["document", "measurement", "derived", "estimate", "synthetic", "unknown"] },
+        "title": { "type": "string" },
+        "publisher": { "type": "string" },
+        "revision": { "type": "string" },
+        "date": { "type": "string" },
+        "page": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "method": { "type": "string" },
+        "assumptions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "reviewStatus": { "enum": ["unreviewed", "needs-source", "reviewed", "disputed"] },
+    "notes": { "type": "string" }
+  },
+  "allOf": [{
+    "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
+    "then": { "properties": { "value": { "type": "null" } } }
+  }]
+}

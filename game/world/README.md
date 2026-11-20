@@ -1,14 +1,24 @@
-# world
+# World and environment architecture
 
-World data and services: terrain, biomes, structures, vegetation, airfields, sea and scenario weather. Keep world truth separate from rendering and sensor observations.
+The world owns authoritative spatial truth: terrain elevation/surface properties, water, vegetation, structures, infrastructure, airfields and world-object placement. It does not own rendering, sensor detection or campaign rules.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+## Canonical ownership
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+- Terrain: elevation, slope, material, roughness, friction and collision/LOS representations.
+- Structures: buildings, bridges, shelters, obstacles, destructible state and damage interfaces.
+- Vegetation: species/instances, collision/occlusion proxies, density and biome/season variation.
+- Infrastructure: roads, rail, bridges, airfields, ports, fuel/power facilities and communications sites.
+- Water: coastlines, lakes, rivers, sea regions and relevant surface data.
+- Streaming: spatial chunk identity, dependencies, load/unload lifecycle, LOD and memory budgets.
+
+Core spatial services provide transforms/indexes. Physics owns collision/propagation; world supplies geometry/material inputs. Sensors query physical services, never renderer visibility. Graphics renders world snapshots but does not own world truth.
+
+## Procedural generation and persistence
+
+Procedural placement uses versioned seeds, biome/terrain constraints, infrastructure rules and stable IDs. Generated content must be reproducible from scenario seed and generator version or explicitly serialized. Separate reusable templates from per-scenario changes.
+
+## Destruction and performance
+
+A structure/terrain change publishes an authoritative event and updated world state. Collision, LOS, radar/IR propagation, navigation, AI and rendering consume appropriate updated representations. Stream chunks by relevance, maintain bounded caches, use LOD/compact proxies and profile CPU/memory. Unloaded visual detail must not delete mission-critical state.
+
+**Status:** Architecture and folder structure only.

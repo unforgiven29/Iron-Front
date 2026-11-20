@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iron-front.local/schemas/measurement.schema.json",
+  "title": "Iron-Front Measurement or Observation",
+  "description": "Common envelope; domain schemas add their specific physical fields.",
+  "type": "object",
+  "required": ["measurementId", "sourceId", "acquisitionTick", "status", "value", "quality"],
+  "properties": {
+    "measurementId": { "type": "string" },
+    "sourceId": { "type": "string" },
+    "entityId": { "type": "string" },
+    "acquisitionTick": { "type": "integer", "minimum": 0 },
+    "publicationTick": { "type": "integer", "minimum": 0 },
+    "frameId": { "type": "string" },
+    "status": { "enum": ["valid", "stale", "invalid", "unavailable", "estimated", "unknown"] },
+    "value": {},
+    "unit": { "type": "string" },
+    "uncertainty": {},
+    "quality": {
+      "type": "object",
+      "required": ["confidence"],
+      "properties": {
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "flags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      }
+    },
+    "provenance": { "type": "object" }
+  },
+  "additionalProperties": true
+}

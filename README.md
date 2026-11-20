@@ -4,39 +4,50 @@ A browser-based combined-arms campaign and combat simulation built with JavaScri
 
 ## Architecture status
 
-The repository contains an evolving code skeleton, subsystem architecture documentation and placeholder directories. A guide or folder does not mean its runtime system is implemented or validated. Check implementation reports and tests before assuming a capability is functional.
+The repository contains an evolving code skeleton, subsystem architecture documentation and placeholder directories. A guide or folder does not mean its runtime system is implemented or validated.
 
-## Integrated simulation
-- Integrated simulation architecture: docs/integrated-simulation/README.md
-- Claude: integrate all systems: docs/integrated-simulation/CLAUDE_IMPLEMENTATION_GUIDE.md
-- Core systems architecture: docs/core-systems/README.md
-- Core implementation guide: docs/core-systems/CLAUDE_IMPLEMENTATION_GUIDE.md
+## Start here: architecture authority
 
-## Aircraft and flight
-- Aircraft module architecture: game/modules/planes/README.md
-- Claude: modular aircraft fleet: game/modules/planes/CLAUDE_IMPLEMENTATION_GUIDE.md
-- F-16 module: game/modules/planes/F-16/README.md
-- Claude: implement F-16: game/modules/planes/F-16/CLAUDE_IMPLEMENTATION_GUIDE.md
-- Professional flight model: docs/flight-model/README.md
-- Flight model implementation guide: docs/flight-model/CLAUDE_IMPLEMENTATION_GUIDE.md
-- Propulsion and engine architecture: docs/propulsion/README.md
-- Engine implementation guide: docs/propulsion/CLAUDE_IMPLEMENTATION_GUIDE.md
+- Architecture overview: docs/ARCHITECTURE_OVERVIEW.md
+- Module system and dependency rules: docs/module-system/README.md
+- Integration contracts and update order: docs/integration-contracts/README.md
+- Data, units, coordinate frames and provenance: docs/data-standards/README.md
+- Testing and validation: docs/testing-and-validation/README.md
+- Architecture decisions: docs/architecture-decisions/README.md
+- Asset pipeline: docs/assets-and-pipeline/README.md
+- Browser/deployment constraints: docs/platform-constraints/README.md
 
-## Sensors
-- Sensor suite architecture: docs/sensors/README.md
-- Sensor implementation guide: docs/sensors/CLAUDE_IMPLEMENTATION_GUIDE.md
-- Radar architecture: docs/radar/README.md
-- Radar implementation guide: docs/radar/CLAUDE_IMPLEMENTATION_GUIDE.md
-- **RWR/ESM architecture:** sensors/RWR/README.md
-- **RWR/ESM implementation guide:** sensors/RWR/CLAUDE_IMPLEMENTATION_GUIDE.md
-- **RWR validation and data standard:** docs/sensors/RWR_VALIDATION_AND_DATA_STANDARD.md
-- IRST architecture: docs/irst/README.md
-- IRST implementation guide: docs/irst/CLAUDE_IMPLEMENTATION_GUIDE.md
+Read these before creating a new subsystem or changing ownership.
 
-## Graphics
-- Graphics engine architecture: docs/graphics-engine/README.md
-- Graphics implementation guide: docs/graphics-engine/CLAUDE_IMPLEMENTATION_GUIDE.md
+## Main subsystem guides
 
-## Technology and deployment
+- Integrated simulation: docs/integrated-simulation/README.md
+- Core systems: docs/core-systems/README.md
+- Aircraft modules: game/modules/planes/README.md
+- F-16C Block 50: game/modules/planes/F-16/README.md
+- MiG-29 product 9.13: game/modules/planes/MiG-29A/README.md
+- Flight model: docs/flight-model/README.md
+- Propulsion: docs/propulsion/README.md
+- Radar: docs/radar/README.md
+- RWR/ESM: sensors/RWR/README.md
+- IRST: docs/irst/README.md
+- Weapons: game/modules/weapons/README.md
+- Ground units: game/modules/ground-units/README.md
+- Infantry: game/modules/infantry/README.md
+- Naval units: game/modules/naval-units/README.md
+- World: game/world/README.md
+- Graphics engine: docs/graphics-engine/README.md
 
-Use TypeScript for new simulation contracts and core logic where practical, interoperate with existing JavaScript, and use HTML5 for the browser shell/UI. Keep the application deployable as static assets on GitHub Pages. Static hosting does not provide a persistent authoritative multiplayer backend.
+## Non-negotiable rules
+
+- One shared engine per reusable capability; platform differences live in configuration and adapters.
+- Modules declare capabilities and dependencies in manifests. Shared code must not branch on aircraft/faction/weapon names.
+- Shared services own simulation time, physics, resource allocation, world queries and persistence contracts.
+- Definitions, configuration, mutable runtime state, observations, diagnostics and presentation are separate.
+- Cross-module communication uses typed contracts, commands, events, resource interfaces and immutable snapshots.
+- Technical data has units, applicability, provenance and uncertainty.
+- A module is not complete until contract, integration, regression and performance tests pass.
+
+The target is HTML5/JavaScript/TypeScript and static GitHub Pages hosting. Static hosting does not provide persistent authoritative multiplayer; that requires an external backend.
+
+**Documentation and folder structure are not proof of runtime implementation.**

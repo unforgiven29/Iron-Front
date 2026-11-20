@@ -1,14 +1,3 @@
-# artillery
+# Artillery modules
 
-Artillery platform modules, fire-control equipment, ammunition compatibility, emplacement and mobility configuration.
-
-## Module requirements
-- Provide a versioned manifest and schema-validated configuration for each concrete variant.
-- Keep content data separate from shared algorithms and mutable runtime state.
-- Declare dependencies, capabilities, coordinate frames, units, lifecycle and failure outputs.
-- Use shared physics/sensor/resource/damage services through explicit contracts.
-- Avoid hardcoded vehicle names, faction branches and duplicated solvers.
-- Record sources, confidence and uncertainty for technical values.
-- Include integration and negative tests when runtime implementation begins.
-
-**Status:** Folder and handoff documentation only.
+Owns platform configuration, weapon/tube geometry, crew, ammunition handling, fire-control inputs, traverse/elevation limits, mobility, communications and damage. Ballistic trajectories/projectile effects use shared physics; target coordinates arrive through observation/fire-control contracts.
