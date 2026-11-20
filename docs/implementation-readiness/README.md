@@ -11,7 +11,7 @@ This gate separates a repository that is organized from one that is safe to exte
 - [x] CI and GitHub Pages workflows committed.
 - [x] Units, frames, quaternion and timestep conventions defined.
 - [x] First F-16 vertical-slice acceptance suite documented.
-- [ ] First successful npm install and generated package-lock.json committed.
+- [x] package-lock.json generated on GitHub Actions and committed; clean installs use npm ci.
 - [ ] CI run green on main.
 - [ ] Repository Pages setting changed to Settings > Pages > Source > GitHub Actions and deployment verified.
 - [ ] Renderer comparison prototype measured and ADR accepted.

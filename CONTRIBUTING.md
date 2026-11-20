@@ -3,16 +3,25 @@
 ## Requirements
 
 - Node.js 22.13 or newer (Node 22 LTS recommended).
-- npm 10 or compatible.
+- npm 10.9.9 (the version recorded by package.json).
 - Git.
 
 ## Setup
 
-Run `npm install`, then `npm run check`, then `npm run dev`.
+```bash
+npm ci
+npm run check
+npm run dev
+```
 
-For browser tests, run `npx playwright install chromium` followed by `npm run test:e2e`.
+For browser tests:
 
-The first successful `npm install` generates `package-lock.json`. Commit that file with dependency changes so CI and other developers use the same dependency graph. Direct dependencies are pinned to exact versions in package.json; do not use floating latest versions.
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+The committed `package-lock.json` is the authoritative dependency graph. Use `npm ci` for clean installs. When adding or changing a dependency, use an exact version (for example `npm install --save-exact package-name@1.2.3`), commit both package.json and package-lock.json, and verify a clean `npm ci`.
 
 ## Changes
 
@@ -26,4 +35,4 @@ The first successful `npm install` generates `package-lock.json`. Commit that fi
 
 ## Required checks
 
-`npm run check` must pass before a change is considered ready. Browser-facing changes should also pass `npm run test:e2e`. GitHub Actions runs CI and publishes the static site from `main`.
+`npm run check` must pass before a change is considered ready. Browser-facing changes should also pass `npm run test:e2e`. GitHub Actions runs CI and builds the static site from `main`.

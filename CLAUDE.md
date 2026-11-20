@@ -63,7 +63,8 @@ The first implementation objective is the F-16C Block 50 vertical slice describe
 
 ## Commands
 
-- `npm install` — install exact direct dependency versions; commit the generated package-lock.json as soon as dependency resolution is available.
+- `npm ci` — clean, reproducible install from the committed package-lock.json.
+- `npm install --save-exact package@version` — add/update an exact dependency; commit package.json and package-lock.json together.
 - `npm run dev` — local browser development server.
 - `npm run check` — lint, schema validation, unit tests and production build.
 - `npm run test:e2e` — browser smoke tests (requires Playwright Chromium installed).
