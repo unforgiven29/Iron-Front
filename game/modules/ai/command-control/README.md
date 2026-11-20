@@ -1,12 +1,7 @@
-# command control
+# Command hierarchy, GCI and AWACS
 
-Command hierarchy, orders, reporting, GCI/AWACS and decision interfaces. Campaign policy remains outside shared AI runtime.
+Own order hierarchy, task allocation, reporting relationships and command-picture policy. Sensor owns detections; comms owns transport; campaign owns strategic rules. GCI/AWACS is not global perfect radar.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Report chain: sensor observation → local report → transport → age/correlation at command node → controller decision/order → delivery/acknowledgment → agent action. Preserve direct versus remote/fused provenance, delay, quality and authority.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Radar/node destruction, jamming, controller workload, link loss and stale tracks degrade control. Define alternate command/autonomy policy; never give units updated hidden truth after communication loss. Test latency, out-of-order reports, authorization, controller capacity, node loss and disconnected autonomy.

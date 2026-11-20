@@ -1,38 +1,11 @@
-# Propulsion
+# Propulsion and engine-family models
 
-**Status: placeholder source structure plus design documentation. No engine thermodynamic solver is implemented yet.**
+**Owner:** physics/propulsion. **Status:** folders/documentation only; no thermodynamic engine solver exists.
 
-Propulsion models must produce thrust, torque/power, fuel demand, thermal state, pressures, operating limits and failures from dynamic engine state. Throttle is a command, not instantaneous thrust. Different engine families must use distinct physical models and aircraft-specific data.
+Model dynamic propulsion families: turbojet, low/high-bypass turbofan, afterburning turbofan, piston, turboprop, turboshaft and rocket motor as applicable. Shared interfaces do not justify one generic curve with family multipliers.
 
-Read:
-- [Propulsion architecture](../../docs/propulsion/README.md)
-- [Claude implementation guide](../../docs/propulsion/CLAUDE_IMPLEMENTATION_GUIDE.md)
-- [Professional flight model integration](../../docs/flight-model/README.md)
+Inputs: throttle/control request, ambient state, inlet recovery/distortion, spool state, fuel grant/pressure/flow, accessory load, nozzle/afterburner configuration and health. Outputs: thrust vector, fuel demand, spool transient, temperatures, pressures, mass flow, exhaust/thermal state, torque/accessory power, limits and faults.
 
-## Folder responsibilities
+Capture transient spool inertia/rate limits, corrected maps, inlet/nozzle installation, combustion/reheat, altitude/Mach lapse, start/stop/relight, thermal limits and failures only to a validated tier. Aircraft provides exact engine fit, installation, control mapping and source data. Fuel inventory is owned by game/systems/fuel; rigidbody integrates thrust.
 
-| Area | Responsibility |
-|---|---|
-| engine-families | Family-specific turbojet, turbofan, piston, turboprop and turboshaft behavior |
-| spool-dynamics | Rotating spool inertia, acceleration/deceleration and transient response |
-| thrust-maps | Engine-specific performance maps and environmental lapse |
-| combustion | Fuel-air energy addition, efficiency, pressure loss and flame stability abstractions |
-| inlets | Inlet recovery, distortion and aircraft-installation effects |
-| nozzles | Fixed/variable nozzle area, expansion and thrust-vector installation |
-| afterburner | Reheat fuel scheduling, light-off, staging, limits and failure |
-| fuel-flow | Engine fuel metering/demand interface; tank ownership remains with the fuel system |
-| startup-shutdown | Start sequencing, ignition, starter, stabilization, shutdown and relight |
-| thermal-limits | Component temperatures, pressure limits, transient exceedances and cooling |
-| failures | Surge/stall, flameout, fire, damage, wear, sensor/actuator and control faults |
-| propellers | Propeller aerodynamic/load and governor interfaces for applicable engines |
-| data | Engine designation, variant, maps, source provenance and uncertainty |
-| validation | Reference cases, transient tests, boundary tests and performance profiles |
-
-## Non-negotiable boundaries
-
-- Engine models do not set aircraft velocity or own aircraft fuel tanks.
-- Engine force/moment outputs are consumed by the rigid-body solver.
-- Atmosphere supplies ambient conditions; engine installation handles inlet/nozzle effects.
-- Aircraft variants select exact engine fit, controls, limits and cockpit instruments.
-- Graphics and audio visualize engine state but never determine thrust or failure.
-- Do not use one generic thrust curve for every engine family or aircraft.
+Validate steady and transient maps, altitude/Mach trends, start/shutdown/relight, afterburner stages, starvation, inlet fault, thermal limits, damage and replay. Unknown/classified values remain unknown.

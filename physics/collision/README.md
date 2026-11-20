@@ -1,14 +1,11 @@
-# collision
+# Collision detection and contact response
 
-Shared collision queries and contact response for aircraft, ground units, infantry, structures and terrain.
+**Owner:** physics/collision. **Status:** architecture only; no runtime solver exists.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Provide broad-phase candidate queries and narrow-phase contact results for aircraft, vehicles, infantry, structures, terrain, projectiles and debris. Do not own world geometry, mobility suspension, damage rules or visual culling.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Use validated collision proxies: spheres, capsules, OBBs, convex hulls, heightfields or swept volumes as needed. High-speed projectiles require swept tests to avoid tunneling. Contact output includes point, normal, separation/penetration, relative velocity and time-of-impact when supported. Rigidbody/vehicle systems consume contact through their own integration contracts.
+
+Physical collision is not sensor LOS, radar blockage, optical visibility or blast occlusion; separate services/filters are required. Render LOD may not remove mission-critical collision proxies.
+
+Validate analytic primitive pairs, edge/corner cases, sweeps, moving pairs, terrain seams, filters, material response, stable pair ordering and performance.

@@ -1,14 +1,9 @@
-# optics
+# Optical path and visibility physics
 
-Shared optical propagation, visibility and attenuation for EO/FLIR/laser systems; never provide perfect target knowledge.
+**Owner:** physics/optics. **Status:** shared path-model design only; no EO/FLIR detector/detection engine.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Provide wavelength/band-dependent optical transmission and path effects for EO, FLIR, IRST and laser-related systems: absorption, scattering, aerosols, haze/fog, precipitation, smoke/dust, humidity and background where supported. World/physics supplies physical obstruction; renderer depth buffers are never the LOS authority.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Sensor owns aperture, optics, detector, processing and detection. Target signature source supplies uncertain radiance/contrast. This service returns path transmission/quality and limitations, not a target identity or detection.
+
+Validate clear-air limiting case, wavelength behavior, attenuation trends, weather bounds, terrain/structure obstruction, background contrast and deterministic repeatability.

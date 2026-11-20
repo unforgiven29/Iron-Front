@@ -1,7 +1,9 @@
-# Infantry module architecture
+# Infantry simulation modules
 
-Infantry are independent entities with equipment, movement, posture, health, suppression, morale, training/behavior profiles, team relationships and limited perception. Equipment/weapons are data-driven; shared ballistics, collision, damage and world queries remain shared services.
+Own dismounted individuals, squads, equipment profiles and infantry-specific behavior. Shared collision, ballistics, damage, optics/world queries, communications and AI infrastructure remain shared.
 
-AI uses observations, orders, communications and local knowledge—not hidden enemy positions. Model incapacitation, casualty care, evacuation, surrender/retreat and civilian interaction as explicit states/events. Visual animation is separate from authoritative movement/health.
+Individual state may include posture/movement, health/injury/incapacitation, equipment/load, ammo, morale/suppression, skill/training, fatigue and perception. Squad state includes cohesion, roles, formation/orders, leader succession, comms and casualty count. Avoid treating a squad as one omniscient point.
 
-**Status:** Architecture and folder documentation only.
+Movement respects terrain, cover, obstacles, posture and load. Perception uses view/hearing/LOS/contrast/report age. Combat results come from weapon/ballistic/damage services. Surrender, retreat, capture, wounds, medic treatment, evacuation and civilian interaction are explicit events—not score multipliers.
+
+Validate cover/obstacle movement, suppression, ammunition, casualty care, leader loss, communication loss, capture/retreat and no hidden enemy coordinates.

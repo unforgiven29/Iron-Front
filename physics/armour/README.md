@@ -1,5 +1,9 @@
-# Armour and terminal-effects physics
+# Armour interaction and terminal effects
 
-Shared models for projectile/warhead interaction with material layers and target structures. Platform modules supply geometry/material/armour layout; weapon modules supply projectile/warhead definitions. This service evaluates interaction and publishes damage inputs; it does not own vehicle internals.
+**Owner:** physics/armour. **Status:** architecture only; no penetration/terminal solver exists.
 
-Support documented approximation levels for impact angle, penetration/residual energy, ricochet, spall/behind-armour effects and blast/fragmentation. Do not invent classified armour values or imply exact finite-element simulation without it.
+Evaluate impact geometry and projectile/warhead interaction with a platform-supplied material/layer map. Inputs include impact location, velocity/energy, obliquity, projectile attitude, target normal, layer material/thickness/spacing and uncertainty. Outputs are structured penetration/residual-effect reports for shared damage service; this system does not own vehicle health, crew state or campaign casualty records.
+
+Separate penetration, non-penetrating damage, ricochet/deflection, projectile breakup, residual energy, spall/behind-armour effects and blast/fragmentation where supported. Each approximation tier states omissions and validity. Armor data must not be invented or made universal for an entire vehicle.
+
+Tests cover obliquity/material trends, layer order, energy accounting, residual effects, ricochet boundary, internal component exposure, uncertainty and sourced reference conditions.

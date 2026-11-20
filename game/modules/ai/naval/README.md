@@ -1,12 +1,7 @@
-# naval
+# Naval-domain AI behaviors
 
-Naval navigation, station keeping, formations and task behaviour modules.
+Own ship task/maneuver policy: route navigation, formation/station keeping, patrol, screen/escort, search, threat response, replenishment and carrier flight-deck coordination. Ship dynamics, propulsion, sensors, weapons and sea/water physics are separate owners.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Use radar/ESM/EO/datalink/visual reports and orders, preserving latency/uncertainty. Never access true submarine/aircraft positions. Vessel motion follows actual propulsion, water and rigid-body contracts; AI emits intent only.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Test formation, sensor/link loss, damage-limited steering/propulsion, replenishment constraints, port/grounding hazards and uncertain contacts.

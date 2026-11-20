@@ -1,11 +1,24 @@
-# Module registry and dependency resolution
+# Module registry and capability dependency resolver
 
-Intended owner for discovery and registration of versioned modules. This is a core service, not a location for aircraft/sensor-specific behavior.
+**Owner:** game/core/module-registry. **Status:** design only; no runtime loader/registry is implemented.
 
-Responsibilities: discover manifests; validate schema, stable IDs and versions; index capabilities/dependencies; resolve providers/version ranges; detect missing/duplicate/incompatible/cyclic dependencies; order initialization/teardown deterministically; construct through registered factories/dependency injection; track lifecycle states; expose dependency graph and useful diagnostics.
+## Responsibility
+Discover manifests, validate identity/schema/version, index capabilities, resolve compatible providers, build the dependency graph and coordinate lifecycle. The registry manages composition metadata, not domain behavior.
 
-Resolve by capability ID/API version, not display name, folder string or aircraft type. If multiple providers satisfy a capability, require explicit selection or a deterministic configured policy. Never silently substitute a failed radar/engine/equipment fit.
+## Resolution rules
+- Match capability ID and API version range; do not resolve by display name, aircraft name or folder path.
+- Honor an explicit providerModuleId.
+- Reject missing required providers, duplicates/conflicts, incompatible versions, self-dependencies and cycles before construction.
+- Multiple valid providers require explicit selection or a deterministic configured policy; never rely on filesystem enumeration order.
+- Optional absence produces the declared degraded behavior. Required absence blocks the dependent.
+- Never silently substitute another engine, radar or equipment fit.
+- Emit a graph and reason for every selected/rejected provider.
 
-Optional dependencies declare degraded behavior. Required dependency failure blocks the dependent module with a clear reason. Registry metadata does not expose or mutate private runtime state.
+## Lifecycle and factory safety
+States should distinguish discovered, validated, resolved, constructed, initializing, ready, degraded, failed and disposed. Factories are registered in an explicit catalog; do not dynamic-import arbitrary manifest paths. Initialization failure unwinds resources. No tick before ready and no publication after disposal.
 
-**Status:** Architecture only; no loader/registry implementation is claimed.
+## Tests
+Manifest schema errors, semantic-version boundaries, missing/incompatible/duplicate provider, dependency cycle, optional degradation, deterministic resolution, factory failure, partial initialization cleanup and two consumers using one capability.
+
+## First slice
+Compose two test modules through one API, then prove missing dependency and cycle rejection with actionable diagnostics.

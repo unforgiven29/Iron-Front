@@ -1,23 +1,15 @@
-# MiG-29 Product 9.13 Aircraft Module
+# MiG-29 product 9.13 — aircraft integration package
 
-**Status:** aircraft-specific architecture and implementation plan. This directory is the single-seat product 9.13 variant selected for Iron-Front; keep it distinct from 9.12, 9.13S, 9.13B, 9.13SE and later modernizations.
+**Internal identity:** single-seat product 9.13. Folder/display label MiG-29A must not cause 9.12, 9.13S, 9.13B, 9.13SE or later modernization data to be merged. **Status:** research/architecture only; no functional aircraft.
 
-Read the [MiG-29 product 9.13 technical reference library](docs/README.md) before implementing this module. It includes flight-model, N019/RLPK-29 radar, Beryoza RWR, optical sensors/EW, RD-33 propulsion, avionics, cockpit, airframe systems, weapons/stores, source and image references.
+## Baseline discipline
+Product 9.13 is the enlarged-spine aircraft selected for the second-platform proof. Do not import 9.13S N019M/TWS2/R-77 or later upgrades into plain 9.13 without evidence. DCS 9-12 material is contextual, not an exact plain-9.13 manual. Beryoza RWR designation/fit remains provisional where sources conflict.
 
-## Module ownership
+## Package owns
+Exact geometry/mass/CG/inertia including spine fuel; surface/aero data; control/stability augmentation and actuators; twin RD-33 installations; fuel/feed/transfer topology; electrical/hydraulic/cooling; gear/brakes; confirmed N019/RLPK-29 fit; provisional/confirmed RWR and optical equipment; avionics/cockpit/weapon-control; stores/hardpoints; damage routing, assets and sources.
 
-- `data/`: exact variant manifest, geometry, mass properties and provenance.
-- `aerodynamics/`: 9.13-specific surface layout and aero datasets; shared solver remains in `physics/aerodynamics/`.
-- `flight-controls/`: aircraft-specific control and stability-augmentation behavior.
-- `propulsion/`: twin RD-33 installation and independent engine configuration; shared solver remains in `physics/propulsion/`.
-- `systems/`: fuel (including the enlarged 9.13 spine tank), electrical, hydraulic, gear, brakes and environmental systems.
-- `avionics/`: radar/optical/RWR equipment fit, navigation, weapon-control and display integration.
-- `cockpit/`: controls, instruments, warning panels and startup procedures.
-- `damage/`: aircraft-specific zones and system routing.
-- `models/`: external/cockpit assets and coordinate conventions.
+## Architecture proof
+Use the same shared rigidbody, aero, atmosphere, propulsion, systems, radar, RWR, optics, damage and presentation services. Package provides two engine installations and exact equipment adapters. Do not copy F-16 solvers or add MiG name branches to shared engines.
 
-## Variant rules
-
-Do not import 9.13S N019M/TWS2/R-77 or later control/avionics upgrades into plain 9.13 without evidence. Keep the RWR designation provisional until the L006LM / SPO-15LM nomenclature and exact fit are verified. Mark unknown values as unknown rather than inventing precision.
-
-This module uses shared simulation engines. It must not contain a private rigid-body, atmosphere, aerodynamic, propulsion, radar, RWR or rendering engine.
+## Acceptance
+Demonstrate materially different geometry, engine installation, control response, sensor/cockpit composition and failure behavior using identical shared contracts. All disputed values remain visible as unknown/provisional with provenance.
