@@ -12,7 +12,7 @@ This gate separates a repository that is organized from one that is safe to exte
 - [x] Units, frames, quaternion and timestep conventions defined.
 - [x] First F-16 vertical-slice acceptance suite documented.
 - [x] package-lock.json generated on GitHub Actions and committed; clean installs use npm ci.
-- [ ] CI run green on main.
+- [x] CI run green on main using the committed lockfile (lint, type, schema, unit, build and browser smoke checks).
 - [ ] Repository Pages setting changed to Settings > Pages > Source > GitHub Actions and deployment verified.
 - [ ] Renderer comparison prototype measured and ADR accepted.
 - [ ] Stage 1 module registry and dependency resolver implemented and tested.
