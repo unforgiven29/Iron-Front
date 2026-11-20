@@ -2,7 +2,7 @@
 
 **Purpose:** Define what "the first aircraft works" means before aircraft implementation begins. These are acceptance requirements, not claims the F-16 simulation exists.
 
-**Target:** F-16C Block 50, using the selected baseline in `game/modules/planes/F-16/docs/variant-baseline.md`. Re-check operator/date/equipment applicability before detailed data is accepted.
+**Target:** F-16C Block 50, using the selected baseline in game/modules/planes/F-16/docs/variant-baseline.md. Re-check operator/date/equipment applicability before detailed data is accepted. See the aircraft installation dossier in game/modules/planes/F-16/systems/.
 
 ## Entry conditions
 
@@ -50,8 +50,32 @@ A save records module/data versions, tick, configuration identity and subsystem-
 ### F16-12 — Performance and resource budget
 Measure physics tick cost, render cost separately, memory and allocations in a documented desktop baseline. Do not invent numeric performance targets before a reference build is profiled; establish a baseline before expanding entity counts.
 
+### F16-13 — Normal electrical generation and distribution
+Battery-only pre-start, external ground power acceptance/rejection, main and standby source availability, AC/DC conversion, bus voltage/frequency, branch load accounting and protection behave according to the exact installation. A connected load receives only the waveform and power actually delivered by its bus.
+
+### F16-14 — Electrical source failure, transfer and load shedding
+Test main generator loss, standby failure, bus tie/contactor failure, converter fault, battery depletion and local short/open faults separately. Verify only connected loads are affected, transfer delay is observable, and the configured emergency/non-emergency load-shedding list is applied. Restoration does not instantly reset equipment that requires restart/warm-up.
+
+### F16-15 — Dedicated flight-control electrical supply
+Test the FLCS PMG and each configured FLCS electrical branch/relay independently. Verify the documented battery transfer/backup path, branch-specific failures, monitoring and degraded behavior. Do not infer that the main avionics battery bus is interchangeable with dedicated FLCS supply.
+
+### F16-16 — Hydraulic A/B circuit split and partial authority
+With both circuits healthy, simultaneous flight-control and utility demands produce finite pressure/flow and correct actuator rates. Fail A only, B only, a pump drive, a line or a valve: prove which utilities disappear, which flight-control actuator chambers remain supplied, the actual reduced maximum actuation rate, and isolation of unrelated branches. No automatic crossfeed is allowed unless the exact installation has it.
+
+### F16-17 — Accumulator and stored-pressure behavior
+Test each FLCS accumulator and brake/JFS accumulator as finite stored energy with precharge, charge source, isolation/check valves, usable volume, leakage and recharge timing. Verify transient bridging and backup braking/start behavior only within the documented reserve. An accumulator must not behave like a continuously operating pump.
+
+### F16-18 — EPU as one coupled emergency machine
+Trigger EPU operation from each documented automatic/manual condition and test DC activation permissives, startup delay, fuel/drive state, emergency AC/DC bus energization, load shedding and System A hydraulic output. Electrical and hydraulic output share one machine state, finite endurance, consumable source and common failure. The EPU must not feed every normal bus or restore every hydraulic consumer.
+
+### F16-19 — Pneumatic emergency landing-gear extension
+With normal System B unavailable, execute the actual documented emergency extension sequence and prove gear deployment/locking through the separate pneumatic path. This must not restore System B pressure, normal retraction, brakes, steering or unrelated utilities. Insufficient reserve, leaking bottle, stuck valve and failed indication are distinct cases.
+
+### F16-20 — Cross-domain indication and recovery
+Remove electrical power from hydraulic gauges/warning displays while leaving hydraulic source state intact. Verify invalid/stale indication is distinguishable from an actual low-pressure condition. Test simultaneous electrical, hydraulic, pneumatic and cooling faults, then recovery under the installation's restart/reset/maintenance rules.
+
 ## Required evidence
 
 For each scenario record test ID, fixture, module/data versions, seed, source dataset, assertions, tolerance, result and limitation. A visual demo or cockpit model alone is not acceptance.
 
-Do not fabricate F-16 performance figures to pass a test. Where public data is insufficient, test internal consistency and explicitly mark the external validation gap.
+Do not fabricate F-16 performance figures to pass a test. Where public data is insufficient, test internal consistency and explicitly mark the external validation gap. Do not convert a manual covering multiple blocks/engine options into exact F110 Block 50 values without checking applicability.
