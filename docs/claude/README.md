@@ -19,8 +19,12 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Registry, scheduler, entities, messages, resources, persistence | game/core/README.md and exact game/core service README | module-system, integration-contracts |
 | Aircraft forces / 6-DoF | physics/README.md, rigidbody, aerodynamics, environment | exact aircraft, propulsion, collision |
 | Engine or motor | physics/propulsion/README.md | platform engine fit, fuel, cooling |
-| Electrical, hydraulics, fuel, cooling, damage, comms, navigation, crew | game/systems/README.md and exact system README | core/resources, installed platform topology |
-| Radar | sensors/Radar/README.md, docs/radar/README.md, physics/radar/README.md | only relevant numbered radar chapters and exact equipment |
+| Electrical generation/distribution | game/systems/electrical/README.md | exact aircraft systems/electrical.md, propulsion/accessory drive, cooling, exact consumers/load list |
+| Hydraulic pressure/flow/actuators | game/systems/hydraulics/README.md | exact aircraft systems/hydraulics.md, pneumatics if coupled, flight controls/gear/brakes, cooling |
+| Pneumatic/stored-gas systems | game/systems/pneumatics/README.md | exact aircraft systems/pneumatics.md, hydraulic reservoir/gear/brake interfaces |
+| Auxiliary/ECS/thermal integration | game/systems/cooling/README.md and physics/thermal/README.md | exact aircraft systems/auxiliary-environmental.md, electrical and pneumatic installations |
+| Fuel/feed/transfer | game/systems/fuel/README.md | exact platform fuel topology, propulsion, mass properties |
+| Radar | sensors/Radar/README.md, docs/radar/README.md, physics/radar/README.md | only relevant numbered radar chapters and exact equipment installation |
 | RWR / ESM | sensors/RWR/README.md or sensors/ESM/README.md | physics/radar and exact receiver installation |
 | IRST, EO/FLIR, MAWS, IFF, fusion | exact sensors/<system>/README.md | physics/optics, equipment install and integration contracts |
 | Weapon, seeker, fuze, guidance | game/modules/weapons/README.md and exact component guide | physics/ballistics, armour, platform launcher |
