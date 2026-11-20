@@ -1,5 +1,7 @@
-# Shared ground-unit contracts
+# Shared ground-platform data contracts
 
-Contains reusable ground-platform definitions/interfaces: vehicle identity, crew/station interfaces, mobility configuration shapes, weapon-station contracts, damage-zone conventions, sight/sensor mounts and common validation fixtures.
+This folder contains common configuration shapes and interfaces for ground platform identity, crew/stations, mount points, mobility configuration, weapon stations, damage zones and sight/sensor installations. It is not a home for generic physical solvers.
 
-Do not place generic physics algorithms here. Track/wheel/suspension mechanics belong in physics/ground-mobility; ballistics/penetration in physics/ballistics and physics/armour; resource coordination in core resources and system adapters.
+Track/wheel/suspension mechanics belong in physics/ground-mobility; rigid-body state in physics/rigidbody; collision in physics/collision; projectiles in physics/ballistics; penetration in physics/armour; resource arbitration in core/resources; electrical/hydraulic/fuel in game/systems.
+
+Shared schema changes must be backward-compatible or versioned and tested against materially different tracked and wheeled consumers. Avoid platform-specific required fields in universal contracts.
