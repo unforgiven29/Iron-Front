@@ -6,6 +6,7 @@ export type QualityStatus =
   | "estimated"
   | "unknown";
 
+/** Common metadata; each message kind adds its own typed payload. */
 export interface MessageEnvelope {
   readonly messageId: string;
   readonly contractId: string;
@@ -13,10 +14,10 @@ export interface MessageEnvelope {
   readonly producerModuleId: string;
   readonly simulationTick: number;
   readonly simulationTimeSeconds: number;
+  readonly status: QualityStatus;
   readonly entityId?: string;
   readonly frameId?: string;
   readonly correlationId?: string;
-  readonly status: QualityStatus;
   readonly provenance?: Readonly<Record<string, unknown>>;
   readonly quality?: Readonly<Record<string, unknown>>;
 }
@@ -38,11 +39,13 @@ export interface Observation<TValue, TUncertainty = unknown> extends MessageEnve
   readonly kind: "observation";
   readonly sourceId: string;
   readonly acquiredAtTick: number;
-  readonly value: TValue;
-  readonly uncertainty: TUncertainty;
+  readonly payload: {
+    readonly value: TValue;
+    readonly uncertainty: TUncertainty;
+  };
 }
 
 export interface ImmutableSnapshot<TState> extends MessageEnvelope {
   readonly kind: "snapshot";
-  readonly state: Readonly<TState>;
+  readonly payload: Readonly<TState>;
 }

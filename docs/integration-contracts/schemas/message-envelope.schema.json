@@ -2,9 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://iron-front.local/schemas/message-envelope.schema.json",
   "title": "Iron-Front Message Envelope",
-  "description": "Shared metadata envelope for commands, events, observations and snapshots. Payload semantics belong to a versioned domain contract.",
+  "description": "Shared metadata for commands, events, observations and snapshots. Payload semantics belong to a versioned domain contract.",
   "type": "object",
-  "required": ["messageId", "contractId", "contractVersion", "producerModuleId", "simulationTick", "messageKind"],
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "contractId",
+    "contractVersion",
+    "producerModuleId",
+    "simulationTick",
+    "simulationTimeSeconds",
+    "kind",
+    "status",
+    "payload"
+  ],
   "properties": {
     "messageId": { "type": "string", "minLength": 1 },
     "contractId": { "type": "string", "minLength": 1 },
@@ -15,11 +26,15 @@
     "simulationTimeSeconds": { "type": "number", "minimum": 0 },
     "frameId": { "type": "string" },
     "correlationId": { "type": "string" },
-    "messageKind": { "enum": ["command", "event", "observation", "snapshot"] },
+    "kind": { "enum": ["command", "event", "observation", "snapshot"] },
     "status": { "enum": ["valid", "stale", "invalid", "unavailable", "estimated", "unknown"] },
+    "issuerId": { "type": "string" },
+    "targetModuleId": { "type": "string" },
+    "eventType": { "type": "string" },
+    "sourceId": { "type": "string" },
+    "acquiredAtTick": { "type": "integer", "minimum": 0 },
     "provenance": { "type": "object" },
     "quality": { "type": "object" },
     "payload": {}
-  },
-  "additionalProperties": false
+  }
 }

@@ -46,15 +46,28 @@ validate(measurementSchema, {
   quality: { confidence: 0.5, flags: ["synthetic-test"] },
   uncertainty: { standardDeviation: 5 }
 }, "measurement envelope");
-validate(envelopeSchema, {
+const commonEnvelope = {
   messageId: "test.message.1",
   contractId: "test.contract",
   contractVersion: 1,
   producerModuleId: "test.producer",
   simulationTick: 1,
   simulationTimeSeconds: 1 / 120,
-  messageKind: "event",
+  status: "valid"
+};
+
+validate(envelopeSchema, {
+  ...commonEnvelope,
+  kind: "event",
+  eventType: "test.event",
   payload: { event: "test" }
-}, "message envelope");
+}, "event message envelope");
+validate(envelopeSchema, {
+  ...commonEnvelope,
+  kind: "observation",
+  sourceId: "test.sensor",
+  acquiredAtTick: 1,
+  payload: { value: 42, uncertainty: { standardDeviation: 0.2 } }
+}, "observation message envelope");
 
 process.stdout.write("All architecture data examples passed schema validation.\n");
