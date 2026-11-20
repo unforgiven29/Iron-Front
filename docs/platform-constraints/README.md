@@ -6,6 +6,12 @@ Target platform: JavaScript/TypeScript, HTML5 and static GitHub Pages hosting.
 
 GitHub Pages serves static files; it does not run a persistent authoritative simulation server, database, account service, matchmaking service or always-on campaign process. Client-local single-player simulation and explicit save export/import fit this model. Persistent co-op campaigns, shared state, cloud saves and server-authoritative multiplayer require a separately hosted backend. Keep those behind replaceable adapters.
 
+## GitHub Pages initial setup
+
+The repository contains a deployment workflow that builds `dist/`, uploads the Pages artifact and deploys when Pages is enabled. The first-time repository setting is not currently enabled. A repository owner/admin must open **Settings → Pages → Build and deployment → Source** and select **GitHub Actions**. Once enabled, the next push to `main` or a manual Pages workflow run should deploy. Until that setting is enabled, the workflow still performs the static build and uploads the artifact, but intentionally skips deployment.
+
+The workflow cannot enable Pages automatically with the default `GITHUB_TOKEN`; GitHub's configure-pages action requires a separate PAT or GitHub App token with administrative Pages permissions for automatic enablement.
+
 ## Simulation/render separation
 
 Core simulation must not depend on the DOM, renderer or render frame rate. Use a simulation clock and explicit scheduler. Rendering consumes immutable snapshots and may interpolate. Core must run in headless tests/replay.

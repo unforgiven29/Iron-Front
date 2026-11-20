@@ -51,3 +51,13 @@ Read these before creating a new subsystem or changing ownership.
 The target is HTML5/JavaScript/TypeScript and static GitHub Pages hosting. Static hosting does not provide persistent authoritative multiplayer; that requires an external backend.
 
 **Documentation and folder structure are not proof of runtime implementation.**
+
+## Developer setup
+
+- Claude instructions: [CLAUDE.md](CLAUDE.md)
+- Implementation roadmap: [docs/implementation-roadmap/README.md](docs/implementation-roadmap/README.md)
+- Simulation conventions: [docs/simulation-conventions/README.md](docs/simulation-conventions/README.md)
+- Implementation readiness gate: [docs/implementation-readiness/README.md](docs/implementation-readiness/README.md)
+- Contributor setup: [CONTRIBUTING.md](CONTRIBUTING.md)
+
+Use Node.js 22.13+ and npm. See CONTRIBUTING.md before running the application.
