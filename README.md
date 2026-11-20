@@ -33,6 +33,6 @@ The repository contains the executable app shell, initial core primitives, exten
 - Assets: docs/assets-and-pipeline/README.md
 
 ## Developer setup
-Claude instructions: CLAUDE.md. Setup and commands: CONTRIBUTING.md. Node.js 22.13+ and npm are required. Clean install uses npm ci. Main validation is npm run check; browser smoke tests use npm run test:e2e.
+Claude entry point: CLAUDE.md. [Claude task router](docs/claude/README.md) tells Claude which focused system guides to read; [implementation workflow](docs/claude/implementation-workflow.md) defines the coding/test/report process. Setup and commands: CONTRIBUTING.md. Node.js 22.13+ and npm are required. Clean install uses npm ci. Main validation is npm run check; browser smoke tests use npm run test:e2e.
 
 Static GitHub Pages supports local client-side simulation and explicit save export/import. Persistent authoritative cooperative campaigns require an external backend. Documentation/folders are not implementation evidence.
