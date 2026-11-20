@@ -44,7 +44,7 @@
         "revision": { "type": "string" },
         "date": { "type": "string" },
         "page": { "type": "string" },
-        "url": { "type": "string", "format": "uri" },
+        "url": { "type": "string", "pattern": "^https?://[^\\s]+$" },
         "method": { "type": "string" },
         "assumptions": { "type": "array", "items": { "type": "string" } }
       }

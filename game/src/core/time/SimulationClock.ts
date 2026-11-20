@@ -68,14 +68,18 @@ export class SimulationClock {
       stepsExecuted += 1;
     }
 
-    const remainder = this.accumulatorSeconds % this.stepSeconds;
+    const overloaded = this.accumulatorSeconds + Number.EPSILON >= this.stepSeconds;
+    const interpolationAlpha = overloaded
+      ? 0
+      : Math.max(0, Math.min(1, this.accumulatorSeconds / this.stepSeconds));
+
     return {
       stepsExecuted,
       currentTick: this.tick,
-      interpolationAlpha: Math.max(0, Math.min(1, remainder / this.stepSeconds)),
+      interpolationAlpha,
       backlogSeconds: this.accumulatorSeconds,
       droppedFrameSeconds,
-      overloaded: this.accumulatorSeconds + Number.EPSILON >= this.stepSeconds
+      overloaded
     };
   }
 

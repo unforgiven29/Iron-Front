@@ -17,6 +17,7 @@ describe("SimulationClock", () => {
 
     expect(first.stepsExecuted).toBe(2);
     expect(first.overloaded).toBe(true);
+    expect(first.interpolationAlpha).toBe(0);
     expect(first.backlogSeconds).toBeCloseTo(0.3, 12);
 
     const second = clock.advanceFrame(0);
