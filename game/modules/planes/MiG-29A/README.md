@@ -20,4 +20,6 @@ Use the same shared rigidbody, aero, atmosphere, propulsion, electrical/hydrauli
 
 ## Acceptance
 
+The second-platform systems suite is [MiG-29 product 9.13 systems architecture](../../../tests/acceptance/MiG-29-platform-systems.md). It verifies that the different electrical, hydraulic, pneumatic and auxiliary configuration uses the same shared contracts without borrowing F-16 architecture.
+
 Demonstrate materially different geometry, engine installation, control response, electrical sources/buses, hydraulic chambers/circuits, emergency systems, sensor/cockpit composition and failure behavior using identical shared contracts. All disputed values remain visible as unknown/provisional with provenance.
