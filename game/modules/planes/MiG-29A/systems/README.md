@@ -11,6 +11,10 @@ The [GAF T.O. 1F-MIG29-1 flight manual](https://www.airwar.ru/other/manuals/%5Ba
 - [Pneumatic stored-gas systems](pneumatics.md)
 - [Auxiliary, environmental and cooling interfaces](auxiliary-environmental.md)
 
+## Acceptance suite
+
+See [MiG-29 product 9.13 systems architecture acceptance](../../../../tests/acceptance/MiG-29-platform-systems.md) for source-applicability, electrical, hydraulic, pneumatic, emergency, damage-isolation and replay scenarios.
+
 ## Distinctive system composition described in the GAF manual
 
 The source describes a different arrangement from the F-16:
