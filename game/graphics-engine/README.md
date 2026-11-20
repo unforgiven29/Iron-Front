@@ -1,22 +1,18 @@
-# Graphics Engine
+# Graphics, cockpit and presentation engine
 
-**Status: placeholder source structure. No renderer implementation is added by this README.**
+**Status:** renderer port and shell exist; final renderer selection and full scene/cockpit implementation remain open.
 
-The graphics engine is responsible for presentation only. It consumes simulation snapshots and subsystem outputs; it must never determine aircraft physics, collisions, damage, radar/IRST detections, campaign outcomes or AI knowledge.
+## Authority boundary
+Graphics consumes immutable simulation snapshots and sends typed commands. It never owns physics, collision, damage, radar/IRST detection, AI knowledge, weapon effects, world truth or campaign outcomes. Invisible mesh is not destruction; a visible target is not a sensor detection.
 
-Read [graphics architecture](../../docs/graphics-engine/README.md) and [Claude implementation guide](../../docs/graphics-engine/CLAUDE_IMPLEMENTATION_GUIDE.md).
+## Responsibilities
+Renderer abstraction/scene lifecycle; camera; snapshot interpolation; frame conversion; terrain/chunk visuals; models/animation; cockpit geometry/interaction; display presentation; lighting/materials/weather visuals; particles/effects; UI/audio; quality and profiling.
 
-## Planned ownership
+## Data flow
+Owner publishes tick snapshot → renderer interpolates for display. User input maps to stable control ID and command issuer/target → owning system validates → later snapshot reflects the result. No mouse callback writes internal fuel/pressure/radar/engine state.
 
-- renderer abstraction, scene lifecycle and camera management
-- render snapshot interpolation, transform hierarchy and coordinate conversion
-- terrain/chunk streaming, LOD, culling, instancing and asset lifetime
-- aircraft/vehicle/ship/infantry models and animation
-- cockpit geometry, interaction surfaces and avionics display presentation
-- materials, lighting, shadows, sky, clouds, fog and weather visuals
-- particles and effects: exhaust, contrails, smoke, fire, tracers, explosions and debris
-- post-processing, quality settings, diagnostics and performance telemetry
+## Asset boundaries
+Render mesh, collision proxy, physical geometry, mass, aero surfaces, armor, radar aperture/signature are separate validated data. LOD/culling changes only presentation.
 
-## Required separation
-
-Simulation state is authoritative. Rendering reads previous/current snapshots and interpolates for display. Cockpit controls send commands to owning aircraft systems. Radar/IRST visuals display actual sensor outputs; visible meshes and rendered cones do not create detections. Visual LOD may remove a model from view but must not silently delete its campaign entity.
+## Renderer decision
+Use controlled comparison prototype and ADR before choosing an engine. Compare cockpit instruments, large terrain, instancing, memory, mobile support, workers, licensing and maintainability using real project scenes.

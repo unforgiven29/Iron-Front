@@ -1,3 +1,5 @@
-# Weapon motor profiles
+# Weapon motor component definitions
 
-Defines missile/rocket motor configuration and shared capability contracts: motor type, thrust-time curve, mass flow, ignition delay, burn state, temperature/limits and failure modes. Weapon packages supply sourced motor data; generic motor dynamics live in shared physics/propulsion services.
+Own motor product configuration: family, propellant/energy, mass, thrust-time curve, burn duration, ignition/transient, staging, nozzle, mass flow, temperature/pressure limits, plume/signature and failure/provenance data. Shared propulsion executes motor behavior; weapon runtime owns phase/lifecycle.
+
+Do not confuse thrust curve with complete missile trajectory. Include mass change, alignment, installation, ambient conditions and thermal/power effects at declared fidelity. Validate integrated impulse, mass depletion, ignition failure, burn-out, staged transition and uncertainty against supported public data.

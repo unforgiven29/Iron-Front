@@ -1,12 +1,7 @@
-# air
+# Air-domain AI behaviors
 
-Aircraft AI tasking, navigation, formation, intercept and tactical behaviour modules.
+Own reusable air-agent task and tactical policies, not flight dynamics, sensors or aircraft autopilot internals. Behaviors include navigation, formation, takeoff/landing requests, patrol/CAP, intercept, escort, BVR/WVR policy, disengage, refueling rendezvous, recovery and emergency tasking.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Agents consume onboard/remote sensor reports with uncertainty and age. They issue tasks/control requests through aircraft adapters. Physical turn/energy/control limits, sensor scan limits and weapon envelopes come from actual platform/equipment snapshots. Doctrine is data, not platform-name branching.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Test formation in wind/damage, lost comms, stale target, low fuel, sensor degradation, unsupported stores, disengagement and deterministic decision replay.

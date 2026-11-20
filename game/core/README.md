@@ -1,26 +1,29 @@
-# Game core
+# Game core — runtime coordination services
 
-**Current folders describe intended ownership; they are not proof that a complete runtime engine exists.**
+**Status:** architecture and initial primitives only. A complete module registry, scheduler, dispatch system, entity store, resource allocator, persistence service, diagnostics and spatial engine are not implemented.
 
-Core is the platform-neutral simulation foundation. It remains independent of aircraft, weapon, campaign, DOM and rendering implementations.
+## Mission
+Core coordinates simulation lifecycle and time. It is shared infrastructure, not a monolithic manager containing aircraft, radar, weapon, ground or campaign rules. Each service has one narrow responsibility and a versioned public contract.
 
-## Canonical responsibilities
+## Service map
+- module-registry: manifest validation, capability resolution, dependency graph, factory/lifecycle orchestration.
+- simulation: authoritative clock, phases, deterministic order and multi-rate scheduling.
+- events: commands, committed events, observations, snapshots, queues and journal.
+- entities: stable IDs, composition and creation/destruction lifecycle.
+- resources: typed offer/demand arbitration and allocation diagnostics.
+- configuration: schema lookup, layer resolution, immutable validated configuration.
+- persistence: coordinated save/load, migrations and replay.
+- diagnostics: structured faults, traces, profiling and developer inspection.
+- spatial: transforms, indexes and generic queries; world owns terrain/structure truth.
+- networking: optional transport/authority adapters; local mode must not require a server.
 
-- Simulation clock, fixed-step accumulator, tick phases and multi-rate scheduler.
-- Module manifest discovery, dependency resolution, lifecycle and capability registry.
-- Entity identity/lifecycle and authoritative state ownership.
-- Typed command queue, event dispatch and immutable snapshot publication.
-- Resource providers/consumers, topology, allocation and dependency diagnostics.
-- Global configuration/schema validation.
-- Save/load, migrations and deterministic replay.
-- Coordinate transforms, spatial indexing and world/entity queries.
-- Structured logs, telemetry, profiling and fault explanations.
-- Networking authority/replication boundaries as replaceable adapters.
+## Initialization lifecycle
+Read scenario header → validate module manifests/configuration → resolve dependencies → construct instances → initialize in dependency order → acquire/validate resources → ready/degraded/failed → schedule. A failure unwinds acquired resources in reverse order. An instance cannot tick before ready or publish after disposal.
 
-The clock controls authoritative time. Modules declare update domains. Core validates commands, dispatches events deterministically and publishes tick-stamped snapshots. Rendering/UI run separately.
+## Invariants
+No authoritative state mutation from UI/render callbacks; no wall-clock dependency in deterministic updates; stable event order; no hidden world-truth route into sensors/AI; no direct cross-module mutable references; required failure blocks dependants; optional absence follows declared degradation; independent failures remain isolated.
 
-One subsystem owns each mutable state. Core coordinates but does not absorb domain algorithms: resource allocation is shared, while the electrical system models its bus and equipment models its response.
+## First implementation order
+Registry/resolver with two test modules; deterministic dispatcher and scheduler; entity lifecycle; resource arbitration; configuration/runtime diagnostics; persistence/replay and spatial acceleration as contracts stabilize. Do not put the F-16 flight model inside core.
 
-Core contracts may be consumed by physics, sensors, weapons, platforms, world and campaign. Core must not import aircraft/faction/weapon-specific implementations. See docs/ARCHITECTURE_OVERVIEW.md and docs/core-systems/README.md.
-
-**Status:** Runtime implementation remains future work.
+Read each service README before implementing it.

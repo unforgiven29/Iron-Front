@@ -1,13 +1,12 @@
-# sensors — aircraft installation
+# MiG-29 product 9.13 sensor installation manifest
 
-MiG-29-specific sensor fit manifest, OEPS/optical equipment, mounting geometry, boresight, resource and avionics connections. Shared sensor engines remain in sensors/.
+Own aircraft-specific sensor selection, placement, boresight, wiring/resources and avionics/display integration. Shared sensor algorithms remain under sensors/. Preserve exact product 9.13 applicability; folder label MiG-29A is not permission to inherit 9.12 or 9.13S fit.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+## Equipment areas
+N019/RLPK-29 radar; OEPS-29/KOLS optical/IR/laser equipment where exact fit is confirmed; helmet-mounted sight/cueing; Beryoza RWR with designation/variant caveats; IFF/navigation/radio and other installed equipment. Distinguish optical cue from a sensor-confirmed track. Never assume later modernization equipment is present.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+## Per-device record
+Stable ID/variant/software; antenna/aperture and sensor mount frames; boresight; fields of regard; control/status data; power/cooling; startup/BIT; warning/display/audio mapping; damage path; source and confidence.
+
+## Tests
+Absent/provisional equipment, mount/boresight transform, independent radar/optical observations, power/cooling, controls, failure and exact-variant compatibility.

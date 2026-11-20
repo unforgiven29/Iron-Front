@@ -1,14 +1,9 @@
-# MAWS
+# Missile approach warning system (MAWS)
 
-Missile approach warning sensors. Keep MAWS separate from RF RWR/ESM and model its own hardware, coverage, false alarms and limitations.
+**Owner:** sensors/MAWS. **Status:** architecture only; no detector/tracker runtime.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Model the physical mechanism of the installed warning equipment: UV/IR optical detectors, imaging arrays, distributed apertures or another documented architecture. MAWS is not an RF RWR and is not a universal missile-truth feed.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Chain: observable threat signature → environment/background path → aperture/FOV coverage → detector/noise/saturation → temporal/spatial processing → candidate event → warning confidence → cockpit/countermeasure command interface. Include blind zones, finite coverage, false alarms and misses. It must not automatically reveal missile identity, exact launch point or perfect trajectory.
+
+Countermeasure dispensing belongs to crew/avionics commands and validated launcher. Validate coverage, blind zones, obscurants, own-engine interference, warning latency, false alarms, sensor damage and resource loss.

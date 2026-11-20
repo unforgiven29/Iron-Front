@@ -1,13 +1,12 @@
-# weapons — aircraft installation
+# F-16C Block 50 weapons and stores installation
 
-F-16 station layout, pylon/launcher compatibility, wiring, stores clearance and variant restrictions. Weapon physics and weapon definitions remain shared.
+Own aircraft station layout, pylons/racks/launchers, wiring/data interfaces, physical attachment transforms, clearance/interference envelopes, permissible loading configurations, release controls and exact variant restrictions. Weapon product data/runtime remain in game/modules/weapons and shared physics.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+## Required data
+Station ID/location/orientation, mass/CG contribution, structural/load limits, compatible rack/launcher/stores, electrical/data connections, release/ejector behavior, safe separation envelope, asymmetric-load restrictions, cockpit SMS/control mapping and provenance. Exact store clearances and software release permissions are configuration-specific.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+## Release flow
+Crew/AI requests store selection/release → SMS validates loaded station/configuration → launcher checks fit/interlock/safe envelope → release/separation event → aircraft mass/drag updates → weapon runtime takes ownership. No visual-only store disappearance or weapon spawn without a validated release event.
+
+## Tests
+Compatible/incompatible loading, mass/CG/inertia, asymmetry, clearance, interlock failure, release impulse, separation/collision, wiring/power/data loss and weapon lifecycle handoff.

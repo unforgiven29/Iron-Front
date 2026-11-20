@@ -1,14 +1,9 @@
-# IFF
+# Identification Friend or Foe (IFF)
 
-IFF interrogation/reply simulation with equipment modes, timing, configuration, crypto abstraction, failure and uncertainty.
+**Owner:** sensors/IFF. **Status:** architecture only; no interrogation/reply runtime.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Model compatible interrogation/reply transactions using fitted equipment, supported modes, timing, configuration and authentication policy. Chain: interrogator ready → request emitted → path/reception → transponder eligibility/mode → reply generation → return path → validation → identity/status assessment.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+A valid reply supports only the identity claim allowed by that protocol/configuration. No reply does not prove hostile: equipment may be absent, damaged, disabled, out of coverage or masked. Preserve mode, source, timestamp and uncertainty. Do not copy faction/campaign truth into response. Do not invent real secure keys or claim classified cryptography.
+
+Test compatible/incompatible modes, absent/delayed/overlapping replies, garble, wrong code, stale response, transponder/power fault and ambiguous identity.

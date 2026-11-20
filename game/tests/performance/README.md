@@ -1,11 +1,7 @@
-# performance
+# Performance and scalability tests
 
-Browser profiling scenarios, frame/tick and memory budgets, stress tests and performance regression thresholds.
+Measure authoritative simulation separately from rendering, streaming and transport. Capture per-tick CPU/percentiles by subsystem, frame time, long frames, memory/allocation growth, entity/projectile/particle count, radar emitters/receivers/tracks, chunk residency, save time/size and worker transfer cost.
 
-## Requirements
-- Keep presentation/test harnesses separate from simulation authority.
-- Use reproducible fixtures and deterministic seeds where applicable.
-- Test module boundaries and observable contracts rather than private implementation details.
-- Document supported browser targets and known limitations.
+Representative scenes: single aircraft; multi-aircraft/radar/RWR; dense SAM/emitter engagement; ground/infantry battle; artillery projectiles; urban/forest map; background campaign; long mixed mission. Include mobile/constrained browser profiles.
 
-**Status:** Documentation and folder structure only.
+Do not invent budgets before baseline measurement. Record hardware/browser/build/seed/warm-up/sample method; set thresholds after measuring. Profile first. Event-driven work, spatial filtering, caching, pooling and workers are tools, not assumptions. Never silently lower detection/physics/damage fidelity to meet FPS. Compare optimized outputs with reference results.

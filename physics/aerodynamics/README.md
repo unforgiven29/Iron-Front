@@ -1,17 +1,17 @@
-# Aerodynamics — PFM Surface Model
+# Aerodynamics and local airflow
 
-**Empty source placeholders. No aerodynamic solver is implemented yet.**
+**Owner:** physics/aerodynamics. **Status:** architecture only; no aerodynamic solver is implemented.
 
-This subsystem owns aircraft geometry and aerodynamic force/moment generation. It does not own 6-DoF integration, global weather or engine thermodynamics.
+## Responsibility
+Generate aerodynamic forces/moments from aircraft-specific geometry/data and local air velocity at each surface. Aircraft packages supply layout, coefficient datasets, controls and provenance. Rigidbody consumes loads.
 
-Planned architecture:
-- **Geometry:** aircraft reference frames, wings, panels/strips, tails, fins, control surfaces and aerodynamic stations.
-- **Local flow:** surface-local velocity, angular-rate effects, AoA/sideslip, dynamic pressure and induced flow.
-- **Coefficient data:** aircraft-specific lift/drag/moment maps, stability/control derivatives, Mach/AoA/configuration ranges, interpolation, uncertainty and provenance.
-- **Loads:** lift, profile/induced/wave drag, pitching/rolling/yawing moments and force application points.
-- **Flow interaction:** downwash, sidewash, wing/tail interference, vortex effects, propwash/jet interaction where appropriate.
-- **Nonlinear behavior:** stall, separation, post-stall response, dynamic lag/hysteresis and high-AoA behavior where supported.
-- **Configuration:** flaps/slats, speed brakes, stores, fuel state, icing and damage effects.
-- **Validation:** trim, coefficient comparisons, stability, maneuvers, stall and regression cases.
+## Model stages
+Surface geometry (wing panels, tails, fins, control surfaces) → ambient/local flow → local velocity/dynamic pressure/Mach/AoA/sideslip → coefficient evaluation/interpolation → force/moment integration at application points.
 
-Every surface must use its own local air sample; one aircraft-wide AoA/q value is insufficient. Use aircraft-specific data and explicit validity envelopes. Do not approximate the entire aircraft with one lift curve or arbitrary multipliers. See [PFM architecture](../../docs/flight-model/README.md).
+Include angular-rate velocity at offset surfaces (ω × r), downwash/sidewash, induced flow and wake effects where supported. Nonlinear stall/separation, hysteresis, high-AoA, ground effect, propwash/jet interaction and damage/store effects require explicit data or declared approximations.
+
+## Rules
+Every surface samples its own local flow; one aircraft-wide AoA/q is insufficient. Coefficient tables state sign conventions, Mach/AoA/sideslip/configuration axes, uncertainty and valid envelope. Do not use one lift curve or an arbitrary handling multiplier. Out-of-envelope input returns a documented degraded/unsupported result, not hidden extrapolation.
+
+## Outputs and tests
+Publish surface and total force/moment, intermediate coefficients, local flow, validity and uncertainty. Test dimensional/sign conventions, symmetric trim, lift/drag trends, controls, sideslip, local angular-rate effect, stall, asymmetry, stores/damage, timestep convergence and sourced reference conditions.

@@ -1,14 +1,7 @@
-# equipment
+# Infantry equipment definitions
 
-Personal equipment definitions with mass, capability, power draw, protection and compatibility data.
+Own data-only personal equipment records: stable ID/version, mass and carried load, armor/protection zones where known, weapon/accessory compatibility, ammunition capacity, sensors/optics, radio capability, battery/power, medical/utility tools, environmental protection and provenance.
 
-## Module requirements
-- Provide a versioned manifest and schema-validated configuration for each concrete variant.
-- Keep content data separate from shared algorithms and mutable runtime state.
-- Declare dependencies, capabilities, coordinate frames, units, lifecycle and failure outputs.
-- Use shared physics/sensor/resource/damage services through explicit contracts.
-- Avoid hardcoded vehicle names, faction branches and duplicated solvers.
-- Record sources, confidence and uncertainty for technical values.
-- Include integration and negative tests when runtime implementation begins.
+An equipment record configures capability; it does not implement the corresponding sensor, ballistics, armor or communication engine. Load/weight affects movement through shared mobility/character dynamics if implemented. Protection must reference shared armor/material models and declared body zones; do not assign a universal protection percentage.
 
-**Status:** Folder and handoff documentation only.
+Validate schema, units, loadout compatibility, mass/capacity, ammunition, equipment failure/depletion and source applicability.

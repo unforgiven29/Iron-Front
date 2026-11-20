@@ -1,13 +1,7 @@
-# weapons — aircraft installation
+# MiG-29 product 9.13 weapons and stores installation
 
-MiG-29 product 9.13 station layout, launcher compatibility, wiring, stores clearance and variant restrictions. Keep later 9.13S/SMT/MiG-29M capabilities separate unless verified.
+Own station/hardpoint geometry, pylon/launcher fit, wiring/data, store clearance, release controls, structural limits and exact variant restrictions. Generic weapon data/physics remains in game/modules/weapons and physics.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+Do not silently inherit MiG-29S 9.13S weapon-control/R-77 or later missile/stores clearances. Each store is a distinct supported fit with source, mass, dimensions, station compatibility, electrical/data requirements, release envelope and software permission where known.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+Release uses validated station compatibility and interlocks, then publishes separation event and updates aircraft mass/drag. Tests cover fit rejection, asymmetry, load limits, clearance, electrical/data failure, separation and exact product 9.13 evidence.

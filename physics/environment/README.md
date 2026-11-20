@@ -1,7 +1,11 @@
-# Environment and atmosphere physics
+# Environment, atmosphere and weather fields
 
-Canonical owner for shared world atmosphere and weather fields. The previous misspelled path physics/enviroment/ has been migrated here; do not create systems under the legacy path.
+**Owner:** physics/environment. **Status:** design only; no complete queryable 3D time-varying field. The misspelled physics/enviroment path is deprecated; do not add new systems there.
 
-The atmosphere is a three-dimensional, time-dependent field, not a single global wind vector. Responsibilities include pressure, temperature, density, humidity/moisture and speed-of-sound profiles; standard/scenario weather profiles; altitude/position/time-dependent wind, shear and frontal boundaries; seeded correlated gusts/turbulence; thermals, downdrafts, mountain waves and terrain-flow approximations; precipitation, icing, visibility and surface conditions; shared queries for aircraft, sensors, weapons and world; interpolation, caching, deterministic seeds and validation.
+Provide coherent environmental state for a position and simulation time. Include pressure, temperature, density, humidity/moisture and speed of sound; mean wind, shear, seeded correlated gust/turbulence; thermals/downdrafts, terrain-flow/mountain-wave approximations; precipitation, icing, visibility and surface condition when supported.
 
-Atmospheric flow is sampled consistently by nearby surfaces and aircraft. Avoid uncorrelated per-frame random noise. Rendered weather is separate from physical weather effects. See docs/flight-model/README.md.
+This is not one global wind vector or a visual cloud effect. Aerodynamics samples each surface; engine maps use ambient conditions; weapons query wind/air density; sensor owners query radar/optical propagation. Renderer only visualizes.
+
+Seed weather/turbulence by stable scenario/spatial/time identities so query order does not change results. Cache/interpolate fields, maintain tile seam continuity and state explicit approximation envelope.
+
+Validate standard atmosphere references, profile continuity, wind interpolation, turbulence autocorrelation/repeatability, precipitation/visibility bounds, terrain flow limits and query-order determinism.

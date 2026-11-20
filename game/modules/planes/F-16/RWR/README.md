@@ -1,13 +1,12 @@
-# RWR — aircraft installation
+# F-16C Block 50 RWR installation
 
-F-16C Block 50 aircraft-specific RWR installation: selected ALR-56M baseline, antenna placement, configuration, threat-library revision, power/cooling connections, controls, display/audio mapping and source confidence. Shared processing remains in sensors/RWR.
+**Selected working baseline:** AN/ALR-56M with exact operator/block/software fit to be verified. This directory owns aircraft-specific installation/configuration; shared dynamic RWR processing remains in sensors/RWR. Do not copy receiver/deinterleaving/classification algorithms here.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+## Installation data
+Antenna count/location/orientation and aperture response; receiver equipment identity/frequency coverage/bandwidth/sensitivity; direction-finding/sector behavior; library/software revision; display/audio/warning policy; power/cooling; controls/BIT; structural/radome/cable damage; cockpit panel/symbology/audio mapping and evidence.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+## Behavior boundary
+The RWR processes actual received RF emissions through propagation and its receiver. It does not query radar target tracks, private lock state or campaign entity data. Emission mode/threat cue is inferred from observed pulse/emission features with confidence. A detected emitter is not automatically hostile or tracking the F-16.
+
+## Verification
+Exact fit/version; antenna frame/bearing calibration; receiver threshold/band limits; simultaneous emitters/deinterleaving; warning priority/audio mapping; power/cooling loss; antenna/cable damage; stale/ambiguous threat library entries.

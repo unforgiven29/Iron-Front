@@ -1,12 +1,7 @@
-# ground
+# Ground-domain AI behaviors
 
-Ground AI movement, formations, manoeuvre, suppression, retreat and task execution modules.
+Own ground maneuver/task policies. Shared ground mobility/contact/weapon/damage services own physical effects. Behaviors include route/formation, bounds/overwatch, flank, defend, suppress, assault, withdraw/retreat, obstacle handling, resupply, repair and casualty evacuation.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Use reported threats, last-known positions, map/terrain constraints and orders. Belief has age/confidence. Terrain/structure services provide route/cover queries; render occlusion is not tactical perception. Suppression, morale, ammo, crew, fuel, mobility damage and communications may influence choices. Fire request is not a hit result.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Test blocked routes, slope/soil constraints, uncertain contact, flank/withdrawal, resupply, comms loss, fragmented unit and no hidden enemy coordinates.

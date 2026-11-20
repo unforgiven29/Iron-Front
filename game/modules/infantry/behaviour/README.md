@@ -1,14 +1,7 @@
-# behaviour
+# Infantry and squad behavior profiles
 
-Composable infantry and squad behaviour profiles. Orders and observations are explicit inputs; no omniscient AI.
+Own behavior/doctrine configuration and task definitions, not movement or weapon algorithms. Inputs are explicit orders, local observations, squad state, terrain/cover queries, communications and resource status. Profiles may declare training/discipline, cohesion, caution, suppression response, movement style, casualty evacuation policy and leadership behavior.
 
-## Module requirements
-- Provide a versioned manifest and schema-validated configuration for each concrete variant.
-- Keep content data separate from shared algorithms and mutable runtime state.
-- Declare dependencies, capabilities, coordinate frames, units, lifecycle and failure outputs.
-- Use shared physics/sensor/resource/damage services through explicit contracts.
-- Avoid hardcoded vehicle names, faction branches and duplicated solvers.
-- Record sources, confidence and uncertainty for technical values.
-- Include integration and negative tests when runtime implementation begins.
+Behavior updates should be multi-rate and deterministic. The agent updates belief, evaluates order/risks and emits intent/commands. It cannot set position, damage, enemy location or weapon outcome. Profiles are faction/mission content data, not hardcoded name branches.
 
-**Status:** Folder and handoff documentation only.
+Test order interpretation, stale/missing observations, suppression and morale effects, leader loss/succession, retreat/surrender, communications loss and reproducible behavior.

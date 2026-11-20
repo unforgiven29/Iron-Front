@@ -1,11 +1,7 @@
-# integration
+# Cross-system integration tests
 
-Cross-module scenarios assert causal behaviour and include negative tests proving unrelated systems remain unaffected.
+Prove causal behavior through production module contracts and scheduler, not only isolated mocks. Every scenario records seed, module/config versions, initial state, commands, events, expected outputs and tolerances.
 
-## Requirements
-- Keep presentation/test harnesses separate from simulation authority.
-- Use reproducible fixtures and deterministic seeds where applicable.
-- Test module boundaries and observable contracts rather than private implementation details.
-- Document supported browser targets and known limitations.
+Early scenarios: capability composition; command→owner validation→event; partial electrical/hydraulic/fuel loss; fuel/store mass properties; engine thrust/resource coupling; radar emission/propagation/receiver observation plus independent RWR interception; world structure change updating collision/LOS; renderer reading snapshots; AI responding differently to stale/missing reports.
 
-**Status:** Documentation and folder structure only.
+Assertions inspect authoritative state and public outputs. Include negative assertions that prohibited paths and unrelated side effects do not occur. Test reproducibility with same seed/input.

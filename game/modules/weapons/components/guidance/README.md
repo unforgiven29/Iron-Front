@@ -1,3 +1,5 @@
-# Guidance capability profiles
+# Guidance and autopilot component definitions
 
-Defines guidance-law interfaces, navigation inputs, command limits, update rates and loss-of-update behavior. Guidance acts only on permitted seeker/navigation/datalink observations and requests control through the weapon actuator interface.
+Own guidance-law and control configuration, not vehicle physics or target truth. Data declares law family, required seeker/navigation inputs, update rate, reference frame, limits, gains/tables, acceleration/turn constraints, actuator interface, terminal modes and lost-guidance policy.
+
+Guidance computes a command request from estimated state/observations; actuator/rigidbody/propulsion/ballistics produce the actual motion. Validate coordinate frames, sensor delay/uncertainty, saturation, actuator loss, target maneuver, coast/reacquisition and deterministic integration.

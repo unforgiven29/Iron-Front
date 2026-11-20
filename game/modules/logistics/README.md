@@ -1,14 +1,9 @@
-# logistics
+# Logistics and sustainment
 
-Logistics is a replaceable module. Supply stock, transport, fuel, ammunition, repair and recovery use explicit resource and event interfaces.
+**Owner:** game/modules/logistics. **Status:** architecture only; no supply/economy runtime.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Model production, storage, transport, distribution, consumption and repair support across bases, depots, airfields, ports and forward units. Use typed resources (fuel grade, ammunition type, spare parts, food/water/medical, personnel, repair capacity), not one generic supply percentage.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Flow: demand/order → reserve stock → assign transport → move with route capacity/time/hazards → receive/verify → update inventory → grant to consumer. Account for loss, delay, damage, interdiction, diversion, spoilage and failure; do not teleport/replenish resources without an event and source.
+
+Fuel system owns tank/feed; weapons/platform own ammunition use; logistics replenishes through explicit interfaces. Repair consumes parts/time/workforce. Infrastructure condition/ownership/frontline affects supply graph. Validate conservation, capacity, route disruption, contested nodes, failed deliveries, rearm/repair time, campaign days and save/load.

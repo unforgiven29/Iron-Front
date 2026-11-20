@@ -1,3 +1,7 @@
-# Surface-to-air missiles
+# Surface-to-air missile variants
 
-Owns exact SAM/MANPADS missile definitions and supported seeker, command, guidance, motor, fuze/warhead and launcher configuration. Ground air-defence platforms own their radar/EO fit, command network, launch rails/canisters, crew and resource installation. Target tracks enter through sensor/command contracts with age and uncertainty; no hidden campaign truth.
+Own exact SAM/MANPADS missile definition and supported seeker, command/uplink, guidance, motor, control, fuze/warhead and launcher configuration. Ground air-defence package owns radar/EO director, command network, crew, power/cooling, launcher placement and reload.
+
+Missile target information enters through local seeker, command guidance or permitted remote track updates with timestamp and uncertainty. No hidden campaign truth. Distinguish launcher acquisition, track quality, missile guidance support and terminal seeker state.
+
+Validate radar/director loss, datalink delay/loss, launcher readiness, launch zone, motor, seeker acquisition, guidance, terrain/low-altitude behavior, fuze, damage and no-target knowledge bypass.

@@ -1,12 +1,7 @@
-# missions
+# Mission templates, objectives and debrief
 
-Mission definitions, tasking, objectives, triggers and debrief contracts. Missions consume simulation events and sensor reports, not hidden truth.
+A mission definition describes task intent/evaluation, not a script that writes world truth. Define stable ID/version, required capabilities, start conditions, task graph, objectives, constraints, time windows, participants, intelligence assumptions and debrief outputs.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Progress consumes committed events/reports: destroyed event, occupied-area report, rescue event, facility repair, pilot status, etc. Distinguish actual objective state from what crew/command knows. Support branching, retask, abort, partial success, collateral/civilian outcomes and post-mission consequences.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Validate unreachable task nodes, missing event source, conflicting conditions, timer edges, unexpected unit loss, debrief reconstruction and repeatable mission seeds.

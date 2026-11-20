@@ -1,14 +1,11 @@
-# fusion
+# Multi-sensor and multi-source fusion
 
-Multi-sensor fusion contracts preserving source, timestamp, covariance/uncertainty and local-versus-remote provenance.
+**Owner:** sensors/fusion. **Status:** design only; no fusion runtime.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Correlate reports from radar, RWR/ESM, IRST, EO/FLIR, IFF, MAWS, datalink and external observers. Fusion does not own sensor tracks or create physical detections.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Inputs retain source, acquisition/publication time, frame, estimate, covariance/error bounds, quality, confidence, age and local/remote provenance. Transform through valid frame contracts. Account for latency and correlated copies; relayed versions of one track are not independent evidence.
+
+Define association gates, source correlation, track-to-track/measurement policy, duplicate suppression, split/merge and stale-source handling. Preserve conflicting hypotheses when identity is uncertain. Outputs include contributing sources and uncertainty so consumers can distinguish onboard detection from remote/fused track.
+
+Test delayed reports, duplicate relays, frame mismatch, outliers, source dropout, conflicting IFF, track split/merge and deterministic replay.

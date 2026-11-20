@@ -1,13 +1,15 @@
-# sensors — aircraft installation
+# F-16C Block 50 sensor installation manifest
 
-F-16-specific sensor fit manifest, mounting geometry, boresight, resource and avionics connections. Each sensor's shared engine remains in sensors/.
+Own the exact set of installed sensors and their aircraft integration, not shared sensor algorithms. The selected baseline is an F-16C Block 50 configuration; every device requires exact hardware/software/operator applicability before its fit is treated as fact.
 
-## Ownership rules
-- This folder contains only this aircraft variant's fit, installation and integration data.
-- Shared sensor/weapon/physics engines must not be copied into the aircraft module.
-- Use versioned configuration schemas and explicit hardware/software revisions.
-- Record source, page/table, date, applicability, confidence and uncertainty for every technical value.
-- Do not silently inherit equipment from a related block or variant.
-- Publish and consume typed interfaces for power, cooling, controls, avionics, damage and cockpit outputs.
+## Per-sensor installation data
+Stable equipment ID/version; physical mount and orientation; boresight/alignment; aperture/antenna placement; field of regard; cable/data/control interfaces; power/cooling; startup/BIT; display/audio mapping; damage/maintenance path; limitations and provenance. Use explicit absence for equipment not fitted.
 
-**Status:** Aircraft-specific architecture only; no functioning installation code is implied.
+## Candidate fit areas
+Radar; AN/ALR-56M RWR baseline (exact fit/revision verify); IFF; INS/GPS/EGI and air data; radio/datalink; EO/FLIR or targeting pod only if the selected configuration supports it; MAWS/IRST only if evidenced for that exact fit. Do not grant optional systems because a shared engine exists in the repository.
+
+## Interfaces
+Aircraft avionics maps cockpit mode/selection commands to the installed sensor. Sensor returns timestamped uncertain measurements/tracks. Resource systems supply actual power/cooling. Damage affects installed antennas/sensors through routing. No platform module contains a private sensor engine.
+
+## Tests
+Fit validation, absent equipment behavior, mount/boresight transforms, power/cooling, startup, controls/displays, damage and exact baseline compatibility.

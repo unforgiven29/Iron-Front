@@ -1,7 +1,9 @@
-# Networking and authority boundaries
+# Networking and authority adapters
 
-Networking is an adapter boundary, not a reason for simulation modules to depend on one backend. Define authoritative ownership, command validation, snapshots, replication, interpolation, reconciliation, latency/staleness and disconnect behavior.
+**Owner:** game/core/networking for transport and replication boundary. **Status:** no network runtime/backend is implemented.
 
-Single-player/client-local operation must work without a server. Persistent cooperative campaigns, shared state and server-authoritative multiplayer require an external service; static GitHub Pages cannot provide it.
+Keep physical simulation transport-agnostic. Local single-player must work without server access. Before multiplayer, define entity authority, command authorization, snapshot replication, interpolation/reconciliation, latency/staleness and transfer of ownership. Never permit two peers to authoritatively advance the same entity.
 
-**Status:** Architecture specification only.
+Messages carry version, sequence, simulation tick, source, acknowledgement/expiry where needed and distinct wall-clock receive metadata. Handle loss, duplication, reordering, disconnect/reconnect, incompatible versions and partial replication. Do not compare wall-clock time with simulation time without an explicit conversion.
+
+GitHub Pages hosts static client assets but cannot provide persistent authoritative cooperative campaigns. Such a feature needs an external backend adapter and security model. Test authority violation, latency/loss/reordering, reconnect/resync and local mode with networking absent.

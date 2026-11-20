@@ -1,14 +1,24 @@
-# README.md
+# Content and platform modules
 
-All content modules are independently identifiable, versioned and replaceable. Shared simulation engines live outside platform/content folders. Module discovery uses manifests and registries, not hardcoded lists.
+**Owner:** game/modules. **Status:** package boundaries and documentation exist; most domain runtime implementations remain future work.
 
-## Claude implementation rules
-- Treat this as a replaceable module boundary, not a second copy of a shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Mark unknown or estimated technical values with provenance. Never invent authoritative specifications.
-- Include normal, degraded, failed and boundary validation cases when implementation begins.
+Content modules select and configure shared capabilities. They are not a second home for physics/sensor engines. A loadable module has stable ID/version, kind, capabilities, dependencies, schema-validated configuration, lifecycle and provenance.
 
-**Status:** Architecture/documentation only. This README does not claim that runtime code or validated data exists.
+## Package families
+- planes: exact aircraft variants, installations, cockpit mappings and platform data.
+- weapons: exact weapon products and component composition.
+- ground-units: tanks, IFV/APC, artillery and air-defense platform configuration.
+- infantry: individuals, squads, behavior/equipment profiles.
+- naval-units: ship variants and carrier operations.
+- ai: doctrine, agent behavior and command/control.
+- logistics: supply, transport, repair and resource distribution.
+- campaign: factions, scenarios, missions, strategic state and campaign history.
+
+## Common module layout guidance
+Use only the subpackages that the actual product supports. Typical responsibilities include definition/data, installation/configuration, controls, damage mapping, assets and validation. Do not create empty module trees simply to imitate another platform. A folder may be data organization rather than an independently loadable module.
+
+## Composition rules
+Shared algorithm remains under its canonical owner. Module manifests reference capabilities/API versions, not directory paths or display names. Required missing dependencies fail before runtime; optional absence has explicit degraded behavior. No silent equipment substitution. Exact fit and software baseline matter.
+
+## Adding a product
+Identify exact variant/operator/software baseline; record source applicability; define geometry/mass/installation; select shared capabilities; add control/asset mappings; validate compatibility and failure paths; prove consumers work without shared name-based branches.

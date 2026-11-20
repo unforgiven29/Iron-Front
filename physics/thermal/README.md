@@ -1,14 +1,9 @@
-# thermal
+# Thermal physics
 
-Shared heat transfer and thermal-state services used by engines, equipment, weapons, environment and thermal sensors.
+**Owner:** physics/thermal. **Status:** architecture only; no reusable heat-transfer runtime exists.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+Provide generic thermal-state and heat-flow calculations for engines, electronics, radar, batteries, weapons, environment and infrared signatures. Equipment owns its heat sources, thermal nodes, limits and control logic; cooling system owns installed cooling network.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Represent thermal mass/capacitance, heat capacity, node temperature, heat generation, conductance/resistance, convection boundary, radiative exchange and coolant coupling at declared fidelity. Keep kelvin/temperature differences dimensionally correct; a temperature limit is not a health percentage.
+
+Temperature changes may derate, disable, damage or alter radiance of equipment through explicit interfaces. A thermal sensor measures radiance after path/detector effects, not hidden node temperatures. Validate steady-state and transient balance, time constants, ambient effects, coolant loss, overheat derating, cooldown and repeatability.

@@ -1,3 +1,7 @@
-# Infrastructure
+# Infrastructure and facilities
 
-Owns roads, rail, bridges, airfields/runways, ports, depots, refineries, fuel storage, power facilities and communications sites as world entities. Operational state and inventories are exposed through explicit services/modules, not hardcoded into terrain tiles.
+Own roads, rail, bridges, runways, airfields, ports, depots, fuel storage, refineries, power and communications sites as stable world entities. Inventories/services are owned by logistics or system modules, not baked into terrain tiles.
+
+Facilities declare footprint/location/elevation, route graph edges, capacity/surface, access, ownership reference, operational capability, physical/damage state, service interface, asset/source. Airfield data includes runway geometry/surface/length/heading, taxi/parking and service capability; ports include berth/depth/access.
+
+Validate connectivity, capacity, runway/berth constraints, route damage, facility shutdown/recovery, ownership changes and save/streaming identity.

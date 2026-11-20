@@ -1,14 +1,18 @@
-# fire control
+# Fire-control and weapon-release solution services
 
-Reusable fire-control interfaces and computation services. Platform-specific sights, ballistic tables and procedures remain in equipment modules.
+**Owner:** game/systems/fire-control. **Status:** architecture only; no firing-solution engine exists.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+## Responsibility
+Turn permitted target/track observations and own-platform/weapon state into estimated aiming/intercept/release solutions. Sensor owners provide observations; ballistic/weapon physics estimate trajectories; platform packages provide sights, stabilization, control procedures and exact weapon fit.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+## Inputs
+Track/measurement with source/time/uncertainty; own-platform navigation/state; weapon/station configuration; ballistic tables; range/rate/angle limits; stabilization and actuator state. Reject stale, invalid, incompatible or unsupported data explicitly.
+
+## Outputs
+Predicted intercept/release point, time, launch/release envelope, uncertainty, quality, limiting reason and operator cue. It is an estimate, not a guaranteed hit. A release command goes to launcher; launcher owns compatibility, interlocks, consent/arming and separation validation.
+
+## Domain separation
+Gun lead, bomb release cue, missile launch cue and ground/naval fire solution may share contracts but have different constraints. The weapon seeker/guidance owns post-release updates. Do not use a hidden target coordinate or bypass sensor/launcher state.
+
+## Tests
+Known geometry/kinematics, stale track, uncertainty sensitivity, unavailable navigation, wrong store, outside envelope, stabilization failure, command delay and no hidden-target access.

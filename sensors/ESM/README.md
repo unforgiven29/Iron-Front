@@ -1,14 +1,9 @@
-# ESM
+# Electronic support measures (ESM)
 
-Electronic support measures: collection, pulse/measurement analysis, emitter association, geolocation and reports with uncertainty. Reuse shared RF propagation.
+**Owner:** sensors/ESM. **Status:** design only; no ESM receiver, measurement or geolocation runtime.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+ESM collects/analyzes emitted RF energy over fitted bands, associates measurements with candidate emitters and publishes uncertain bearing/geolocation reports. It does not transmit radar pulses, see radar target tracks or access a list of all entities.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Processing: receiver/aperture response → channelization → pulse/CW feature measurement → deinterleaving → emitter association → library comparison/classification → bearing/geolocation estimate → emitter report/track. Inputs are only received signals after propagation and receiver limits. Overlap, intermittent emission, frequency agility, jamming and low SNR may make identity ambiguous.
+
+Outputs retain time, frequency/PRI/pulse-width/amplitude/bearing when observable, uncertainty, quality, candidate identities and age. Reuse RWR utilities only through contracts; mission ESM and cockpit warning policy remain distinct. Validate overlapping emitters, bearing error, own-platform motion, receiver saturation, intermittent emissions and multiple-hypothesis classification.

@@ -1,9 +1,18 @@
-# Persistence, save/load and replay
+# Save/load, migrations and deterministic replay
 
-Save data is versioned scenario state, not a dump of arbitrary live JavaScript objects. A save records format version, tick/time, scenario/configuration identity, module IDs/versions, random stream state, entity/system state and migration metadata.
+**Owner:** game/core/persistence coordinates serialization. Each module serializes its own authoritative state. **Status:** design only.
 
-Each module owns serialization of its state through a versioned contract; core coordinates orchestration. Load validates required modules and schemas before mutating the running scenario. Migrations are explicit and tested. Unknown optional data may be preserved when safe; incompatible critical state fails with a useful explanation rather than silently changing equipment.
+## Save envelope
+Record format version, scenario ID/seed, tick and step settings, module IDs/versions, configuration hashes, entity IDs/composition, per-module state payloads, PRNG stream states and migration metadata. Do not dump arbitrary JavaScript object graphs or renderer handles.
 
-Command/event recording supports deterministic replay. Browser local storage is not a durable multiplayer database.
+## Snapshot versus replay
+A save restores a snapshot. Replay reconstructs a timeline from initial state plus recorded commands/external inputs. Replay requires seeds, module/data versions, numeric settings, scheduler semantics and external input record.
 
-**Status:** Architecture specification only.
+## Atomic load
+Validate critical modules/payloads and cross references before mutating the live scenario. Restore into staging state, validate and then commit. If required data or migration fails, abort and retain the original running state.
+
+## Migration
+Use explicit schema-version transitions and tests. Unknown optional fields may be preserved when safe; unknown critical state fails visibly. Never silently change equipment fit or physics meaning.
+
+## Hosting and tests
+Browser-local export/import is appropriate for local play; GitHub Pages is not a durable multiplayer database. Test round-trip, corruption, missing modules, incompatible versions, failed migrations, deterministic replay, stable IDs and long-running save size.

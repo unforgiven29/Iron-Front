@@ -1,14 +1,7 @@
-# ships
+# Ship class and variant packages
 
-Ship classes and variants with hull, propulsion, sensors, weapons, crew stations and damage layouts as versioned data.
+A ship package owns exact hull class/variant, dimensions, displacement/draft, mass/CG/inertia, compartment layout, propulsion/shaft/rudder/propeller installation, electrical/fuel/cooling topology, crew stations, sensors/antennas, weapon mounts, magazines, communications, damage-control map, boat/aircraft interfaces and source/asset metadata.
 
-## Module requirements
-- Provide a versioned manifest and schema-validated configuration for each concrete variant.
-- Keep content data separate from shared algorithms and mutable runtime state.
-- Declare dependencies, capabilities, coordinate frames, units, lifecycle and failure outputs.
-- Use shared physics/sensor/resource/damage services through explicit contracts.
-- Avoid hardcoded vehicle names, faction branches and duplicated solvers.
-- Record sources, confidence and uncertainty for technical values.
-- Include integration and negative tests when runtime implementation begins.
+Shared physics/services calculate body motion, propulsion, collision, water/sea interaction at supported fidelity, weapons, sensors and damage. Platform config supplies fit and topology. Do not make ship movement a renderer animation or treat hull compartments as generic hit points.
 
-**Status:** Folder and handoff documentation only.
+Validate turning/stop/draft, loading, propulsion/shaft/rudder failure, flooding/fire isolation, electrical distribution, sensor arcs, weapon compatibility, crew and port/grounding behavior.

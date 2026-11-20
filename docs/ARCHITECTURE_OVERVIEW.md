@@ -1,58 +1,55 @@
 # Iron-Front architecture overview
 
-Read this before creating files, changing ownership or implementing subsystems. This is the project architecture authority; subsystem READMEs refine it but must not contradict it.
+**Authority:** repository-wide ownership, dependency direction and boundaries. Detailed behavior belongs in the README beside its canonical owner. This is an index and boundary map, not one combined implementation manual.
 
-**Status:** Architecture specification and initial executable shell. Most simulation systems remain unimplemented.
+**Status:** initial app shell and a few core primitives exist. Most simulation systems remain unimplemented.
 
 ## Dependency direction
-
-1. game/core owns time, lifecycle, module discovery, command/event dispatch, resource coordination, persistence, diagnostics and spatial services.
-2. physics owns shared physical/numerical services.
-3. sensors and domain engines consume public contracts and publish observations/effects.
-4. Platform/content modules select and configure capabilities and provide installation-specific adapters.
-5. AI/campaign/mission modules consume published world/sensor reports and events; they do not query hidden truth.
-6. Cockpit/UI/audio/rendering consume immutable snapshots and issue typed commands; presentation never owns authoritative state.
+1. game/core coordinates time, modules, entities, messages, resources, configuration, persistence, diagnostics and spatial services.
+2. physics owns reusable numerical/physical models.
+3. game/systems owns reusable platform network/system behavior.
+4. sensors owns sensor equipment/processing; physics provides shared propagation/environment models.
+5. game/modules contains aircraft, weapons, ground units, infantry, naval units, AI, logistics and campaign content/configuration.
+6. game/world owns authoritative spatial content and procedural placement.
+7. game/graphics-engine consumes snapshots and sends commands; it never decides simulation outcomes.
 
 ## Canonical ownership
 
-| Concern | Owner | Must not be duplicated in |
+| Concern | Owner | Must not be owned by |
 |---|---|---|
-| Clock, tick phases, lifecycle, registry | game/core | Aircraft, weapons, campaign or UI |
-| Resource coordination | game/core/resources plus game/systems adapters | Individual engines/sensors |
-| Rigid-body state/integration | physics/rigidbody | Aircraft packages |
-| Atmosphere/weather | physics/environment | Aircraft or renderer |
-| Aerodynamics/local airflow | physics/aerodynamics | Individual aircraft |
-| Engine-family solvers | physics/propulsion | Aircraft modules |
-| RF propagation/scattering | physics/radar | Radar, RWR or campaign |
-| Radar equipment/processing | sensors/Radar | Aircraft packages |
-| RWR processing | sensors/RWR | Aircraft RWR installations |
-| Ballistics | physics/ballistics | Individual weapons |
-| Ground mobility | physics/ground-mobility | Individual ground vehicles |
-| Armour interaction | physics/armour | Individual platforms |
-| World truth | game/world | Renderer, sensors or campaign |
-| Rendering/cockpit/audio/UI | game/graphics-engine | Simulation authority |
-| Campaign rules | game/modules/campaign | Global core/runtime |
-
-The canonical owner is the only authoritative implementation. Others consume its public interfaces.
-
-## Composition and configuration
-
-Every loadable module has stable ID, semantic version, kind, capabilities, dependencies, configuration schemas and lifecycle. Resolve dependencies by capability/API version, not folder path or display-name conditionals. Missing required providers and cycles fail before startup. Optional absence has explicit degraded behavior; no silent substitution.
-
-Use composition, not deep inheritance. Aircraft/vehicle/weapon packages supply immutable variant/install/configuration data and platform adapters. Shared engines remain platform-neutral. Replace providers by configuration only when the replacement satisfies the same interface and tests.
+| Clock/order/lifecycle/entities/messages | game/core | platform modules, campaign, renderer |
+| Resource arbitration | game/core/resources | individual network solvers |
+| Electrical/hydraulic/fuel/cooling networks | game/systems | cockpit or physics integrator |
+| Six-DoF rigid body | physics/rigidbody | aircraft package or renderer |
+| Aero/local airflow | physics/aerodynamics | aircraft package (provides data only) |
+| Atmosphere/weather | physics/environment | renderer or platform-local duplicate |
+| Engine-family behavior | physics/propulsion | aircraft package (installation/data only) |
+| Collision/contact | physics/collision | visual mesh tests |
+| Ballistics | physics/ballistics | weapon package duplicate |
+| Armour interaction | physics/armour | vehicle-specific duplicate |
+| Ground mobility | physics/ground-mobility | vehicle package movement script |
+| RF environment/scattering/clutter | physics/radar | radar/RWR receiver |
+| Radar equipment/processing | sensors/Radar | aircraft package |
+| RWR/ESM | sensors/RWR and sensors/ESM | radar target-track internals |
+| IRST/EO/IFF/MAWS/fusion | corresponding sensors/<system> | campaign truth |
+| Equipment installation and cockpit mapping | platform package | shared solver |
+| Weapon composition/lifecycle | game/modules/weapons | physics algorithm owner |
+| World truth | game/world | renderer/sensor/campaign |
+| AI decisions and doctrine | game/modules/ai | physics or hidden state |
+| Campaign rules | game/modules/campaign | global runtime/physics |
+| Rendering/audio/UI/assets | game/graphics-engine | authoritative systems |
 
 ## State and information boundaries
+Definitions/configuration are immutable during a scenario except explicit reconfiguration boundaries. Runtime state is changed only by its owner. Other systems receive typed commands, committed events, resource grants, observations and immutable snapshots. Preserve observation source, acquisition time, frame, age, uncertainty and quality through fusion/datalink/AI/presentation. Diagnostics are developer-only and not a hidden information API.
 
-Separate immutable definitions/configuration, mutable runtime state, observations, commands, committed events, immutable snapshots and diagnostics. One owner changes each authoritative state. Sensors and AI see only reports permitted by interfaces; preserve source, time, frame, age, quality and uncertainty.
+## Composition
+Modules have stable IDs, semantic versions, capabilities/API versions, dependencies, configuration schemas and lifecycle. Resolve by capability/version, not folder or display name. Required missing/incompatible/cyclic dependencies fail before startup. Optional dependencies require explicit degraded behavior. A folder is not automatically a module.
 
-## Time and coordinate conventions
+## Time and numerical conventions
+Authoritative time uses integer ticks and a documented step. Initial rigid-body/control target is 120 Hz, subject to validation. Other systems declare their own update domains. Rendering interpolates immutable snapshots. Use SI, local right-handed ENU world, right-handed FRD aircraft body and normalized [x,y,z,w] body-to-world quaternions as defined in docs/simulation-conventions/README.md.
 
-Read docs/simulation-conventions/README.md. Initial physics/control timestep target is 120 Hz; rendering is independent. World uses right-handed local ENU; aircraft body uses right-handed FRD; quaternions are [x,y,z,w] body-to-world. SI units are canonical.
+## Detailed owner guides
+Core: game/core/README.md. Physics: physics/README.md. Platform systems: game/systems/README.md. Sensors: sensors/README.md. Content modules: game/modules/README.md. World: game/world/README.md. Presentation: game/graphics-engine/README.md. Validation: docs/testing-and-validation/README.md.
 
-## Implementation order
-
-Follow docs/implementation-roadmap/README.md. The first aircraft vertical slice is F-16C Block 50; MiG-29 product 9.13 is a later second-platform proof. Do not start campaign expansion before core, physics and aircraft contracts work.
-
-## Browser deployment
-
-The app is built from game/ by Vite into dist/ and deploys to GitHub Pages. Static hosting cannot provide persistent authoritative multiplayer. A future backend is an adapter, not a dependency of local simulation.
+## Hosting
+The browser client is statically built from game/ and can run local single-player with explicit save export/import. GitHub Pages is not an authoritative multiplayer backend. Persistent co-op needs a separate backend adapter; do not make backend access mandatory to local simulation.

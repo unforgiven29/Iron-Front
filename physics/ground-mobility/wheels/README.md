@@ -1,3 +1,7 @@
-# Wheeled mobility
+# Wheeled vehicle mobility
 
-Reusable wheel contact, steering, braking, rolling resistance and slip models. Wheel count, size, suspension and steering geometry are platform data. Share contact/force interfaces with tracked vehicles where physically valid without forcing identical dynamics.
+**Owner:** physics/ground-mobility/wheels. Platform data supplies wheel dimensions, steering geometry, axle/differential layout, tire properties, pressure/load limits and drive/brake fit.
+
+Calculate tire forces from wheel angular speed, contact normal load, slip ratio/angle, surface and combined-slip limits. Include rolling resistance, steering geometry, drive torque and braking. Tire/surface models declare range and are not one universal traction coefficient.
+
+Validate static load, acceleration/braking, cornering, combined slip, wheel lift, tire damage, low/high pressure assumptions, loose surface and deterministic contact.

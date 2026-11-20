@@ -1,14 +1,7 @@
-# naval units
+# Naval platform modules
 
-Ships and naval platforms as replaceable modules over shared movement, propulsion, damage, sensor, weapon and crew services.
+Ship packages own exact hull variant, displacement/draft, geometry, mass/CG/inertia, propulsion/shaft/rudder installation, fuel/electrical/cooling topology, compartments/bulkheads, crew, sensors, antennas, weapons, communications, damage-control, aircraft/deck interface and provenance. Shared rigidbody/collision/propulsion/damage/sensor/weapon services remain external.
 
-## Claude implementation rules
-- This is a replaceable module boundary, not a duplicate shared engine.
-- Use versioned manifests, schema-validated configuration, explicit dependencies and lifecycle contracts.
-- Separate immutable definitions, mutable runtime state, algorithms, diagnostics and presentation.
-- Prefer data-driven variants, capability interfaces, dependency injection and registries over hardcoded platform/faction/name conditionals.
-- Exchange typed commands, events, resource allocations and immutable snapshots; declare units, frames, timestamps and uncertainty.
-- Unknown or estimated values require provenance. Never invent authoritative specifications.
-- Validate normal, degraded, failed and boundary conditions.
+World owns water/coast/bathymetry. Naval movement requires physical force/propulsion and supported hydrodynamic/sea-state models; do not directly animate ship position as authoritative movement. Carrier operations coordinate deck/catapult/arresting and aircraft handling but do not own aircraft flight physics.
 
-**Status:** Architecture/documentation only; no runtime implementation is implied.
+Validate turning/stopping, draft/grounding, loading, propulsion/rudder damage, flooding/fire boundaries, sensor/weapons integration, carrier deck cycles and logistics.

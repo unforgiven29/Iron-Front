@@ -1,23 +1,9 @@
-# Weapon module architecture
+# Weapon content and runtime composition
 
-Weapons are independently configurable content modules composed from shared guidance, seeker, fuze, warhead, launcher, ballistics, collision, damage and resource interfaces. A weapon package describes one exact product/variant and its supported configuration; generic physics and processing remain outside it.
+Weapon packages compose exact body/mass/inertia, motor, aero/ballistics, seeker, guidance/autopilot, fuze/arming, warhead, launcher/station, data link, power/thermal, countermeasure interaction and assets. Shared trajectory, propulsion, seeker/sensor, collision, armor and damage algorithms remain in canonical owners.
 
-## Content categories
+Lifecycle: stored → configured → release requested → launcher validates compatibility/interlocks/safe envelope → separation event → boost/coast/guided phases → seeker/track state if fitted → armed → impact/miss/dud/self-destruct/inert result → damage report. Define abort and lost-guidance behavior.
 
-- Guns and ammunition.
-- Air-to-air, air-to-ground, anti-radiation, anti-ship and surface-launched missiles.
-- Guided/unguided bombs and glide weapons.
-- Rockets and rocket pods.
-- Naval weapons where supported.
-- Launchers, pylons, racks, stations and release adapters.
-- Countermeasures and expendables.
+Post-release weapon uses only onboard seeker, inertial state, initial release data and permitted datalink/external reports. Never read hidden target truth or guarantee acquisition/hit. Categories include guns/ammo, air-to-air/air-to-ground/anti-radiation/anti-ship/SAM missiles, bombs/glide weapons, rockets, torpedoes/mines and countermeasures.
 
-## Composition
-
-A weapon can reference seeker capability/configuration, guidance law/navigation, fuze and arming conditions, warhead effect model, propulsion/motor data, launcher compatibility/station geometry, telemetry/faults and asset/audio/cockpit references. Not every weapon has every capability; absence is explicit. Similar weapons may share an implementation but retain their own limits and data.
-
-Launcher validates compatibility and release conditions. After release the weapon owns its flight state and consumes only observations available through its seeker/navigation/datalink contracts. Guidance requests control; shared propulsion/ballistics/actuator models affect motion; fuze/warhead acts only when arming/trigger conditions are satisfied. Damage is applied through shared damage services.
-
-Do not allow hidden-target reads, perfect tracking, arbitrary target reacquisition or instantaneous arming. Each weapon has exact variant ID, mass/geometry, propulsion, seeker/guidance, fuze/warhead, release compatibility, safe envelope, provenance and uncertainty.
-
-**Status:** Architecture/folders only; no functioning weapon simulation is implied.
+Validate fit/release, separation, mass/drag changes, powered/coast trajectory, seeker/guidance limits, countermeasures, fuze safety, effects and replay.

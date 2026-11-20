@@ -1,3 +1,7 @@
-# Guns and ammunition
+# Gun and ammunition definitions
 
-Owns gun/ammunition definitions, feed/belt configuration, mount compatibility, fire-control interfaces and provenance. Projectile motion/impact use shared ballistics, collision and damage services. Platform modules define gun installation and cockpit controls.
+Own gun/ammunition product data, feed/belt arrangement, projectile mass/geometry, muzzle condition, mounting/compatibility, fire control integration and provenance. Platform supplies physical installation, traverse/elevation, trigger controls, recoil mount and ammunition inventory.
+
+Shared ballistics handles projectile trajectory; collision/armor/damage resolve impacts; fire control estimates lead from observations. Model rate/dispersion/heat/barrel wear and jams only to supported fidelity. Do not spawn hits at reticle position or use hidden target coordinates.
+
+Validate feed/ammo accounting, cadence, recoil, projectile dispersion, muzzle velocity envelope, lead solution, heat/jam/degradation and impact/damage.

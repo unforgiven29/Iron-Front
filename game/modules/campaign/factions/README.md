@@ -1,12 +1,5 @@
-# factions
+# Faction content definitions
 
-Faction definitions are data modules: identifiers, relationships, doctrine references, equipment access and starting parameters. Campaign logic must not hardcode faction names.
+Factions are data modules, not hardcoded branches. A definition may include stable ID, display name, doctrine references, command structure, diplomatic relations, equipment access/pools, starting force/reserve parameters, logistics policy and narrative metadata. Values are sourced or explicitly fictional/gameplay-tuned.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
-
-**Status:** Architecture handoff only; not a runtime implementation.
+Campaign/AI resolve faction policy by IDs/capability/configuration. No faction-name conditional in shared runtime. Keep visual insignia/livery separate from combat mechanics. Validate duplicate IDs, missing doctrine/equipment refs, incompatible variant fit, invalid relations and provenance.

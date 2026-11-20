@@ -1,12 +1,9 @@
-# persistence
+# Campaign save payloads and migrations
 
-Campaign save schema, versioning, migrations and serialization adapters. Persistence uses core save/load services and must not own campaign simulation rules.
+**Owner:** campaign/persistence for strategic payload schema; game/core/persistence coordinates the transaction. **Status:** design only.
 
-## Rules
-- Implement as a versioned, replaceable module with schema-validated data.
-- Do not hardcode faction, scenario, mission or platform identities in shared engine code.
-- Consume and publish explicit commands, events and timestamped reports.
-- Preserve uncertainty and provenance; AI and mission logic cannot read hidden sensor truth.
-- Keep shared simulation services outside this content module.
+Campaign payload stores strategic state, not a dump of active runtime objects: faction relations, territorial ownership/frontline, campaign clock, logistics stock/contracts, production, reserves, mission history, political/peace state, news/war events, civilian outcomes and references to active entities. Active units serialize through their platform/core modules and are linked by stable IDs.
 
-**Status:** Architecture handoff only; not a runtime implementation.
+Record schema/content versions, scenario/world seed and generator version, module/config hashes, event cursor/history policy, and migration metadata. Validate references between unit/faction, facility/owner, mission/events and inventory/logistics nodes before committing load.
+
+Load into staging state; validate all required cross references; commit atomically. Failed migration leaves original state intact. Preserve unknown optional history when safe; fail on incompatible critical state. Test round-trip over multiple campaign days, corrupted data, version upgrade, missing optional content and stable IDs.

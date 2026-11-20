@@ -1,3 +1,7 @@
-# Air-to-air missiles
+# Air-to-air missile variants
 
-Owns exact AAM variant data, seeker/guidance fit, motor, control limits, fuze/warhead, launch envelope and provenance. Seeker reports retain field-of-regard, update-rate and uncertainty; hidden-target tracking is prohibited.
+Own exact AAM variant data and composition: body/mass/inertia, motor, aero/control, seeker band/FOV/update/track limits, guidance, fuze/arming, warhead, launcher compatibility, datalink and provenance. Shared propulsion/ballistics/sensor/damage engines execute behavior.
+
+Distinguish active radar, semi-active radar, IR, command/beam-riding or other seeker architectures only when the exact missile supports them. Initial cue is not confirmed acquisition. After release the missile receives only onboard seeker, inertial and permitted datalink information; it cannot read target state.
+
+Validate launch envelope, separation, motor transient, seeker field-of-regard, target maneuver/uncertainty, chaff/flare/electronic countermeasure interactions, lost track, guidance saturation, fuze safety and terminal effects. Exact limits need sources; unknown remains unknown.
