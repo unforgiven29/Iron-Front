@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iron-front.local/schemas/module-manifest.schema.json",
+  "title": "Iron-Front Module Manifest",
+  "description": "Declarative description of a loadable module; this schema does not implement a loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestSchemaVersion", "id", "kind", "name", "version", "apiCompatibility", "provides", "dependencies", "configuration"],
+  "properties": {
+    "manifestSchemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*)+$" },
+    "kind": { "enum": ["aircraft", "ground-vehicle", "infantry", "naval-unit", "weapon", "sensor", "physics-service", "simulation-service", "world-content", "campaign", "asset-pack", "ui"] },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "$ref": "#/$defs/semver" },
+    "apiCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum"],
+      "properties": {
+        "minimum": { "$ref": "#/$defs/semver" },
+        "maximumExclusive": { "oneOf": [{ "$ref": "#/$defs/semver" }, { "type": "null" }] }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "family": { "type": "string" },
+        "designation": { "type": "string" },
+        "revision": { "type": "string" },
+        "operatorBaseline": { "type": "string" },
+        "effectiveDate": { "type": "string", "format": "date" }
+      }
+    },
+    "provides": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
+    "dependencies": { "type": "array", "items": { "$ref": "#/$defs/dependency" } },
+    "configuration": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "schemaId", "schemaVersion"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "schemaId": { "type": "string" },
+          "schemaVersion": { "type": "integer", "minimum": 1 },
+          "required": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "moduleId"],
+        "properties": {
+          "role": { "type": "string" },
+          "moduleId": { "type": "string" },
+          "configurationId": { "type": "string" },
+          "optional": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path"],
+        "properties": {
+          "id": { "type": "string" },
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "license": { "type": "string" }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initialization": { "enum": ["eager", "lazy", "scenario-load"] },
+        "updateDomain": { "enum": ["fixed-tick", "event-driven", "scheduled", "presentation-only", "static-data"] },
+        "deterministic": { "type": "boolean" },
+        "supportsSaveState": { "type": "boolean" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maintainer": { "type": "string" },
+        "source": { "type": "string" },
+        "license": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "apiVersion"],
+      "properties": {
+        "id": { "type": "string" },
+        "apiVersion": { "$ref": "#/$defs/semver" },
+        "description": { "type": "string" }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilityId", "versionRange", "optional"],
+      "properties": {
+        "capabilityId": { "type": "string" },
+        "versionRange": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "providerModuleId": { "type": "string" },
+        "degradedBehavior": { "type": "string" }
+      },
+      "allOf": [{
+        "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
+        "then": { "required": ["degradedBehavior"] }
+      }]
+    }
+  }
+}

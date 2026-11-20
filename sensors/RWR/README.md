@@ -8,7 +8,7 @@ Read [the RWR implementation guide](CLAUDE_IMPLEMENTATION_GUIDE.md), [shared sen
 
 ## Ownership
 
-- `sensors/RWR/` owns installed RWR equipment, antenna/receiver configuration, channelization, pulse/scan measurements, deinterleaving, emitter association, classification, emitter tracks, threat evaluation, cockpit output and equipment health.
+- `sensors/RWR/` owns the shared dynamic RWR runtime, generic antenna/receiver processing, channelization, measurements, deinterleaving, emitter association, classification, emitter tracks, threat evaluation, shared interfaces, diagnostics and validation. It does not own aircraft-specific equipment profiles or installations.
 - `physics/radar/` and its shared propagation/emission environment own world-space RF propagation and radar-emitter signal representation. Extend existing ownership; do not create a second propagation engine.
 - Radar equipment publishes time-bounded emissions from its actual transmitter, waveform, antenna pattern, beam schedule, power state and mode. RWR never queries a radar's private state or target list.
 - Aircraft modules select the exact RWR fit, antennas, apertures, software/library baseline, installation, controls, power/cooling and cockpit mapping.
@@ -47,7 +47,7 @@ Each stage has explicit inputs, outputs, timing, uncertainty and failure states.
 | `threat-evaluation/` | Threat ranking and warning logic from evidence and configured doctrine |
 | `cockpit/` | Aircraft-specific display, audio, controls, modes and annunciation |
 | `health/` | BIT, calibration, antenna/receiver faults, damage and degradation |
-| `data/` | Emitter libraries, RWR equipment definitions, source and uncertainty records |
+| `data/` | Shared generic definitions and source/uncertainty records; equipment-specific profiles live with each platform |
 | `integration/` | Radar emission interface, EW, avionics, datalink and aircraft resource adapters |
 | `diagnostics/` | Replay, pulse/event inspection, confidence and error budgets |
 | `lab/` | Controlled RWR scenarios using the production processing chain |
@@ -169,20 +169,19 @@ The intended implementation is **one shared, dynamic RWR runtime**, not a separa
 
 | Path | Owns |
 |---|---|
-| `core/` | Runtime orchestration, lifecycle, receiver-to-display processing sequence and state transitions |
-| `hardware/` | Reusable hardware models and interfaces for receiver/processor assemblies; aircraft apertures remain in the existing `antennas/` area |
-| `display/` | Generic display-state and audio-output adapters, with equipment-specific presentation rules |
-| `equipment/AN-ALR-67/V2/` | AN/ALR-67(V)2 capability/configuration profile |
-| `equipment/AN-ALR-67/V3/` | AN/ALR-67(V)3 capability/configuration profile |
-| `equipment/SPO-15LM/` | SPO-15LM capability/configuration profile and its characteristic channel/lamp/CW logic |
-| `installations/F-16/` | Aircraft-specific RWR fit, aperture transforms, airframe masking, wiring, resource connections and cockpit mapping |
-| `installations/MiG-29A/` | MiG-29A-specific RWR fit and cockpit/airframe integration |
-| `libraries/emitter-library/` | Versioned emitter signature data with source, confidence, uncertainty and applicability |
-| `interfaces/` | Typed contracts for configuration, received observations, emitter contacts, commands and display snapshots |
-| `validation/scenarios/` | Repeatable RF/RWR interaction scenarios |
-| `validation/tests/` | Unit, integration, regression and deterministic replay tests |
+| `sensors/RWR/core/` | Shared runtime orchestration, lifecycle and processing sequence |
+| `sensors/RWR/hardware/` | Reusable receiver/processor interfaces and hardware models |
+| `sensors/RWR/receiver/` | Generic receiver response and limitations |
+| `sensors/RWR/antennas/` | Generic aperture response/DF algorithms and contracts; no aircraft-specific placement |
+| `sensors/RWR/interfaces/` | Typed contracts for emissions, observations, contacts, commands and snapshots |
+| `sensors/RWR/libraries/emitter-library/` | Shared reusable emitter records with provenance and uncertainty |
+| `sensors/RWR/validation/` | Shared scenarios, tests and metrics |
+| `game/modules/planes/F-16/RWR/` | F-16C Block 50 profile, installation, antennas, library selection, display and audio |
+| `game/modules/planes/MiG-29A/RWR/` | Product 9.13 profile, installation, antennas, library selection, display and audio |
 
-The existing `receiver/`, `antennas/`, `channelization/`, `measurements/`, `pulse-descriptors/`, `deinterleaving/`, `emitter-association/`, `classification/`, `tracking/`, `threat-evaluation/`, `cockpit/`, `health/`, `data/`, `integration/`, `diagnostics/` and `lab/` directories remain in place. Do not create duplicate owners for those responsibilities.
+Aircraft-specific profiles must not be stored under the shared RWR engine. A platform composes the shared runtime by selecting an equipment configuration and supplying its own installation adapters.
+
+The existing shared `receiver/`, `antennas/`, `channelization/`, `measurements/`, `pulse-descriptors/`, `deinterleaving/`, `emitter-association/`, `classification/`, `tracking/`, `threat-evaluation/`, `cockpit/`, `health/`, `data/`, `integration/`, `diagnostics/` and `lab/` directories remain in place. Aircraft-specific RWR folders contain only profile/configuration/installation/presentation data and adapters. Do not duplicate shared algorithms.
 
 ### Configuration layers
 

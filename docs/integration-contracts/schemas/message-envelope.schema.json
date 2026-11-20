@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iron-front.local/schemas/message-envelope.schema.json",
+  "title": "Iron-Front Message Envelope",
+  "description": "Shared metadata envelope for commands, events, observations and snapshots. Payload semantics belong to a versioned domain contract.",
+  "type": "object",
+  "required": ["messageId", "contractId", "contractVersion", "producerModuleId", "simulationTick", "messageKind"],
+  "properties": {
+    "messageId": { "type": "string", "minLength": 1 },
+    "contractId": { "type": "string", "minLength": 1 },
+    "contractVersion": { "type": "integer", "minimum": 1 },
+    "producerModuleId": { "type": "string", "minLength": 1 },
+    "entityId": { "type": "string" },
+    "simulationTick": { "type": "integer", "minimum": 0 },
+    "simulationTimeSeconds": { "type": "number", "minimum": 0 },
+    "frameId": { "type": "string" },
+    "correlationId": { "type": "string" },
+    "messageKind": { "enum": ["command", "event", "observation", "snapshot"] },
+    "status": { "enum": ["valid", "stale", "invalid", "unavailable", "estimated", "unknown"] },
+    "provenance": { "type": "object" },
+    "quality": { "type": "object" },
+    "payload": {}
+  },
+  "additionalProperties": false
+}
