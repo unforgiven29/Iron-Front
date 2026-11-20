@@ -1,5 +1,4 @@
 {
-  "$comment": "Illustrative only. Replace all values and validate against module-manifest.schema.json before use.",
   "manifestSchemaVersion": 1,
   "id": "aircraft.example.variant",
   "kind": "aircraft",

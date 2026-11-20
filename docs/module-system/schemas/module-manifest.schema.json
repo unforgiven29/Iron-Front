@@ -29,7 +29,7 @@
         "designation": { "type": "string" },
         "revision": { "type": "string" },
         "operatorBaseline": { "type": "string" },
-        "effectiveDate": { "type": "string", "format": "date" }
+        "effectiveDate": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
       }
     },
     "provides": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
