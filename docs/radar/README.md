@@ -26,6 +26,19 @@ This directory defines the planned radar-simulation domain for Iron-Front. It is
 9. Tracking logic associates reports over time and estimates target state.
 10. Modes, displays and integration systems schedule and present information.
 
+## Architecture classification axes
+
+Do not represent a radar with one mutually exclusive "type" field. At minimum, keep these related but independent:
+- Waveform/processing family: pulse, pulse-Doppler, CW/FMCW, coherent/non-coherent processing.
+- RF/beamforming architecture: mechanically scanned, PESA, AESA, hybrid or equipment-specific.
+- Physical aperture construction: parabolic reflector dish, flat slotted-waveguide planar array, horn, phased planar array, conformal array, reflectarray or documented specialized aperture.
+- Scan/steering mechanism: fixed, mechanically moved, electronically steered or hybrid.
+- Channels and tasks: actual transmit/receive channels, beam scheduling, dwell/revisit and supported simultaneous tasks.
+
+A parabolic dish is a curved reflector with a feed; a flat slotted-waveguide planar array is a flat slot-radiating aperture with a waveguide feed network. Neither construction alone identifies the waveform or establishes AESA/PESA electronics. A mechanically scanned radar can use either aperture when its installation supports it. A conventional fixed-feed slotted array is not automatically electronically steered.
+
+The versioned aperture-data schema is docs/radar/schemas/antenna-aperture.schema.json; its synthetic examples are docs/radar/examples/antenna-apertures.example.json. They define data shape only, not implemented antenna physics.
+
 ## Folder guide
 
 | Folder | Responsibility |
@@ -66,7 +79,7 @@ Signal processing should expose intermediate quantities for validation: waveform
 - Operating modes schedule capabilities but must not bypass the signal chain.
 - Displays present system outputs and must not create detections.
 - Electronic warfare changes the signal environment through defined interfaces, not arbitrary range multipliers.
-- IRST is a separate passive infrared sensor; radar may cue it, but cannot guarantee an IRST detection. See [sensor suite](../sensors/README.md) and [IRST architecture](../irst/README.md).
+- IRST is a separate passive infrared sensor; radar may cue it, but cannot guarantee an IRST detection.
 
 ## Status
 

@@ -15,11 +15,12 @@ This gate separates a repository that is organized from one that is safe to exte
 - [x] CI run green on main using the committed lockfile (lint, type, schema, unit, build and browser smoke checks).
 - [ ] Repository Pages setting changed to Settings > Pages > Source > GitHub Actions and deployment verified.
 - [ ] Renderer comparison prototype measured and ADR accepted.
+- [ ] Stage 0.5 foundation hardening changes merged and CI-verified.
 - [ ] Stage 1 module registry and dependency resolver implemented and tested.
 
 ## What Claude may start
 
-Claude may begin Stage 0 verification/fixes and Stage 1 core contracts/module-loader work. It must not claim flight simulation or start large feature expansion until Stage 1 exit criteria pass.
+Claude may complete Stage 0.5 hardening, then begin Stage 1 core contracts/module-loader work. The new antenna schema and radar documentation do not mean antenna physics exists. Claude must not claim flight simulation or start large feature expansion until Stage 1 exit criteria pass.
 
 The F-16 vertical slice is a test contract, not evidence that the F-16 is implemented.
 

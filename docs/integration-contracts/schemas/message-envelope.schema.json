@@ -5,17 +5,7 @@
   "description": "Shared metadata for commands, events, observations and snapshots. Payload semantics belong to a versioned domain contract.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "messageId",
-    "contractId",
-    "contractVersion",
-    "producerModuleId",
-    "simulationTick",
-    "simulationTimeSeconds",
-    "kind",
-    "status",
-    "payload"
-  ],
+  "required": ["messageId", "contractId", "contractVersion", "producerModuleId", "simulationTick", "simulationTimeSeconds", "kind", "status", "payload"],
   "properties": {
     "messageId": { "type": "string", "minLength": 1 },
     "contractId": { "type": "string", "minLength": 1 },
@@ -28,13 +18,42 @@
     "correlationId": { "type": "string" },
     "kind": { "enum": ["command", "event", "observation", "snapshot"] },
     "status": { "enum": ["valid", "stale", "invalid", "unavailable", "estimated", "unknown"] },
-    "issuerId": { "type": "string" },
-    "targetModuleId": { "type": "string" },
-    "eventType": { "type": "string" },
-    "sourceId": { "type": "string" },
+    "issuerId": { "type": "string", "minLength": 1 },
+    "targetModuleId": { "type": "string", "minLength": 1 },
+    "eventType": { "type": "string", "minLength": 1 },
+    "sourceId": { "type": "string", "minLength": 1 },
     "acquiredAtTick": { "type": "integer", "minimum": 0 },
     "provenance": { "type": "object" },
     "quality": { "type": "object" },
     "payload": {}
-  }
+  },
+  "oneOf": [
+    {
+      "title": "Command message",
+      "properties": { "kind": { "const": "command" } },
+      "required": ["issuerId", "targetModuleId"]
+    },
+    {
+      "title": "Domain event",
+      "properties": { "kind": { "const": "event" } },
+      "required": ["eventType"]
+    },
+    {
+      "title": "Observation",
+      "properties": {
+        "kind": { "const": "observation" },
+        "payload": {
+          "type": "object",
+          "required": ["value", "uncertainty"],
+          "properties": { "value": {}, "uncertainty": {} },
+          "additionalProperties": false
+        }
+      },
+      "required": ["sourceId", "acquiredAtTick"]
+    },
+    {
+      "title": "Immutable snapshot",
+      "properties": { "kind": { "const": "snapshot" } }
+    }
+  ]
 }

@@ -119,12 +119,18 @@
         "versionRange": { "type": "string" },
         "optional": { "type": "boolean" },
         "providerModuleId": { "type": "string" },
-        "degradedBehavior": { "type": "string" }
+        "degradedBehavior": { "type": "string", "minLength": 1 }
       },
-      "allOf": [{
-        "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
-        "then": { "required": ["degradedBehavior"] }
-      }]
+      "allOf": [
+        {
+          "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
+          "then": { "required": ["degradedBehavior"] }
+        },
+        {
+          "if": { "properties": { "optional": { "const": false } }, "required": ["optional"] },
+          "then": { "not": { "required": ["degradedBehavior"] } }
+        }
+      ]
     }
   }
 }
