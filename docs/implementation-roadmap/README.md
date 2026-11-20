@@ -10,6 +10,14 @@ Deliverables: Node/npm policy, pinned direct dependencies, Vite shell, strict Ty
 
 Exit: clean install, lockfile committed, lint/type/schema/unit/build and browser tests pass in CI.
 
+## Stage 0.5 — Foundation hardening
+
+Goal: close contract gaps in the initial shell and turn critical conventions into executable validation before the runtime expands.
+
+Deliverables: TypeScript/JSON Schema parity for module manifests; kind-specific message-envelope validation; known ENU/FRD reference-attitude tests and finite-vector validation; stable independent random streams derived from scenario/entity/subsystem identity; versioned antenna-aperture schema with explicit parabolic-reflector and flat slotted-waveguide examples; positive and negative schema tests.
+
+Exit: valid and invalid manifests/messages are distinguished by CI; all four cardinal level-flight attitudes map body axes correctly; gravity maps into body-down; non-finite vectors are rejected; scoped random streams are repeatable and independent of entity creation order; both aperture examples validate and invalid aperture records are rejected.
+
 ## Stage 1 — Runtime contracts and core services
 
 Implement a validated module manifest loader/registry and capability resolver; versioned commands/events/observations/snapshots; entity identity/lifecycle; fixed-step clock and deterministic event order; seeded random streams; diagnostics; resource contracts/allocation; coordinate/unit utilities; configuration validation.

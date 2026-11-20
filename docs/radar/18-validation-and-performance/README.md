@@ -8,7 +8,10 @@ Define how radar behavior is tested, calibrated, compared with references, and k
 - **Signal-chain cases:** known transmit/receive conditions and expected intermediate values.
 - **Detection statistics:** Monte Carlo tests for Pd/Pfa under documented assumptions.
 - **Waveform tests:** range/Doppler resolution, ambiguity, and pulse-compression behavior.
-- **Antenna tests:** beamwidth, gain, sidelobes, scan loss, and array-fault effects.
+- **Antenna tests:** beamwidth, gain, sidelobes, scan loss, polarization and array/aperture fault effects.
+- **Parabolic-reflector tests:** aperture efficiency, feed illumination taper, blockage, surface error, pointing error and frequency-dependent pattern.
+- **Slotted-waveguide-array tests:** slot geometry/layout, feed-network phase and amplitude distribution, bandwidth sensitivity, slot/feed faults and resulting pattern changes.
+- **Architecture separation tests:** prove that planar aperture geometry alone does not imply AESA/PESA capability or unlimited electronic steering.
 - **Propagation tests:** line of sight, terrain obstruction, attenuation, and multipath scenarios.
 - **Tracking tests:** maneuvers, missed detections, false alarms, crossing tracks, and uncertainty growth.
 - **Regression scenarios:** fixed seeds and repeatable cases.

@@ -1,0 +1,55 @@
+{
+  "description": "Synthetic schema fixtures only. These are not specifications for real radar equipment.",
+  "apertures": [
+    {
+      "schemaVersion": 1,
+      "id": "example.aperture.parabolic-dish",
+      "name": "Illustrative parabolic reflector dish",
+      "construction": "parabolic-reflector-dish",
+      "steeringMethod": "mechanical",
+      "frequencyRangeHz": { "minimumHz": 8500000000, "maximumHz": 9500000000 },
+      "polarization": "horizontal",
+      "patternModel": "physical-optics-approximation",
+      "geometry": {
+        "diameterM": 0.8,
+        "focalLengthM": 0.24,
+        "feedSupport": "prime-focus",
+        "apertureEfficiency": 0.55,
+        "surfaceRmsErrorM": 0.0008,
+        "blockageFraction": 0.08,
+        "edgeTaperDb": -10
+      },
+      "provenance": {
+        "classification": "synthetic",
+        "notes": "Illustrative schema fixture only; not representative of a named radar."
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "example.aperture.slotted-planar",
+      "name": "Illustrative flat slotted-waveguide planar array",
+      "construction": "flat-slotted-waveguide-planar-array",
+      "steeringMethod": "mechanical",
+      "frequencyRangeHz": { "minimumHz": 3000000000, "maximumHz": 3200000000 },
+      "polarization": "horizontal",
+      "patternModel": "ideal-aperture",
+      "geometry": {
+        "apertureWidthM": 0.9,
+        "apertureHeightM": 0.4,
+        "slotCount": 48,
+        "rowCount": 4,
+        "slotsPerRow": 12,
+        "slotLayout": "inclined",
+        "feedNetwork": "series-fed",
+        "phaseControl": "fixed",
+        "slotSpacingAlongM": 0.075,
+        "rowSpacingM": 0.1,
+        "apertureEfficiency": 0.65
+      },
+      "provenance": {
+        "classification": "synthetic",
+        "notes": "Illustrative schema fixture only; not representative of a named radar."
+      }
+    }
+  ]
+}

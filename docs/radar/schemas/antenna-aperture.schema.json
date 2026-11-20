@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iron-front.local/schemas/antenna-aperture.schema.json",
+  "title": "Iron-Front Radar Antenna Aperture",
+  "description": "Versioned physical aperture description. It does not imply a waveform, transmitter architecture, scan mechanism, or implemented antenna solver.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "construction", "steeringMethod", "frequencyRangeHz", "polarization", "patternModel", "geometry", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "construction": { "enum": ["parabolic-reflector-dish", "flat-slotted-waveguide-planar-array"] },
+    "steeringMethod": { "enum": ["fixed", "mechanical", "electronic", "hybrid", "unknown"] },
+    "frequencyRangeHz": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumHz", "maximumHz"],
+      "properties": {
+        "minimumHz": { "type": "number", "exclusiveMinimum": 0 },
+        "maximumHz": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "polarization": { "enum": ["horizontal", "vertical", "linear", "circular", "dual-linear", "dual-circular", "unknown"] },
+    "patternModel": { "enum": ["ideal-aperture", "physical-optics-approximation", "measured-pattern-table", "synthetic-table", "unknown"] },
+    "geometry": { "type": "object" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "notes"],
+      "properties": {
+        "classification": { "enum": ["publicly-sourced", "derived", "estimated", "synthetic", "gameplay-tuned", "unknown"] },
+        "sourceReference": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "construction": { "const": "parabolic-reflector-dish" },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["diameterM", "focalLengthM", "feedSupport"],
+          "properties": {
+            "diameterM": { "type": "number", "exclusiveMinimum": 0 },
+            "focalLengthM": { "type": "number", "exclusiveMinimum": 0 },
+            "feedSupport": { "enum": ["prime-focus", "offset-focus", "cassegrain", "gregorian", "unknown"] },
+            "apertureEfficiency": { "type": "number", "minimum": 0, "maximum": 1 },
+            "surfaceRmsErrorM": { "type": "number", "minimum": 0 },
+            "blockageFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+            "edgeTaperDb": { "type": "number", "maximum": 0 }
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "construction": { "const": "flat-slotted-waveguide-planar-array" },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["apertureWidthM", "apertureHeightM", "slotCount", "rowCount", "slotLayout", "feedNetwork", "phaseControl"],
+          "properties": {
+            "apertureWidthM": { "type": "number", "exclusiveMinimum": 0 },
+            "apertureHeightM": { "type": "number", "exclusiveMinimum": 0 },
+            "slotCount": { "type": "integer", "minimum": 1 },
+            "rowCount": { "type": "integer", "minimum": 1 },
+            "slotsPerRow": { "type": "integer", "minimum": 1 },
+            "slotLayout": { "enum": ["transverse", "longitudinal", "inclined", "mixed", "unknown"] },
+            "feedNetwork": { "enum": ["end-fed", "center-fed", "series-fed", "parallel-fed", "corporate-fed", "equipment-specific", "unknown"] },
+            "phaseControl": { "enum": ["fixed", "discrete-phase", "continuous-phase", "unknown"] },
+            "slotSpacingAlongM": { "type": "number", "exclusiveMinimum": 0 },
+            "rowSpacingM": { "type": "number", "exclusiveMinimum": 0 },
+            "apertureEfficiency": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  ]
+}
