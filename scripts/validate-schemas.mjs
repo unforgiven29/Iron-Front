@@ -1,7 +1,7 @@
-import Ajv from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
 import { readFile } from "node:fs/promises";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv2020({ allErrors: true, strict: false });
 
 async function readJson(path) {
   return JSON.parse(await readFile(new URL("../" + path, import.meta.url), "utf8"));

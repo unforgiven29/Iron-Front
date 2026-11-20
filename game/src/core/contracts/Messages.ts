@@ -6,23 +6,19 @@ export type QualityStatus =
   | "estimated"
   | "unknown";
 
-export interface ContractVersion {
-  readonly major: number;
-  readonly minor: number;
-}
-
 export interface MessageEnvelope {
   readonly messageId: string;
   readonly contractId: string;
-  readonly contractVersion: ContractVersion;
+  readonly contractVersion: number;
   readonly producerModuleId: string;
   readonly simulationTick: number;
   readonly simulationTimeSeconds: number;
   readonly entityId?: string;
   readonly frameId?: string;
   readonly correlationId?: string;
-  readonly qualityStatus: QualityStatus;
-  readonly provenance?: string;
+  readonly status: QualityStatus;
+  readonly provenance?: Readonly<Record<string, unknown>>;
+  readonly quality?: Readonly<Record<string, unknown>>;
 }
 
 export interface CommandMessage<TPayload> extends MessageEnvelope {
