@@ -1,7 +1,27 @@
-# Missile product and variant definitions
+# Missile families — entry point
 
-A missile package composes exact airframe mass/geometry/inertia, motor, aerodynamic/control data, seeker, guidance law, autopilot/actuator, fuze/arming, warhead/effects, launcher compatibility, datalink and provenance. It supplies data/configuration; shared propulsion/ballistics/sensor/guidance/damage owners execute behavior.
+**Owner:** game/modules/weapons/missiles. **Status:** content composition architecture; individual complete missile runtime is not implemented.
 
-Define lifecycle phases: safe/stored, selected, release requested, separated, boost/sustain/coast, seeker search/acquisition/track (if fitted), guided, lost guidance, armed, terminal, detonation, miss, dud or self-destruct. Each transition has preconditions, time and failure behavior.
+All missile variants compose physical vehicle data, motor, aerodynamic/control model, navigation/guidance, seeker if fitted, command/datalink/illumination support, fuze/arming, warhead, launcher compatibility and evidence. Shared equations and state machines remain in physics, sensors and game/systems owners.
 
-A seeker receives only physical observations through its field-of-view/band/receiver limits; it never reads target truth. Guidance is bounded by navigation/actuator/kinematic capabilities. Validate motor transient, drag, guidance stability, seeker limits, countermeasures, lost track, fuze safe/arm conditions, warhead effects and replay.
+## Read the relevant family only
+
+- [Air-to-air](air-to-air/README.md)
+- [Air-to-ground](air-to-ground/README.md)
+- [Anti-radiation](anti-radiation/README.md)
+- [Anti-ship](anti-ship/README.md)
+- [Surface-to-air](surface-to-air/README.md)
+
+## Shared missile lifecycle
+
+Stored/safe → selected/configured → release request → launcher checks compatibility/interlocks/envelope → separation/initial conditions → boost/sustain/coast → navigation/midcourse → seeker search/acquisition/track where fitted → terminal guidance → fuze/impact/miss/dud/self-destruct/inert → effect report.
+
+Not all missiles have every phase. Each transition has explicit conditions, timing, required inputs, fault response and provenance. Commands are not state. Do not treat a seeker cue as a confirmed lock or a valid track as a guaranteed hit.
+
+## Shared component owners
+
+For a concrete, typed profile-composition shape, see [the weapon profile contract](../components/profile-contract.md).
+
+Read [weapon composition](../components/README.md), [seeker profiles](../components/seekers/README.md), [guidance profiles](../components/guidance/README.md), [motor](../components/motors/README.md), [fuze/warhead](../components/fuzes-warheads/README.md), and [launcher/store](../components/launchers-and-stores/README.md) only as needed. Dynamic decoy response belongs in sensors/weapon-seeker/countermeasure-discrimination.
+
+Each product is data-driven; shared code must never branch on weapon display name.

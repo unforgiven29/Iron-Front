@@ -19,4 +19,6 @@ Reference case includes exact variant/configuration, conditions, units, source/r
 
 Aircraft flight-model validation also uses physics/flight-model/verification/README.md, physics/flight-model/tests/README.md and game/tests/acceptance/Flight-model-verification.md. Flight-log comparisons must preserve source columns, normalize units/frames explicitly, and separate calibration cases from held-out validation.
 
+Weapon guidance, seeker and decoy interaction scenarios are listed in game/tests/acceptance/Weapon-guidance-seeker-countermeasures.md.
+
 Completion needs reproducible scenarios, causal assertions, failure cases, performance evidence and supported/unsupported conditions.

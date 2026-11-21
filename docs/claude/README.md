@@ -30,7 +30,11 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Radar | sensors/Radar/README.md, docs/radar/README.md, physics/radar/README.md | only relevant numbered radar chapters and exact equipment installation |
 | RWR / ESM | sensors/RWR/README.md or sensors/ESM/README.md | physics/radar and exact receiver installation |
 | IRST, EO/FLIR, MAWS, IFF, fusion | exact sensors/<system>/README.md | physics/optics, equipment install and integration contracts |
-| Weapon, seeker, fuze, guidance | game/modules/weapons/README.md and exact component guide | physics/ballistics, armour, platform launcher |
+| Weapon product/variant composition | game/modules/weapons/README.md and the exact category guide | game/modules/weapons/components/README.md; platform launcher only when involved |
+| Weapon guidance architecture/law | game/modules/weapons/components/guidance/README.md and the matching physics/guidance page | exact seeker profile and permitted navigation/command producer |
+| Weapon seeker architecture/track | game/modules/weapons/components/seekers/README.md and only the relevant family page | sensors/weapon-seeker/README.md and its matching family processor |
+| Dynamic chaff/flare/decoy interaction | game/modules/weapons/countermeasures/README.md and only the relevant decoy profile | sensors/weapon-seeker/countermeasure-discrimination/README.md; physics/radar or optics/thermal only when directly relevant |
+| Missile trajectory, motor or vehicle fidelity | missiles/README.md, physics/ballistics/README.md and physics/propulsion/README.md | physics/guidance, exact missile variant and seeker profile only as needed |
 | Tanks, IFVs, artillery, air defense, infantry, naval | exact game/modules/<domain>/README.md | mobility, rigidbody, armour, ballistics, crew, sensors as needed |
 | AI / GCI / AWACS / command hierarchy | game/modules/ai/README.md and relevant role guide | observation, communications and sensor owners |
 | Campaign, mission, faction, logistics, save | campaign/logistics owner guides | world, AI and core persistence |

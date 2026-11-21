@@ -15,6 +15,7 @@ Physics owns reusable physical equations, numerical integration and physical que
 - thermal: reusable heat-transfer and thermal-state calculations.
 - optics: optical path transmission/attenuation.
 - radar: RF geometry, propagation, scattering and clutter.
+- guidance: shared weapon guidance-law and navigation-command calculations; it consumes sensor/navigation estimates and outputs bounded control requests.
 
 ## Model contract
 Each model documents owner, inputs/outputs, SI units, frames, operating envelope, fidelity tier, uncertainty, numerical stability and provenance. Shared logic may not branch on aircraft/weapon name. Configuration selects data/capabilities; it does not create per-platform algorithm copies.

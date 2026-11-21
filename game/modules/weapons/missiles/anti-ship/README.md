@@ -1,7 +1,19 @@
 # Anti-ship missile variants
 
-Own exact missile body/motor, sea-skimming or other supported flight profile, seeker, terminal target-selection, navigation, datalink, fuze/warhead, launch compatibility and provenance.
+**Owner:** anti-ship product definitions. Sea/environment physics, seekers and navigation remain in their canonical owners. **Status:** architecture specification.
 
-Maritime target reports have position/course/speed uncertainty and age. Target group composition and decoys may produce ambiguous seeker association. Do not assume a perfect ship position from campaign database. Environment and sea clutter/propagation affect sensor behavior through the actual seeker system.
+## Product composition
 
-Validate stale/cooperative targeting reports, target maneuver, sea/background clutter assumptions, seeker limits, terminal selection, countermeasures, safe separation, fuze and damage routing.
+Record exact body/mass/inertia; propulsion and trajectory profile; altitude/sea-skimming controller if fitted; navigation and external target reports; seeker architecture; target association/selection; command/datalink; fuze/warhead; launcher and ship/aircraft compatibility; and source/provenance.
+
+## Seeker architecture
+
+A variant may use active radar, passive RF, IR/EO imaging, dual-mode radar/IR or other evidence-supported terminal sensing. Keep sea-surface radar clutter, multipath, low-elevation propagation, target group association, decoy handling and target motion as explicit effects. Do not assume a single point target or a perfect ship coordinate.
+
+## Target report uncertainty
+
+Target reports contain position, course, speed, identity hypothesis, timestamp, source, uncertainty and age. The weapon's navigation and terminal seeker must work with these values; do not pass a hidden exact ship state.
+
+## Validation
+
+Test stale/cooperative target reports, target maneuver/group geometry, sea/background clutter, multipath/propagation limits, seeker search and target association, decoys, terminal selection, fuze/damage, safe separation and replay.

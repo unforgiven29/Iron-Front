@@ -32,6 +32,10 @@
 | Engine-family behavior | physics/propulsion | aircraft package (installation/data only) |
 | Collision/contact | physics/collision | visual mesh tests |
 | Ballistics | physics/ballistics | weapon package duplicate |
+| Weapon guidance laws/navigation command generation | physics/guidance | weapon package or seeker processor duplicate |
+| Weapon seeker state/association | sensors/weapon-seeker | weapon product or physics/guidance |
+| Decoy physical profiles/deployment | game/modules/weapons/countermeasures | missile seeker processor |
+| Decoy discrimination and candidate association | sensors/weapon-seeker/countermeasure-discrimination | campaign/weapon product scalar rating |
 | Armour interaction | physics/armour | vehicle-specific duplicate |
 | Ground mobility | physics/ground-mobility | vehicle package movement script |
 | RF environment/scattering/clutter | physics/radar | radar/RWR receiver |
