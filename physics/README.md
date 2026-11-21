@@ -5,7 +5,8 @@ Physics owns reusable physical equations, numerical integration and physical que
 ## Domains
 - flight-model: aircraft-specific composition of surface elements, coefficient datasets, control/actuator state, propulsion installation and force/moment contributions. It does not own the rigid-body integrator or duplicate aerodynamic/engine solvers.
 - rigidbody: 6-DoF state, force/moment accumulation, inertia and integration.
-- aerodynamics: local surface flow, coefficient evaluation and aerodynamic loads.
+- aerodynamics: local surface flow, coefficient evaluation and aerodynamic loads; optional unsteady-aerodynamics and compressibility subowners handle stateful separation/dynamic stall and local-Mach/transonic response.
+- ground-handling: aircraft landing-gear, tire, strut, brake, steering and runway-contact dynamics.
 - rotorcraft: rotor blade/disk flow, induced velocity, rotor forces/moments and drivetrain-coupled rotor dynamics; exact helicopter configuration remains in game/modules/rotorcraft.
 - environment: atmosphere, winds, turbulence and weather fields.
 - propulsion: reusable engine/motor family behavior.
@@ -17,6 +18,18 @@ Physics owns reusable physical equations, numerical integration and physical que
 - optics: optical path transmission/attenuation.
 - radar: RF geometry, propagation, scattering and clutter.
 - guidance: shared weapon guidance-law and navigation-command calculations; it consumes sensor/navigation estimates and outputs bounded control requests.
+
+## Advanced fixed-wing flight-model subowners
+
+The flight-model assembly composes, but does not duplicate, these physical owners:
+- `physics/aerodynamics/unsteady-aerodynamics/`: attached-flow lag, separation, dynamic stall and hysteresis.
+- `physics/aerodynamics/compressibility/`: local compressibility and transonic/shock/buffet response.
+- `physics/flight-model/flow-interactions/`: aircraft-specific vortex sources, wakes and interaction configuration.
+- `physics/flight-model/structural-response/`: structural loads, flexibility, fatigue interfaces and supported aeroelastic modes.
+- `physics/flight-model/propulsion-integration/`: installed inlet/nozzle coupling and engine force installation.
+- `physics/ground-handling/`: landing gear, tires, brakes, steering and runway interactions.
+
+Platform packages choose their actual capabilities and supply the appropriate data. The F-16 and MiG-29 keep independent model data, control mappings and validity envelopes.
 
 ## Model contract
 Each model documents owner, inputs/outputs, SI units, frames, operating envelope, fidelity tier, uncertainty, numerical stability and provenance. Shared logic may not branch on aircraft/weapon name. Configuration selects data/capabilities; it does not create per-platform algorithm copies.
