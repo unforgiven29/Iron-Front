@@ -41,7 +41,9 @@ IRCCM is a family of seeker-specific discrimination features, not a single immun
 
 Per candidate and update, publish: detection validity; measurement quality; target/decoy hypothesis likelihood or association score; innovation/gate result; track continuity; discrimination reason code; confidence/uncertainty; and chosen transition (maintain/transfer/reject/coast/lost/reacquire). Preserve random seed and observation history for deterministic replay.
 
-Probability may be used for detector noise and association uncertainty, but it must be conditioned on the current observation and track history. A reproducible stochastic process is not the same as a static random success roll.
+For a probabilistic implementation, treat each observed candidate as a hypothesis. Its relative association weight is derived from the likelihood of the current measurement given the predicted track, the candidate's observed features, the seeker architecture, environment and history, multiplied by the prior track/association weight. Normalize only among actually detected candidates and include a no-valid-detection hypothesis. Preserve uncertainty; do not turn the result into a single missile-level constant.
+
+Probability may be used for detector noise and association uncertainty, but it must be conditioned on the current observation and track history. A reproducible stochastic process is not the same as a static random success roll. Separate at least detection probability, false-alarm probability, track-association probability, decoy-transfer probability and track-loss probability. They are related outputs of the scene/processing model, not interchangeable tuning knobs.
 
 ## Required tests
 
