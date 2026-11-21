@@ -4,6 +4,8 @@ Own dismounted individuals, squads, equipment profiles and infantry-specific beh
 
 Individual state may include posture/movement, health/injury/incapacitation, equipment/load, ammo, morale/suppression, skill/training, fatigue and perception. Squad state includes cohesion, roles, formation/orders, leader succession, comms and casualty count. Avoid treating a squad as one omniscient point.
 
+**Research references:** use [Tactics and campaign context](../../../docs/reference-library/tactics-and-campaign.md) for public infantry/mechanized doctrine routes and [Ground vehicles and infantry](../../../docs/reference-library/ground-vehicles-and-infantry.md) for mounted/dismounted and platform interactions. Doctrine is country- and era-specific.
+
 ## Player and squad actions
 Support dismounted movement, stance, sprint/crouch/prone/crawl, aiming, iron sights and installed optics, firing/reload/fire mode, weapon and launcher selection, grenades, interaction, treatment, radio calls, entering/exiting structures and mounting/dismounting vehicles. Mouse/keyboard/controller/touch input maps to validated commands with hold/release cancellation. The same weapon/ballistic and damage services resolve player and AI fire.
 
