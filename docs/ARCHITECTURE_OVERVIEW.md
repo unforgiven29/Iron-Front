@@ -42,6 +42,7 @@
 | World truth/structures/vegetation/infrastructure | game/world | renderer/sensor/campaign |
 | Tactical AI decisions/doctrine | game/modules/ai | physics or hidden state |
 | Strategic institutions, diplomacy, public consequences and war state | game/modules/campaign | global core/runtime/physics |
+| Legal cases, investigations and accountability | game/modules/campaign/justice | society news projection or tactical truth |
 | Persistent campaign personnel/fate/history | game/modules/campaign/personnel | live crew/infantry state |
 | Rendering/audio/UI/assets | game/graphics-engine | authoritative systems |
 
