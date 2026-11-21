@@ -9,6 +9,8 @@ This directory defines weapon products and their installed component profiles. I
 - New weapon type/variant: this guide, the relevant category under missiles/bombs/rockets/guns/naval, and [component composition](components/README.md).
 - Seeker hardware/profile: [seeker index](components/seekers/README.md), then only the relevant seeker family page.
 - Guidance/navigation: [guidance index](components/guidance/README.md), then the matching physics/guidance owner guide.
+- Anti-tank guided missile behavior: [anti-tank family guide](missiles/anti-tank/README.md), plus infantry/vehicle launcher installation when relevant.
+- Man-portable and vehicle air defence: [surface-to-air family guide](missiles/surface-to-air/README.md) and the exact launcher/ground-unit package.
 - Chaff/flare/towed/active decoys: [countermeasure index](countermeasures/README.md), then [dynamic seeker discrimination](../../../sensors/weapon-seeker/countermeasure-discrimination/README.md).
 - Motor/trajectory/warhead/fuze/launcher: the corresponding component README, plus its canonical shared physics owner when behavior is involved.
 
