@@ -90,4 +90,4 @@ The model must expose out-of-domain data and finite-value checks. If a table is 
 
 ## Research references
 
-See [Advanced flight physics references](../../../../docs/reference-library/advanced-flight-physics.md). NASA transonic research cited there is a method/validation example for other configurations, not an F-16C or MiG-29 product 9.13 coefficient source.
+See [Advanced flight physics references](../../../docs/reference-library/advanced-flight-physics.md). NASA transonic research cited there is a method/validation example for other configurations, not an F-16C or MiG-29 product 9.13 coefficient source.
