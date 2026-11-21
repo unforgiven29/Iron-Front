@@ -8,6 +8,7 @@ Iron-Front is a browser-based combat flight simulation project inspired by the s
 2. Read `docs/claude/README.md` to route the task to its canonical owner. Do not load the full documentation tree.
 3. Before changing code, follow `docs/claude/implementation-workflow.md`.
 4. Read `docs/ARCHITECTURE_OVERVIEW.md` when a change crosses ownership boundaries. Read the roadmap when selecting or updating a stage.
+5. For technical research, open `docs/reference-library/README.md` and only the domain guide relevant to the task. Do not treat simulator manuals, doctrine or generic standards as exact platform data.
 
 ## Non-negotiable architecture rules
 
