@@ -8,6 +8,10 @@ It is deliberately inspired by the component separation visible in the Community
 
 > **Important — this is a shared framework, not a universal aircraft flight model.** Each aircraft owns a separate aircraft-specific flight model in its platform package. This directory owns reusable orchestration/contracts and the shared force/moment assembly infrastructure. It must not force every aircraft to use the same aerodynamic representation, coefficient tables, panelization, control response or handling. A shared rigid-body integrator and reusable aerodynamic mathematics do not make two aircraft share a flight model.
 
+## Research references
+
+Use [the annotated flight-dynamics reference guide](../../docs/reference-library/flight-dynamics.md) before selecting an aerodynamic representation or interpreting DATCOM/NASA/simulator data. Keep each aircraft's own validated model and dataset; the reference library is not a universal coefficient source.
+
 ## Shared framework versus aircraft-specific model
 
 Keep these responsibilities distinct:
