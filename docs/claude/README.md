@@ -2,13 +2,17 @@
 
 This file is the reading map, not a duplicate of every subsystem design. Detailed instructions live beside the system that owns the behavior.
 
+**Before routing a task:** read [PROJECT_STATE.md](PROJECT_STATE.md). It tells you what is executable, what is specification-only and which roadmap stage is currently allowed. Do not interpret a detailed owner guide as proof that its subsystem exists.
+
 ## Authority order
-1. CLAUDE.md: agent operating rules and project boundary.
-2. docs/ARCHITECTURE_OVERVIEW.md: canonical ownership and dependency direction.
-3. docs/implementation-roadmap/README.md: stage order and exit criteria.
-4. docs/module-system/README.md, docs/integration-contracts/README.md, docs/data-standards/README.md and docs/simulation-conventions/README.md: shared contracts/data rules.
-5. Canonical owner README for the task.
-6. Direct producer/consumer README, platform/content guide, technical reference or ADR only if directly involved.
+
+1. `CLAUDE.md`: agent operating rules and project boundary.
+2. `docs/claude/PROJECT_STATE.md`: current implementation evidence and starting stage.
+3. `docs/ARCHITECTURE_OVERVIEW.md`: canonical ownership and dependency direction.
+4. `docs/implementation-roadmap/README.md`: stage order and exit criteria.
+5. `docs/module-system/README.md`, `docs/integration-contracts/README.md`, `docs/data-standards/README.md` and `docs/simulation-conventions/README.md`: shared contracts/data rules.
+6. Canonical owner README for the task.
+7. Direct producer/consumer README, platform/content guide, technical reference or ADR only if directly involved.
 
 A subsystem guide may refine but may not contradict global ownership/conventions. On conflict, stop and identify the conflict before coding.
 
@@ -59,6 +63,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Legacy game feature migration/parity audit | docs/legacy-game-feature-crosswalk.md | only the canonical owners for features being migrated |
 
 ## Expected content in every owner README
+
 A useful guide defines: purpose; owner and non-owners; state/configuration separation; public inputs/outputs; dependencies; tick/update domain; resource use; normal/degraded/failed/recovery behavior; data/provenance; test matrix; performance concerns; first implementation slice; status and known gaps.
 
 Do not create a runtime module just because a folder exists. Do not repeat global Claude rules in every README. A child folder can be a data category or private implementation detail rather than an independently loadable module.
