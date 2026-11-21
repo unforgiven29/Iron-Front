@@ -29,3 +29,27 @@ Support command disconnect, sensor disagreement, jammed/stuck surface, runaway/b
 ## Tests
 
 Test axis sign and range; trim and neutral; mixing matrices; symmetric/asymmetric commands; control-law mode transition; actuator saturation; rate-limited response; resource loss; jam/runaway; surface-feedback disagreement; deterministic replay; and cross-platform proof that identical shared interfaces can produce different control mappings.
+
+
+## Surface and device taxonomy
+
+The shared contract must represent more than `aileron`, `elevator` and `rudder`. Support:
+- ailerons, elevators, all-moving stabilators, tailerons, rudders and elevons;
+- flaperons, leading-edge flaps, slats and trailing-edge flap families;
+- spoilers/spoilerons/lift-dump panels;
+- fuselage/wing speedbrakes and airbrakes;
+- trim/balance/servo tabs and other auxiliary devices only when fitted.
+
+The platform config declares what exists. A missing device is not silently created by the shared engine. Use the [high-lift and drag-device guide](../high-lift-devices/README.md) for the physical distinctions, schedules and actuator/effect contract.
+
+## Actuator and surface state detail
+
+Where data supports it, model actuator command/target/actual/indicated position separately, with:
+- maximum travel, rate, acceleration and load/pressure-dependent rate;
+- hinge moments, mechanical leverage, friction, backlash/free play and stops;
+- hydraulic pressure/flow, electrical control/servo supply, pneumatic or mechanical drive as fitted;
+- actuator lag and finite movement time;
+- left/right/segment independence, synchronization or asymmetry protection;
+- failed feedback, jam, runaway, leakage, damage and reversion behavior.
+
+Do not implement all aircraft as identical first-order servos. The actuator model and failure architecture are installation-specific. A simplified actuator tier must still enforce declared rate/load/resource limits and document omitted effects.
