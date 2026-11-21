@@ -18,6 +18,9 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 |---|---|---|
 | Registry, scheduler, entities, messages, resources, persistence | game/core/README.md and exact game/core service README | module-system, integration-contracts |
 | Aircraft forces / 6-DoF | physics/README.md, rigidbody, aerodynamics, environment | exact aircraft, propulsion, collision |
+| Aircraft FM assembly / panels / coefficient data / trim | physics/flight-model/README.md and relevant child guide | exact aircraft flight-model dossier, rigidbody, aerodynamics, propulsion, actuator/resources as involved |
+| Aircraft control surfaces / high-lift devices | physics/flight-model/control-surfaces/README.md and high-lift-devices/README.md | exact aircraft controls-and-actuators and systems dossiers |
+| Flight-model verification / flight-log comparison | physics/flight-model/verification/README.md and tests/README.md | exact aircraft validation plan and acceptance suite |
 | Engine or motor | physics/propulsion/README.md | platform engine fit, fuel, cooling |
 | Electrical generation/distribution | game/systems/electrical/README.md | exact aircraft systems/electrical.md, propulsion/accessory drive, cooling, exact consumers/load list |
 | Hydraulic pressure/flow/actuators | game/systems/hydraulics/README.md | exact aircraft systems/hydraulics.md, pneumatics if coupled, flight controls/gear/brakes, cooling |
