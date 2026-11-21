@@ -2,6 +2,10 @@
 
 **Authority:** sensors/ contains equipment and processing. Each sensor owns its receiver/measurement/detection/track logic. Shared environment models live under physics/. Platform modules select exact equipment fit, aperture, installation, resource requirements and cockpit mapping.
 
+## Research references
+
+Use [the sensors and electronic-warfare reference guide](../docs/reference-library/sensors-and-ew.md) for MIT Lincoln Laboratory radar courses, RIT DIRSIG thermal/radar documentation, HITRAN and guidance on the limits of public RWR/ESM data. It is an annotated source map, not a substitute for an exact equipment fit or the sensor contracts below.
+
 ## Owners
 Radar: active RF radar equipment and processing. RWR: passive radar-emission interception and threat warning. ESM: broader RF measurement, emitter association/geolocation. IRST: passive thermal search/track. EO-FLIR: optical/thermal imagery. IFF: interrogation/reply identity response. MAWS: missile-approach warning via its actual fitted detector. NCTR: non-cooperative target-recognition hypotheses from permitted sensor-derived features. Fusion: correlation of local and remote reports. Weapon seekers: weapon-mounted sensing state, candidate association, track maintenance and dynamic decoy discrimination through the fitted RF/IR/EO/laser observation chain.
 
