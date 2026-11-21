@@ -28,7 +28,6 @@
 | Aircraft FM assembly and force/moment composition | physics/flight-model | aircraft package duplicate solver or renderer |
 | Local aerodynamic flow and coefficient equations | physics/aerodynamics | aircraft package or FM assembly duplicate |
 
-| Aero/local airflow | physics/aerodynamics | aircraft package (provides data only) |
 | Atmosphere/weather | physics/environment | renderer or platform-local duplicate |
 | Engine-family behavior | physics/propulsion | aircraft package (installation/data only) |
 | Collision/contact | physics/collision | visual mesh tests |
@@ -62,7 +61,7 @@ Modules have stable IDs, semantic versions, capabilities/API versions, dependenc
 Authoritative time uses integer ticks and a documented step. Initial rigid-body/control target is 120 Hz, subject to validation. Other systems declare their own update domains. Rendering interpolates immutable snapshots. Use SI, local right-handed ENU world, right-handed FRD aircraft body and normalized [x,y,z,w] body-to-world quaternions as defined in docs/simulation-conventions/README.md.
 
 ## Detailed owner guides
-Core: game/core/README.md. Physics: physics/README.md and physics/flight-model/README.md. Aircraft installations: game/modules/planes/README.md and the exact aircraft systems/flight-model indices. Core: game/core/README.md. Physics: physics/README.md. Platform systems: game/systems/README.md. Aircraft installations: game/modules/planes/README.md and the exact aircraft systems index. Sensors: sensors/README.md. Content modules: game/modules/README.md. World: game/world/README.md. Presentation: game/graphics-engine/README.md. Validation: docs/testing-and-validation/README.md.
+Core: game/core/README.md. Physics: physics/README.md and physics/flight-model/README.md. Platform systems: game/systems/README.md. Aircraft installations: game/modules/planes/README.md and the exact aircraft systems/flight-model indices. Sensors: sensors/README.md. Content modules: game/modules/README.md. World: game/world/README.md. Presentation: game/graphics-engine/README.md. Validation: docs/testing-and-validation/README.md.
 
 ## Hosting
 The browser client is statically built from game/ and can run local single-player with explicit save export/import. GitHub Pages is not an authoritative multiplayer backend. Persistent co-op needs a separate backend adapter; do not make backend access mandatory to local simulation.
