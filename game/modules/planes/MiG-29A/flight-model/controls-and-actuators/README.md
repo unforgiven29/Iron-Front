@@ -21,3 +21,18 @@ Cover one hydraulic circuit lost; one actuator/chamber degraded; asymmetric tail
 ## Acceptance
 
 Verify command-to-surface mapping, correct sign/range, rates under normal/degraded pressure, dual-chamber partial failure, asymmetric response, control mode switching, feedback validity and deterministic replay. Compare both circuit-loss cases independently.
+
+
+## Movable-device state and schedule checklist
+
+Keep independent command and actual-state channels for:
+- taileron symmetric pitch and differential roll;
+- aileron roll control;
+- twin rudders/yaw control;
+- leading-edge flap/slat mechanism (retain original source terminology until physical slot geometry is confirmed);
+- trailing-edge flap movement and cockpit flap selection;
+- upper/lower fuselage speedbrake motion, including possible non-synchronous achieved position and any documented blow-back/interlock.
+
+The GAF T.O. source describes the speedbrake panels as electrically controlled/hydraulically operated and says the two panels operate simultaneously but are not synchronized. Preserve this distinction; do not force identical actual positions by sharing a single animation scalar. Exact blow-back thresholds, flap schedules and interlocks require confirmed applicability to product 9.13.
+
+The DCS manual's numeric slat/flap/speedbrake behavior is simulator-reference material only. Do not promote it to product 9.13 technical data without independent confirmation.
