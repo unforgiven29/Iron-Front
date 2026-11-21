@@ -8,7 +8,7 @@ The repository contains the executable app shell, initial core primitives, exten
 ## How Claude should navigate this repository
 - Start with CLAUDE.md. It is intentionally short and routes the agent to the relevant owner guides.
 - Read docs/claude/README.md for task-specific documentation paths.
-- Read docs/claude/implementation-workflow.md for the required implementation/test/reporting process.
+- Read docs/claude/implementation-workflow.md for the required coding/test/reporting process.
 - Do not load every README. Read the owner guide and only direct dependencies/consumers for the task.
 
 ## Architecture authority
@@ -19,13 +19,17 @@ The repository contains the executable app shell, initial core primitives, exten
 - docs/data-standards/README.md — schemas, units, provenance, uncertainty and configuration.
 - docs/simulation-conventions/README.md — time, coordinate frames, precision and determinism.
 - docs/testing-and-validation/README.md — test layers, causal validation and performance evidence.
+- docs/legacy-game-feature-crosswalk.md — migration index for capabilities from the user's HTML-Flight-Combat game.
 
 ## System entry points
 - Runtime/core: game/core/README.md
 - Physics: physics/README.md
 - Platform systems: game/systems/README.md
 - Sensors: sensors/README.md
-- Aircraft: game/modules/planes/README.md
+- Fixed-wing aircraft: game/modules/planes/README.md
+- Rotorcraft: game/modules/rotorcraft/README.md and physics/rotorcraft/README.md
+- Uncrewed aircraft/drones: game/modules/uncrewed-systems/README.md
+- Civil aviation: game/modules/civil-aviation/README.md
 - Weapons: game/modules/weapons/README.md
 - Ground/naval/infantry/AI/campaign/logistics: corresponding game/modules/*/README.md
 - World: game/world/README.md
