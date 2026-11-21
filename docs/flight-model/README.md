@@ -6,6 +6,10 @@ Iron-Front must not use an arcade flight controller with speed/pitch multipliers
 
 A DCS-style PFM is not synonymous with running full computational fluid dynamics (CFD) over every aircraft in real time. The practical target is a validated, aircraft-specific nonlinear aerodynamic model coupled to a physically meaningful atmosphere and local-flow model. Use high-fidelity engineering models where they matter, and carefully bounded approximations for expensive effects.
 
+## Research references
+
+Start with [the curated flight-dynamics reference guide](../reference-library/flight-dynamics.md). It links USAF Digital DATCOM, NASA TP-1538, NASA F-16XL flight-test work, the Standard Atmosphere, flight-test methodology, Stengel and Falcon BMS developer notes, while explaining exact-aircraft applicability limits. For platform data, use the F-16C Block 50 or MiG-29 product 9.13 source register rather than borrowing another aircraft's data.
+
 ## 1. Three coupled simulation domains
 
 ### A. Aircraft rigid-body and systems model
