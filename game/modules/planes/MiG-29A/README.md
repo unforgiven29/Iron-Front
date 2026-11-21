@@ -14,6 +14,10 @@ Exact geometry/mass/CG/inertia including spine fuel; surface/aero data; control/
 
 Use the [MiG-29 product 9.13 technical evidence package](../../../../docs/platform-reference-program/aircraft/MiG-29-product-9-13.md) as the cross-domain research checklist. It covers the independent aerodynamic model, movable surfaces, control/actuation, twin RD-33 installation, aircraft systems, sensors/EW, stores and validation. Extend the [MiG-29 source register](docs/references/README.md) with page-level records and preserve 9.13 applicability gaps.
 
+## Initial stores and product data
+
+Use the [MiG-29 product 9.13 starter weapon profiles](../../../../docs/platform-reference-program/weapons/README.md) for R-27R, R-27T, R-73A and GSh-30-1 public data and variant boundaries. The DCS standard loadout is a simulator-reference scenario only; do not convert it into authoritative product 9.13 station clearance without exact documentation.
+
 ## Flight-model dossier
 
 Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13's independent flight model: its geometry, aerodynamic representation/coefficient data, control/actuator response and validation structure. Keep the GAF source's applicability limitations explicit. Only the underlying numerical/physics infrastructure and contracts are reusable; the MiG-29 must not inherit F-16 coefficients, geometry, aerodynamic assumptions, control logic, tuning or engine installation.
