@@ -12,7 +12,7 @@ Exact geometry/mass/CG/inertia including spine fuel; surface/aero data; control/
 
 ## Flight-model dossier
 
-Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13-specific geometry, coefficient-data, control/actuator and validation structure. Keep the GAF source's applicability limitations explicit; the shared solver architecture must not inherit F-16 geometry, control logic or engine installation.
+Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13's independent flight model: its geometry, aerodynamic representation/coefficient data, control/actuator response and validation structure. Keep the GAF source's applicability limitations explicit. Only the underlying numerical/physics infrastructure and contracts are reusable; the MiG-29 must not inherit F-16 coefficients, geometry, aerodynamic assumptions, control logic, tuning or engine installation.
 
 ## Aircraft systems dossier
 
@@ -20,7 +20,7 @@ Read [the MiG-29 systems index](systems/README.md) and its focused [electrical](
 
 ## Architecture proof
 
-Use the same shared rigidbody, aero, atmosphere, propulsion, electrical/hydraulic/pneumatic/fuel/cooling, radar, RWR, optics, damage and presentation services. Package provides two engine installations and exact equipment adapters. Do not copy F-16 solvers or add MiG name branches to shared engines. The source-described electrical and hydraulic architectures are materially different from the selected F-16 reference and should remain different.
+Use reusable rigidbody integration, aerodynamic mathematical primitives/interfaces, atmosphere, propulsion-family services, electrical/hydraulic/pneumatic/fuel/cooling networks, radar/RWR/optics, damage and presentation contracts where applicable. This does not mean using the F-16 flight model: the MiG-29 has its own aerodynamic model, coefficient data, geometry, control response, mass properties and acceptance envelope. The package provides two RD-33 installations and exact equipment adapters. Do not copy F-16 solvers or add MiG name branches to shared engines. The source-described electrical and hydraulic architectures are materially different from the selected F-16 reference and should remain different.
 
 ## Acceptance
 
