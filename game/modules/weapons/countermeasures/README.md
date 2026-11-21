@@ -11,7 +11,7 @@ This directory owns physical decoy product profiles, finite inventory, dispenser
 - Active RF / repeater decoys: [active RF decoys](active-rf-decoys/README.md)
 - Towed decoys: [towed decoys](towed-decoys/README.md)
 - Dispenser, programs, release and inventory: [dispenser and deployment](dispenser-and-deployment/README.md)
-- Seeker response/CM outcome: [dynamic discrimination owner](../../../sensors/weapon-seeker/countermeasure-discrimination/README.md)
+- Seeker response/CM outcome: [dynamic discrimination owner](../../../../sensors/weapon-seeker/countermeasure-discrimination/README.md)
 
 ## Shared decoy contract
 
