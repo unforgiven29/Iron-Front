@@ -19,3 +19,14 @@
 | [Falcon BMS FM developer notes](https://www.falcon-bms.com/blog/category/flight-model) | Simulation architecture, local aerodynamic modeling and F-16 FLCS case study | BMS implementation notes, not independent engineering validation |
 
 For each parameter record value, units, source, page/table/figure, revision/date, block/operator/OFP applicability, confidence, uncertainty and status (`publicly sourced`, `estimated`, `synthetic`, `unknown`). These linked documents are not copied into this repository; check reuse terms before extracting images.
+
+
+## Movable-surface / flight-control source additions
+
+| Source | Use | Caveat |
+|---|---|---|
+| [F-16C/D Blocks 50 and 52+ Flight Manual, T.O. GR1F16CJ1, 15 Oct 2002 (third-party mirror)](https://studylib.net/doc/26036763/block-50) | Describes LEF scheduling, TEF/flaperon dual function, LEF asymmetry/lock, FLCS and speedbrakes | Mirror of a technical manual; verify revision and exact Block 50/OFP applicability against an authorized source before accepting exact schedules/limits |
+| [USAF T.O. 1F-16A-1 flight manual](https://www.aahs-online.org/resources/e-library/fm/USAF-F16A_B-Flight-Manual.pdf) | Older A/B control and device terminology for historical context | Not a Block 50 data source |
+| [Eagle Dynamics F-16C guide](https://www.digitalcombatsimulator.com/upload/iblock/3dc/5p9ejw7gi488n9zd15csrxxs8os2dflk/DCS_F-16C_Early_Access_Guide_EN.pdf) | Cockpit/interaction overview and simulated FLCS control panels | Simulator documentation only; do not use as independent engineering proof |
+
+Current surface-inventory conclusion: source material identifies LEFs, TEF flaperons, stabilators, rudder and fuselage speedbrakes. The current source set does not identify separate wing spoilers or conventional slot-forming slats for the selected F-16C Block 50 package. Keep these as provisional not-fitted pending exact-baseline confirmation.
