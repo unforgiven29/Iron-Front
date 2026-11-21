@@ -6,6 +6,8 @@ Agents maintain local beliefs from permitted reports, memory and orders. They ne
 
 A decision cycle is: receive reports/orders → update belief → evaluate objectives/resources/risk → select intent → issue typed command/order → receive authoritative result/event → reassess. Agents do not set positions, damage, radar locks or weapon outcomes directly.
 
+**Research references:** use [Tactics and campaign context](../../../docs/reference-library/tactics-and-campaign.md) for unit organization, command relationships and doctrinal behavior. Convert those references into observable inputs, orders and state transitions; do not give AI hidden world truth.
+
 ## Domains
 Air agents support navigation, formation, takeoff/landing requests, patrol/CAP, intercept, escort, BVR/WVR policy, disengage, refuelling rendezvous, recovery and emergency tasking. Ground agents support route/formation, bounds/overwatch, flank, defend, suppress, assault, withdraw/retreat, obstacle handling, resupply, repair and casualty evacuation. Naval agents support route/station keeping, patrol, screen/escort, search, threat response, replenishment and deck/convoy coordination. Infantry agents act at the individual and squad level under their own behavior profiles.
 
