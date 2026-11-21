@@ -10,6 +10,10 @@ Product 9.13 is the enlarged-spine aircraft selected for the second-platform pro
 
 Exact geometry/mass/CG/inertia including spine fuel; surface/aero data; control/stability augmentation and actuators; twin RD-33 installations; fuel/feed/transfer topology; electrical/hydraulic/pneumatic/cooling and auxiliary system topology; gear/brakes; confirmed N019/RLPK-29 fit; provisional/confirmed RWR and optical equipment; avionics/cockpit/weapon-control; stores/hardpoints; damage routing, assets and sources.
 
+## Platform technical evidence package
+
+Use the [MiG-29 product 9.13 technical evidence package](../../../docs/platform-reference-program/aircraft/MiG-29-product-9-13.md) as the cross-domain research checklist. It covers the independent aerodynamic model, movable surfaces, control/actuation, twin RD-33 installation, aircraft systems, sensors/EW, stores and validation. Extend the [MiG-29 source register](docs/references/README.md) with page-level records and preserve 9.13 applicability gaps.
+
 ## Flight-model dossier
 
 Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13's independent flight model: its geometry, aerodynamic representation/coefficient data, control/actuator response and validation structure. Keep the GAF source's applicability limitations explicit. Only the underlying numerical/physics infrastructure and contracts are reusable; the MiG-29 must not inherit F-16 coefficients, geometry, aerodynamic assumptions, control logic, tuning or engine installation.
