@@ -18,6 +18,10 @@ Use the [F-16C Block 50 technical evidence package](../../../../docs/platform-re
 
 Read [the F-16 flight-model index](flight-model/README.md) for the aircraft-specific geometry, coefficient-data, control/actuator and validation structure. The shared physics/flight-model and physics/aerodynamics layers provide reusable numerical infrastructure and interfaces, not a universal aircraft flight model. This package owns the F-16C Block 50's distinct aerodynamic model, geometry, coefficient data, FLCS/control response, mass properties and validity/validation envelope, with exact Block 50/GE installation data and provenance. Do not export F-16 handling or coefficients as shared defaults for other aircraft.
 
+## Advanced flight physics and ground handling
+
+Use the [F-16C Block 50 evidence package](../../../../docs/platform-reference-program/aircraft/F-16C-Block-50.md) with the shared owner guides for unsteady aerodynamics, compressibility, flow interactions, structural response, installed propulsion and [aircraft ground handling](../../../../physics/ground-handling/README.md). Every enabled model needs Block 50-applicable evidence and its own validity envelope. Do not import modified high-AoA F-16 research-configuration results, F-16XL data or F/A-18 LEX behavior as standard Block 50 behavior.
+
 ## Aircraft systems dossier
 
 Read [the F-16 systems index](systems/README.md) for the installation map, then the focused [electrical](systems/electrical.md), [hydraulic](systems/hydraulics.md) and [pneumatic/emergency gear](systems/pneumatics.md) guides. These are platform installation descriptions, not separate solvers. The shared electrical/hydraulic/pneumatic owner guides define reusable behavior.
