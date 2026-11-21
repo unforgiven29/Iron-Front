@@ -50,6 +50,62 @@ validate(parameterSchema, {
   provenance: { sourceType: "unknown" },
   reviewStatus: "needs-source"
 }, "unknown technical parameter record");
+
+validate(parameterSchema, {
+  id: "example.mig29.loadout",
+  name: "Simulator-reference MiG-29 loadout report",
+  status: "simulator-reference",
+  value: "2 x R-27R and 4 x R-73",
+  unit: null,
+  applicability: { platform: "MiG-29", variant: "product 9.13; exact fit not proven" },
+  provenance: {
+    sourceType: "document",
+    title: "DCS MiG-29 Flight Manual",
+    publisher: "Eagle Dynamics",
+    url: "https://www.digitalcombatsimulator.com/en/downloads/documentation/dcs-mig-29_flight_manual_en/"
+  },
+  reviewStatus: "needs-source",
+  notes: "Simulator-only loadout evidence; not an authoritative product 9.13 clearance."
+}, "simulator-reference technical parameter");
+validate(parameterSchema, {
+  id: "example.f16.gun-capacity",
+  name: "Disputed F-16 ammunition capacity",
+  status: "disputed",
+  value: null,
+  unit: "rounds",
+  applicability: { platform: "F-16C", variant: "Block 50" },
+  provenance: { sourceType: "document", title: "Conflicting public installation references" },
+  reviewStatus: "disputed",
+  notes: "Public sources report 500 and 511 rounds; exact selected baseline source is required."
+}, "disputed technical parameter");
+validate(parameterSchema, {
+  id: "example.sensor.unknown",
+  name: "Unknown sensor performance value",
+  status: "unknown",
+  value: null,
+  unit: "m",
+  applicability: { platform: "example" },
+  provenance: { sourceType: "unknown" },
+  reviewStatus: "needs-source"
+}, "explicit unknown technical parameter");
+reject(parameterSchema, {
+  id: "example.sensor.fake",
+  name: "Invalid fabricated unknown",
+  status: "unknown",
+  value: 123,
+  unit: "m",
+  applicability: { platform: "example" },
+  provenance: { sourceType: "unknown" }
+}, "unknown technical parameter with numeric value");
+reject(parameterSchema, {
+  id: "example.surface.not-fitted",
+  name: "Surface declared absent",
+  status: "not-fitted",
+  value: 1,
+  unit: "count",
+  applicability: { platform: "example" },
+  provenance: { sourceType: "unknown" }
+}, "not-fitted parameter with non-null value");
 validate(measurementSchema, {
   measurementId: "test.measurement.1",
   sourceId: "test.sensor",
