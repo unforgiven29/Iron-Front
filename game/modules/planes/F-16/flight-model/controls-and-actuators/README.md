@@ -21,3 +21,17 @@ Document and test FLCS computer/branch power loss; sensor disagreement; command 
 ## Acceptance
 
 Verify axis signs, neutral/trim behavior, control mixing, commanded-versus-achieved deflection, rate/force limit, resource loss, asymmetric response, reversion logic and deterministic replay. Never tune aerodynamic coefficients to disguise incorrect FLCS or actuator behavior.
+
+
+## F-16 movable-device schedule and interaction checklist
+
+Keep these surface controls distinct in the platform map:
+- LEF command/automatic FLCS schedule and LEF actual-position/lock/asymmetry state.
+- TEF/flaperon scheduled flap command and pilot/FLCS differential roll command.
+- Stabilator symmetric pitch command and differential roll contribution.
+- Rudder command and any documented limiter/interconnect.
+- Each split speedbrake panel command, actual position and interlock state.
+
+The Block 50/52+ flight-manual family describes LEF scheduling as a function of Mach, AoA and altitude and TEF/flaperon operation as a function of gear-handle position, ALT FLAPS switch, airspeed and Mach. It also describes LEF asymmetry detection/locking. The cited public manual copy is not a substitute for an exact, authorized baseline document; capture page/figure and applicability before encoding schedules.
+
+Do not implement a separate F-16 slat or wing-spoiler actuator without evidence. The shared engine supports these device types for other aircraft.
