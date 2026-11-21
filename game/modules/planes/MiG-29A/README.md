@@ -18,6 +18,10 @@ Use the [MiG-29 product 9.13 technical evidence package](../../../../docs/platfo
 
 Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13's independent flight model: its geometry, aerodynamic representation/coefficient data, control/actuator response and validation structure. Keep the GAF source's applicability limitations explicit. Only the underlying numerical/physics infrastructure and contracts are reusable; the MiG-29 must not inherit F-16 coefficients, geometry, aerodynamic assumptions, control logic, tuning or engine installation.
 
+## Advanced flight physics and ground handling
+
+Use the [MiG-29 product 9.13 evidence package](../../../../docs/platform-reference-program/aircraft/MiG-29-product-9-13.md) with the shared owner guides for unsteady aerodynamics, compressibility, flow interactions, structural response, installed propulsion and [aircraft ground handling](../../../../physics/ground-handling/README.md). The LERX/root/forebody geometry, twin-engine inlets, tail interactions and twin-engine asymmetry are aircraft-specific. Do not use the F-16 profile or generic fighter assumptions to fill gaps. Exact MiG-29 product 9.13 data that cannot be verified must remain unknown/provisional.
+
 ## Aircraft systems dossier
 
 Read [the MiG-29 systems index](systems/README.md) and its focused [electrical](systems/electrical.md), [hydraulic](systems/hydraulics.md), [pneumatic](systems/pneumatics.md) and [auxiliary/environmental](systems/auxiliary-environmental.md) guides. The GAF T.O. 1F-MIG29-1 is a useful installation reference, but its exact applicability to selected product 9.13 is not established. Treat transferred values and topology as provisional until confirmed by exact 9.13 documentation.
