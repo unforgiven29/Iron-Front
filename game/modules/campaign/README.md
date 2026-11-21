@@ -16,6 +16,7 @@ Consume committed world/unit/logistics/personnel events and permitted reconnaiss
 - institutions: government, general staff, service commands, intelligence, finance, diplomacy and civil defence decisions.
 - intelligence: strategic estimates, signals/intercepts, deception, information integrity and public claims.
 - society: population, media, local government, humanitarian services, infrastructure and civic consequences.
+- justice: legal cases, investigations, due process, corruption/crime and accountability.
 - personnel: named service histories, crew/soldier fate, rescue/capture/prisoners, casualty archive and memorial records.
 - strategic-operations: long-range missions, strategic strikes, warning/verification and escalation.
 - persistence: campaign schemas and migrations coordinated by core.
