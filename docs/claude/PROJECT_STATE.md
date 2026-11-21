@@ -58,7 +58,7 @@ The flight-model specification now has dedicated owner guides for unsteady aerod
 
 
 
-The implementation-readiness checklist and roadmap put the next work at **Stage 0.5 — Foundation hardening**, followed by **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before the Stage 1 exit criteria pass.
+The implementation-readiness checklist and roadmap put the next work at **Stage 0.5 — Foundation hardening**, followed by **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before the Stage 1 exit criteria pass. After that, build the F-16C Block 50 as the first full vertical slice, including staged advanced flight physics; then use the MiG-29 product 9.13 as a second, independent flight-model proof.
 
 ### Stage 0.5 — finish these contract checks first
 
