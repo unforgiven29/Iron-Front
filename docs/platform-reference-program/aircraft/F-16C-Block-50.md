@@ -116,4 +116,4 @@ Before enabling advanced effects, fill the F-16C Block 50 evidence records for:
 - **Installed propulsion:** inlet geometry, recovery/distortion/allowed operating data if public, spillage effects, F110 installed engine behavior and nozzle/exhaust interaction.
 - **Ground handling:** gear geometry, strut/tire curves, wheel properties, steering/braking/anti-skid, emergency extension and runway/contact limits.
 
-The common reference guide [Advanced flight physics](../../../reference-library/advanced-flight-physics.md) contains NASA research, dynamic-stall methods, aeroelastic references and landing-gear research. Those sources establish mechanisms/test methods, not F-16C Block 50 values. Keep every platform number tied to exact manual/report page and applicability.
+The common reference guide [Advanced flight physics](../../reference-library/advanced-flight-physics.md) contains NASA research, dynamic-stall methods, aeroelastic references and landing-gear research. Those sources establish mechanisms/test methods, not F-16C Block 50 values. Keep every platform number tied to exact manual/report page and applicability.
