@@ -13,8 +13,8 @@ Use a common institution record (mandate, capacity, budget/resources, trust, ser
 ## Media and public information
 Fictional outlets can have ownership, reach, editorial policy, verification practice, censorship pressure and journalist safety state. They report events from evidence available to them, distinguish confirmed/estimated/reported/contested claims and may issue corrections. Different outlets may frame the same event differently, but repetition never upgrades a claim into truth. Public trust and resilience influence bounded morale/policy effects.
 
-## Culture and justice interfaces
-Heritage sites, museums, religious shelters, sports/cultural venues and tourism may be protected, evacuated, suspended, damaged or resumed. Police, courts, civil claims, criminal cases, curfews and corruption are owned by a separate justice-policy subdomain where detailed enough; this page defines the civilian effects and links to those records.
+## Culture, justice and public order
+Heritage sites, museums, religious shelters, sports/cultural venues and tourism may be protected, evacuated, suspended, damaged or resumed. Police, courts, civil claims, organised crime, black markets, corruption cases and rule-of-law outcomes belong to [campaign justice](../justice/README.md); this module consumes their public/service/trust effects rather than implementing legal procedure.
 
 ## Human-cost rules
 Civilian deaths, injuries, displacement, disrupted services and destroyed homes are consequences, not score bonuses. Distinguish direct observations from aggregate estimates. Memorials and histories consume the authoritative event/personnel record; they do not turn casualties into achievements.
