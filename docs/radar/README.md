@@ -2,6 +2,10 @@
 
 This directory defines the planned radar-simulation domain for Iron-Front. It is documentation and organization only; none of the described systems are implemented by these files.
 
+## Research references
+
+Start with [the sensors and electronic-warfare reference guide](../reference-library/sensors-and-ew.md), especially the MIT Lincoln Laboratory introductory and graduate radar courses and the RIT DIRSIG radar handbook. Note DIRSIG's documented experimental status and missing noise/phased-array/atmospheric features; it is a reference for scene/radar concepts, not a complete fighter radar implementation.
+
 ## Goals and principles
 
 - Model the complete chain from RF generation through antenna, propagation, target scattering, reception, processing, detection, tracking and display.
