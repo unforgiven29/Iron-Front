@@ -178,3 +178,35 @@ Every aircraft must have a validation report that identifies supported envelope,
 12. Profile and optimize without changing the validated physics semantics.
 
 **Do not label the implementation DCS-level or PFM-complete until the aircraft-specific models have data-backed validation across their declared flight envelopes.**
+
+## 4. Advanced, time-dependent flight physics
+
+A high-fidelity aircraft model must be able to represent more than a steady lift/drag lookup. The following are separate stateful/physical capabilities, each enabled only for an aircraft where its geometry, system configuration, data and validation support it.
+
+- **Unsteady aerodynamics and dynamic stall:** `physics/aerodynamics/unsteady-aerodynamics/README.md` describes attached-flow lag, separation state, dynamic-stall hysteresis, transient vortex loading, reattachment and per-element history. Do not implement stall as a binary AoA switch.
+- **Compressibility and transonic flow:** `physics/aerodynamics/compressibility/README.md` describes local Mach, critical-Mach/drag-rise behavior, shock-induced separation, transonic buffet and supersonic regime separation. Do not extrapolate subsonic tables.
+- **Vortex and wake interactions:** `physics/flight-model/flow-interactions/README.md` describes LEX/LERX/forebody vortices, wingtip vortices, inter-aircraft wakes, convection, decay and tail/fin/inlet effects. Use aircraft-specific geometry and avoid renderer-driven forces.
+- **Aeroelasticity and structural response:** `physics/flight-model/structural-response/README.md` describes static flexibility, reduced-order bending/torsion modes, aerodynamic/structural coupling, fatigue and the evidence required to claim flutter/divergence.
+- **Installed propulsion interaction:** `physics/flight-model/propulsion-integration/README.md` describes inlet recovery/distortion, spillage drag, engine-face flow, nozzle/exhaust and airframe coupling. Engine-family thermodynamics remain with physics/propulsion.
+- **Aircraft ground handling:** `physics/ground-handling/README.md` describes gear deployment, strut/tire contact, steering, braking, anti-skid, touchdown, bounce, runway surface and damage coupling.
+
+These are not one universal fidelity switch. A model can be physically detailed in one region and explicitly unsupported in another. Model state, time constants, valid envelopes, approximation class and error evidence must remain visible.
+
+## 5. Deterministic coupling order
+
+Use staged previous/current snapshots so systems can interact without update-order dependence. At a minimum:
+
+1. Freeze authoritative state and configuration snapshots for the tick (rigid body, flexible structure, environment, damage, actual controls, resources and engine state).
+2. Sample atmosphere and world conditions at aircraft/element/inlet/gear locations.
+3. Run aircraft-specific flight-control logic and actuator/resource systems to obtain actual achieved device positions.
+4. Update each engine's operating state and its installed inlet/nozzle state through the propulsion contract.
+5. Build the current aircraft geometry from mass configuration, actual movable devices and any enabled structural deformation.
+6. Evaluate per-element local airflow, coherent flow interactions and local Mach/Reynolds as supported.
+7. Evaluate steady coefficients plus the selected unsteady, dynamic-stall and compressibility states for each aerodynamic element.
+8. Evaluate gear/tire/runway contact when grounded or transitioning; evaluate stores and other installed force contributions.
+9. Deterministically aggregate force/moment contributions and generalized structural loads.
+10. Advance rigid-body and enabled structural states with declared fixed steps/substeps. Use bounded corrector iterations only when the model requires them.
+11. Commit events/snapshots, then emit new wake/vortex state for the next tick and publish renderer-facing observations.
+
+No subsystem may read a half-updated state written by another subsystem during the same tick. No step may depend on browser frame delta. All stateful unsteady/structural/actuator/engine/gear models must be save/replay safe.
+
