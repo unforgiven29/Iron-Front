@@ -6,6 +6,18 @@ This subsystem is the aircraft-specific bridge between the aircraft package and 
 
 It is deliberately inspired by the component separation visible in the Community A-4E-C ExternalFM project: a central flight-model coordinator alongside aircraft state, aerodynamic elements, airframe/control mechanisms, engine/fuel components, data tables, tests and standalone verification. Iron-Front adapts those ideas to its own browser simulation. It does not copy the A-4 implementation or its DCS DLL API.
 
+> **Important — this is a shared framework, not a universal aircraft flight model.** Each aircraft owns a separate aircraft-specific flight model in its platform package. This directory owns reusable orchestration/contracts and the shared force/moment assembly infrastructure. It must not force every aircraft to use the same aerodynamic representation, coefficient tables, panelization, control response or handling. A shared rigid-body integrator and reusable aerodynamic mathematics do not make two aircraft share a flight model.
+
+## Shared framework versus aircraft-specific model
+
+Keep these responsibilities distinct:
+
+- **Shared physics infrastructure:** rigid-body numerical integration; reusable local-flow and aerodynamic mathematics; coordinate/frame/unit utilities; common force/moment contribution contracts; deterministic accumulation and diagnostics.
+- **Aircraft-specific flight model:** the actual model selected and parameterized for one exact aircraft variant; geometry and reference stations; aerodynamic surfaces or other model representation; coefficient maps/tables/equations; compressibility/separation/stall behavior within its supported model; control laws and trim; actuator/surface mapping; mass and inertia configuration; propulsion installation; ground-effect and configuration effects; validity envelope and validation data.
+- **Aircraft-specific installation systems:** engine, fuel, electrical, hydraulic, pneumatic, cooling, sensors and damage topology remain in the aircraft package and their canonical shared behavior owners.
+
+The shared framework may host several model strategies behind stable interfaces where that is useful, but it must not flatten materially different aircraft into one generic coefficient set or response curve. The F-16C Block 50 and MiG-29 product 9.13 require separate model instances, separate data, separate validation suites and separate handling. No F-16-derived coefficient, geometry, control law or tuning value may silently flow into the MiG-29 model, or vice versa.
+
 ## What this owner does — and does not do
 
 **Owns**
