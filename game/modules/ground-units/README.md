@@ -2,6 +2,10 @@
 
 Platform packages own exact vehicle variant, geometry, mass/CG/inertia, suspension layout, engine/transmission fit, armour layers, crew, weapon stations/sights, communications, ammunition stowage, damage routing, animations and provenance. Shared mobility, rigidbody, collision, ballistics, armour, sensors, resources and damage engines remain outside.
 
+## Research references
+
+Use [the ground-vehicle and infantry reference guide](../../../docs/reference-library/ground-vehicles-and-infantry.md) for Project Chrono vehicle/terrain architecture, terramechanics, current Army tank/mechanized-infantry doctrine and armour test-method references. Keep technical vehicle parameters tied to the exact platform and variant; doctrine does not establish vehicle performance or armour layout.
+
 ## Families and integration
 Families: tanks; IFV/APC; artillery; air-defence; and shared platform contracts. Air-defence may be one integrated vehicle or separate search/engagement radar, command post, launcher and support vehicles. Artillery may be self-propelled, towed or rocket artillery; exact setup, fire-control, crew, ammunition and mobility are variant-specific.
 
