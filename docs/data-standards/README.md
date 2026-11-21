@@ -22,7 +22,9 @@ Simulation time is distinct from wall-clock time. Use integer ticks and document
 
 ## Technical parameter records
 
-Every value records stable ID/name, value and unit (or explicit unknown), exact platform/variant/equipment/software applicability, source/document/revision/date/page/table/URL, derivation assumptions, confidence, uncertainty/range/distribution, status (publicly sourced, measured, estimated, synthetic, gameplay-tuned or unknown) and review state. See schemas/technical-parameter.schema.json.
+Every value records stable ID/name, value and unit (or explicit unknown), exact platform/variant/equipment/software applicability, source/document/revision/date/page/table/URL, derivation assumptions, confidence, uncertainty/range/distribution, evidence status and review state. See schemas/technical-parameter.schema.json.
+
+Evidence status distinguishes primary-published, measured-test, derived, secondary-reported, simulator-reference, estimated, synthetic-test-only, gameplay-tuned, unknown, disputed and not-fitted. The older publicly-sourced/measured/synthetic labels remain accepted for existing records. A simulator-reference or secondary-reported value is not promoted to a real-platform parameter merely because it is useful for a prototype. Unknown and not-fitted records require an explicit null value; disputed records require explanatory notes and remain unapproved for authoritative configuration until resolved.
 
 Never replace unknown values with fabricated precision. Estimated and gameplay-tuned values remain distinguishable from sourced specifications.
 
