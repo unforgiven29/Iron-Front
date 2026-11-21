@@ -12,7 +12,7 @@ Exact geometry/datum, mass/CG/inertia and fuel/store locations; aero surface lay
 
 ## Flight-model dossier
 
-Read [the F-16 flight-model index](flight-model/README.md) for the aircraft-specific geometry, coefficient-data, control/actuator and validation structure. Shared assembly and equations live in physics/flight-model and physics/aerodynamics; this folder contains only exact Block 50/GE installation data and provenance.
+Read [the F-16 flight-model index](flight-model/README.md) for the aircraft-specific geometry, coefficient-data, control/actuator and validation structure. The shared physics/flight-model and physics/aerodynamics layers provide reusable numerical infrastructure and interfaces, not a universal aircraft flight model. This package owns the F-16C Block 50's distinct aerodynamic model, geometry, coefficient data, FLCS/control response, mass properties and validity/validation envelope, with exact Block 50/GE installation data and provenance. Do not export F-16 handling or coefficients as shared defaults for other aircraft.
 
 ## Aircraft systems dossier
 
