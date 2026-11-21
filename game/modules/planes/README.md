@@ -20,6 +20,10 @@ Every aircraft has its **own flight model**. The shared layer is the physics too
 
 Different aircraft may use different aerodynamic model structures when their design and available data require it. Do not force all aircraft into an identical panel layout, coefficient lookup scheme or handling model merely to maximize code reuse. Share mathematical primitives and interfaces where valid; preserve aircraft-specific behavior and uncertainty. In particular, the F-16C Block 50 and MiG-29 product 9.13 must have independent flight-model data and validation. A common rigid-body integrator does not mean a common flight model.
 
+## First two full-fidelity aircraft — technical research packages
+
+The first aircraft are the F-16C Block 50 and MiG-29 product 9.13. Use [the platform-by-platform technical evidence program](../../../docs/platform-reference-program/README.md) and its separate [F-16C Block 50 dossier](../../../docs/platform-reference-program/aircraft/F-16C-Block-50.md) and [MiG-29 product 9.13 dossier](../../../docs/platform-reference-program/aircraft/MiG-29-product-9-13.md). The aircraft do not share one flight model; each dossier tracks its own geometry, coefficients, control response, movable devices, engine installation, systems, sensors, stores and validation.
+
 ## Required aircraft flight-model dossier
 
 Every aircraft package must also maintain a focused flight-model directory. It records aircraft-specific aerodynamic geometry/panelization, coefficient datasets and valid envelope, control-surface mapping, actual actuator interfaces, high-lift devices, engine installation transforms, damage/structural coupling and validation cases. Reusable framework, mathematical primitives and force/moment contracts remain in physics/flight-model and physics/aerodynamics; the aircraft-specific model and its data remain in that aircraft's package. Do not create private copies of shared solvers or store authoritative values as hard-coded constants inside an FM coordinator.
