@@ -16,6 +16,10 @@ These systems are reusable physical network behavior and resource adapters. Airc
 - **fire-control:** reusable aiming/release solution interfaces; sensors/weapon execution remain separate.
 - **crew:** crew stations, workload, injury/incapacitation and human action interfaces.
 
+## Research references
+
+Use [the aircraft systems and platform-data reference guide](../../docs/reference-library/aircraft-systems-and-data.md) for aircraft-system terminology and source discipline. Exact generator, bus, hydraulic, pneumatic, fuel and cooling topology must still come from the selected aircraft's applicable manual.
+
 ## Shared network patterns
 
 Each network owns its physical/runtime state and publishes typed offers, demands, actual delivery, snapshots and fault events. Core/resources arbitrates scarce shared resource capacity but does not own bus voltage, hydraulic pressure, gas inventory, fuel tank geometry or coolant flow. Commands are validated by the owner; committed state changes publish events; UI consumes immutable snapshots.
