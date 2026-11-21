@@ -4,57 +4,222 @@
   "title": "Iron-Front Technical Parameter",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "name", "status", "applicability", "provenance"],
+  "required": [
+    "id",
+    "name",
+    "status",
+    "applicability",
+    "provenance"
+  ],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "name": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["publicly-sourced", "measured", "estimated", "synthetic", "gameplay-tuned", "unknown"] },
-    "value": { "type": ["number", "string", "null"] },
-    "unit": { "type": ["string", "null"] },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "publicly-sourced",
+        "primary-published",
+        "measured",
+        "measured-test",
+        "derived",
+        "secondary-reported",
+        "simulator-reference",
+        "estimated",
+        "synthetic",
+        "synthetic-test-only",
+        "gameplay-tuned",
+        "unknown",
+        "disputed",
+        "not-fitted"
+      ]
+    },
+    "value": {
+      "type": [
+        "number",
+        "string",
+        "null"
+      ]
+    },
+    "unit": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "uncertainty": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["absolute", "relative", "range", "standard-deviation", "covariance", "qualitative"] },
+        "type": {
+          "enum": [
+            "absolute",
+            "relative",
+            "range",
+            "standard-deviation",
+            "covariance",
+            "qualitative"
+          ]
+        },
         "value": {},
-        "lower": { "type": "number" },
-        "upper": { "type": "number" },
-        "notes": { "type": "string" }
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        }
       }
     },
     "applicability": {
       "type": "object",
-      "required": ["platform"],
+      "required": [
+        "platform"
+      ],
       "properties": {
-        "platform": { "type": "string" },
-        "variant": { "type": "string" },
-        "equipment": { "type": "string" },
-        "software": { "type": "string" },
-        "operator": { "type": "string" },
-        "dateRange": { "type": "string" }
+        "platform": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        },
+        "equipment": {
+          "type": "string"
+        },
+        "software": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "dateRange": {
+          "type": "string"
+        }
       }
     },
     "provenance": {
       "type": "object",
-      "required": ["sourceType"],
+      "required": [
+        "sourceType"
+      ],
       "properties": {
-        "sourceType": { "enum": ["document", "measurement", "derived", "estimate", "synthetic", "unknown"] },
-        "title": { "type": "string" },
-        "publisher": { "type": "string" },
-        "revision": { "type": "string" },
-        "date": { "type": "string" },
-        "page": { "type": "string" },
-        "url": { "type": "string", "pattern": "^https?://[^\\s]+$" },
-        "method": { "type": "string" },
-        "assumptions": { "type": "array", "items": { "type": "string" } }
+        "sourceType": {
+          "enum": [
+            "document",
+            "measurement",
+            "derived",
+            "estimate",
+            "synthetic",
+            "unknown"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "page": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https?://[^\\s]+$"
+        },
+        "method": {
+          "type": "string"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
-    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-    "reviewStatus": { "enum": ["unreviewed", "needs-source", "reviewed", "disputed"] },
-    "notes": { "type": "string" }
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reviewStatus": {
+      "enum": [
+        "unreviewed",
+        "needs-source",
+        "reviewed",
+        "disputed"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
   },
-  "allOf": [{
-    "if": { "properties": { "status": { "const": "unknown" } }, "required": ["status"] },
-    "then": { "properties": { "value": { "type": "null" } } }
-  }]
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "unknown",
+              "not-fitted"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "disputed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "notes"
+        ],
+        "properties": {
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
 }
