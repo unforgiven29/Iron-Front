@@ -50,7 +50,13 @@ A shared six-degree-of-freedom rigid-body integrator, reusable aerodynamic equat
 
 Use `docs/reference-library/README.md` as the central annotated source index. Read the specific domain guide for flight dynamics, ground vehicles/infantry, sensors/EW, weapons/ballistics, aircraft systems, validation or tactical/campaign context. The references are intentionally annotated with what they establish and what they do not establish. They do not create implementation evidence or authorize copying restricted/copyrighted material. Keep exact variant applicability, page/table citations, units, provenance, uncertainty and validity envelope attached to every adopted datum.
 
-## Current development stage
+## Advanced flight-physics specifications
+
+The flight-model specification now has dedicated owner guides for unsteady aerodynamics/dynamic stall, compressibility/transonic response, LEX/LERX and wake interactions, structural flexibility/aeroelasticity, installed inlet/exhaust coupling and aircraft ground handling. Read [advanced flight physics references](../reference-library/advanced-flight-physics.md) and the exact owner guide before implementing any of these capabilities.
+
+**These additions are specifications and research routes only.** They do not mean dynamic stall, shock response, vortex fields, aeroelastic modes, inlet distortion, fatigue tracking or aircraft tire/gear dynamics have been implemented. Do not mark them complete until executable vertical slices and the FM-21 to FM-31 acceptance cases pass.
+
+
 
 The implementation-readiness checklist and roadmap put the next work at **Stage 0.5 — Foundation hardening**, followed by **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before the Stage 1 exit criteria pass.
 
