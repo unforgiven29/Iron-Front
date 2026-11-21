@@ -9,3 +9,10 @@
 | [DCS SPO-15 development article](https://www.digitalcombatsimulator.com/en/news/2025-07-12/) | Physics-based RWR modeling concepts | Not historical equipment proof |
 
 For each parameter record value, units, source, page/figure, publication date/revision, product number, operator, confidence, uncertainty and status (`publicly sourced`, `estimated`, `synthetic`, `unknown`). Preserve Cyrillic labels with transliteration/translation. Linked documents are not redistributed.
+
+
+## Flight-model evidence gap
+
+The sources currently registered above are not a validated product 9.13 aerodynamic coefficient dataset or complete flight-test record. The DCS manual is simulation documentation with the variant caveat already stated; the GAF technical order in the systems research does not establish all aerodynamic values for the selected plain 9.13. Do not create numeric aero tables by scraping simulator behavior, borrowing F-16 data or substituting 9.12/9.13S values.
+
+Use the [curated flight-dynamics reference guide](../../../../../docs/reference-library/flight-dynamics.md) for general methods (Digital DATCOM, JSBSim architecture, NASA test methodology and flight-dynamics textbooks). These sources inform methods and software design; they do not fill the product 9.13 data gap. Keep unsupported parameters `unknown` or clearly `synthetic` until exact applicability is established.
