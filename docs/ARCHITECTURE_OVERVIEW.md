@@ -54,7 +54,19 @@ Iron-Front does **not** use one shared flight model for every aircraft. Every ai
 
 An aircraft package owns its aerodynamic geometry/panelization, aircraft-specific coefficient datasets or model equations, control-law behavior, trim/stability augmentation, actuator mapping, mass/inertia configuration, propulsion installation, ground-effect/drag configuration and validated flight envelope. Different aircraft may require materially different model structures. Reuse a model component only when its assumptions and validity are appropriate and the aircraft data supports it. The F-16C Block 50 and MiG-29 product 9.13 are deliberately separate flight models and must never inherit one another's coefficients, geometry, control laws or handling characteristics.
 
-## State and information boundaries
+## Advanced aircraft physics ownership
+
+The flight-model framework composes these specialized owners; it does not own duplicate implementations of their algorithms:
+- `physics/aerodynamics/unsteady-aerodynamics`: time-dependent attached flow, separation, dynamic stall and hysteresis.
+- `physics/aerodynamics/compressibility`: local compressibility and transonic/shock response.
+- `physics/flight-model/flow-interactions`: aircraft-specific vortex/wake source configuration and flow interaction.
+- `physics/flight-model/structural-response`: structural loads, flexibility, fatigue interfaces and supported aeroelastic/modal response.
+- `physics/flight-model/propulsion-integration`: installed inlet/nozzle transforms and the interface between engine response and airframe forces.
+- `physics/ground-handling`: aircraft landing-gear, tire, brake, steering and runway-contact response; rigidbody integrates aircraft motion and collision supplies contact geometry.
+
+Each aircraft package selects only supported capabilities and supplies its own geometry/data/validity. The F-16 and MiG-29 must not share platform-specific aero, structural, inlet, gear or control datasets. The shared capability interface does not grant every aircraft a device or effect.
+
+
 Definitions/configuration are immutable during a scenario except explicit reconfiguration boundaries. Runtime state is changed only by its owner. Other systems receive typed commands, committed events, resource grants, observations and immutable snapshots. Preserve observation source, acquisition time, frame, age, uncertainty and quality through fusion/datalink/AI/presentation. Diagnostics are developer-only and not a hidden information API.
 
 ## Platform installation and network composition
