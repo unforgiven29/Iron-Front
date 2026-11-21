@@ -30,6 +30,9 @@ const antennaApertureSchema = await readJson("docs/radar/schemas/antenna-apertur
 const manifestExample = await readJson("docs/module-system/templates/module.manifest.example.json");
 
 validate(manifestSchema, manifestExample, "module manifest example");
+const missingApiUpperBound = structuredClone(manifestExample);
+delete missingApiUpperBound.apiCompatibility.maximumExclusive;
+reject(manifestSchema, missingApiUpperBound, "module manifest without explicit API compatibility upper bound");
 const missingDegradedBehavior = structuredClone(manifestExample);
 delete missingDegradedBehavior.dependencies[2].degradedBehavior;
 reject(manifestSchema, missingDegradedBehavior, "optional dependency without degraded behavior");
