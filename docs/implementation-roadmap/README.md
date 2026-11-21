@@ -1,6 +1,6 @@
 # Iron-Front implementation roadmap
 
-This roadmap defines the order in which the architecture becomes an executable simulator. Work milestone by milestone, not by implementing every folder at once.
+This roadmap defines the order in which the architecture becomes an executable simulator. Work milestone by milestone, not by implementing every folder at once. Feature breadth migrated from the legacy Viper Sortie project is catalogued in docs/legacy-game-feature-crosswalk.md; it must not bypass the vertical-slice sequence below.
 
 ## Stage 0 — Reproducible project foundation
 
@@ -26,9 +26,9 @@ Exit: missing/incompatible/cyclic dependencies rejected; two test modules compos
 
 ## Stage 2 — Physics and world foundations
 
-Implement world coordinates/local ENU, rigid-body integration and force/moment contracts, collision/query contracts, atmosphere sampling/local air velocity, terrain surface data and spatial index.
+Implement world coordinates/local ENU, rigid-body integration and force/moment contracts, collision/query contracts, atmosphere sampling/local air velocity, terrain surface data and spatial index. Lay the world data contract so both deterministic generated theatres and region-streamed, licensed geospatial Earth tiles can use the same interfaces.
 
-Exit: analytical rigid-body/force tests, coordinate transforms, timestep sensitivity and deterministic replay pass.
+Exit: analytical rigid-body/force tests, coordinate transforms, timestep sensitivity and deterministic replay pass; missing/invalid geodata cannot silently become flat terrain.
 
 ## Stage 3 — F-16C Block 50 vertical slice
 
@@ -38,19 +38,19 @@ Exit: F-16 acceptance scenarios pass, no F-16 branch exists in shared physics, a
 
 ## Stage 4 — Cockpit and asset pipeline
 
-Prototype and select renderer; finalize asset metadata/import conventions; build model hierarchy/attachments/animation bindings; map cockpit controls to real commands and indicators to snapshots; measure LOD/performance.
+Prototype and select renderer; finalize asset metadata/import conventions; build model hierarchy/attachments/animation bindings; map cockpit controls to real commands and indicators to snapshots; measure LOD/performance. Add reusable interaction/input paths, but keep each aircraft's cockpit layout, startup, warnings and display mappings variant-specific.
 
 Exit: renderer passes comparison; cockpit controls cause system changes; indications reflect authoritative snapshots.
 
 ## Stage 5 — Sensors and electronic warfare
 
-Build radar emissions/propagation/receiver/detection/tracking, RWR direct RF interception, passive IRST thermal chain, EO/FLIR, IFF, MAWS, fusion and datalink.
+Build radar emissions/propagation/receiver/detection/tracking, RWR direct RF interception, passive IRST thermal chain, EO/FLIR/targeting payloads, IFF, MAWS, NCTR, fusion, datalink and the physical communication/navigation interference interfaces.
 
 Exit: sensor outputs follow physical signal/geometry/resource limits, preserve uncertainty and have no hidden-truth shortcuts.
 
 ## Stage 6 — Weapons and damage
 
-Build launcher compatibility/release, weapon runtime, shared ballistics/propulsion/guidance/seeker/fuze/warhead interfaces, countermeasures and damage propagation.
+Build launcher compatibility/release, weapon runtime, shared ballistics/propulsion/guidance/seeker/fuze/warhead interfaces, infantry small-arms handling, countermeasures and damage propagation. Prove a coherent guided weapon and a small-arms/armour interaction before broad catalog expansion.
 
 Exit: supported weapon scenarios pass from release through flight, impact and damage.
 
@@ -58,17 +58,19 @@ Exit: supported weapon scenarios pass from release through flight, impact and da
 
 Use MiG-29 product 9.13 to prove the shared engines support materially different geometry, propulsion, control, system, sensor and cockpit configurations without copying F-16 code.
 
-## Stage 8 — Combined arms
+## Stage 8 — Combined arms and rotorcraft
 
-Build ground mobility, armour, vehicles, infantry, naval units and carrier operations over shared services. Every family needs a vertical slice and performance tests.
+Build ground mobility, layered armour, tanks, IFV/APC transport and dismount, artillery, ground air-defence, infantry first-person combat, squad AI, structures/interiors/fortifications, tactical medical/evacuation, rotorcraft dynamics, naval units/submarines and carrier operations over shared services. Each family needs a focused vertical slice, damage/failure cases and performance tests.
 
-## Stage 9 — World, AI, logistics and campaign
+## Stage 9 — Uncrewed systems, civil traffic, world-war and campaign
 
-Build streaming terrain/infrastructure, AI, command/control, logistics and campaign as optional modules consuming imperfect observations and published events. Validate save/load/migration for long-running campaigns.
+Add FPV/UAS/loitering systems with link/autonomy behavior; civil aviation; real-Earth and generated theatre content; campaign/world-war state, institutions, intelligence, economy/logistics, civilian society, personnel/CSAR and strategic operations. Run one persistent causal campaign slice before adding the full country/event catalogue.
+
+Exit: a sortie/infantry battle occurs inside a continuing campaign; supply, front, personnel and public consequences reconcile through events; save/migration and no-hidden-truth tests pass.
 
 ## Stage 10 — Optimization, expansion and multiplayer adapters
 
-Profile actual workloads; add LOD, workers, spatial culling and bounded approximations only when measured. Persistent authoritative co-op requires an external backend; GitHub Pages is static hosting.
+Profile actual workloads; add LOD, workers, spatial culling and bounded approximations only when measured. Expand aircraft/weapon/country rosters from validated data packages. Persistent authoritative co-op requires an external backend; GitHub Pages is static hosting.
 
 ## Completion rules
 

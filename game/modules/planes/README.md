@@ -1,12 +1,18 @@
 # Aircraft platform modules
 
-**Owner:** game/modules/planes for aircraft-specific definition, configuration, installation and adapters. Shared physics, sensor and system engines remain outside platform folders.
+**Owner:** game/modules/planes for fixed-wing aircraft-specific definition, configuration, installation and adapters. Shared physics, sensor and system engines remain outside platform folders. Rotorcraft, UAS and civil aircraft have their own package owners.
 
 ## Package responsibility
 
 A package describes an exact aircraft configuration: variant/block/operator/software baseline; geometry and mass distribution; aerodynamic surfaces/data; flight-control laws/actuators; engine installation; fuel, electrical, hydraulic, pneumatic and cooling topology; auxiliary/environmental control; landing gear/brakes; sensors/avionics; hardpoints/stores; damage routes; crew/escape; cockpit control/display map; assets and provenance.
 
 Each aircraft has its own installed systems architecture. A shared electrical or hydraulic solver does not mean aircraft share the same generators, batteries, buses, pump count, reservoirs, pressure ratings, accumulator arrangements, crossfeed, emergency sources or consumers. The platform package selects and wires exact equipment; shared solvers execute that hardware configuration.
+
+## Mission and aircraft catalogue breadth
+
+The legacy game includes a broad multi-era hangar rather than only two fighters. Preserve that breadth through independently versioned packages: fighters/interceptors, multirole/strike aircraft, attack aircraft, bombers, reconnaissance, trainers, transports and other supported categories. Aircraft availability is tied to scenario faction/equipment and exact product variants, not a hardcoded universal hangar list.
+
+Supported task profiles should include CAP, intercept, BVR/WVR combat, escort, strike, CAS, SEAD, reconnaissance, anti-ship, ferry, refuelling, carrier operations, emergency recovery and training where the exact aircraft fit permits them. A role label does not grant an aircraft equipment it does not carry.
 
 ## Required aircraft flight-model dossier
 
@@ -25,6 +31,10 @@ Every aircraft package must maintain a focused systems directory with an index a
 5. **Fuel and cooling:** tank/feed/transfer configuration, engine/APU/emergency unit feed, fuel thermal exchange, coolant/air loops and equipment cooling interfaces.
 
 A system may be omitted only with an explicit not-fitted/not-applicable record and evidence/reason. Do not silently substitute another aircraft's system, values or backup.
+
+## Cockpit and human interfaces
+
+A cockpit package defines aircraft-specific geometry, controls, displays, warnings, labels, sightlines, click/hold/axis interaction and startup/shutdown procedure mapping. A shared instrument/widget library may draw a gauge, but the meaning, range, failure behavior and wiring belong to the installed aircraft system. Cold/dark startup, ground power, engine start, avionics alignment, checks and shutdown are explicit procedures. Do not infer an accurate cockpit from a generic 3D shell.
 
 ## Platform installation versus shared behavior
 

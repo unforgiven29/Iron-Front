@@ -6,6 +6,7 @@ Physics owns reusable physical equations, numerical integration and physical que
 - flight-model: aircraft-specific composition of surface elements, coefficient datasets, control/actuator state, propulsion installation and force/moment contributions. It does not own the rigid-body integrator or duplicate aerodynamic/engine solvers.
 - rigidbody: 6-DoF state, force/moment accumulation, inertia and integration.
 - aerodynamics: local surface flow, coefficient evaluation and aerodynamic loads.
+- rotorcraft: rotor blade/disk flow, induced velocity, rotor forces/moments and drivetrain-coupled rotor dynamics; exact helicopter configuration remains in game/modules/rotorcraft.
 - environment: atmosphere, winds, turbulence and weather fields.
 - propulsion: reusable engine/motor family behavior.
 - collision: broad/narrow physical contacts and collision queries.
@@ -21,9 +22,11 @@ Physics owns reusable physical equations, numerical integration and physical que
 Each model documents owner, inputs/outputs, SI units, frames, operating envelope, fidelity tier, uncertainty, numerical stability and provenance. Shared logic may not branch on aircraft/weapon name. Configuration selects data/capabilities; it does not create per-platform algorithm copies.
 
 ## Coupling
-The flight-model assembly composes the aircraft-specific surface/configuration graph and submits force/moment contributions to rigidbody. Aerodynamics owns local-flow/coefficient equations; propulsion owns engine-family behavior; aircraft packages provide installation/data. Flight-model assembly does not integrate motion.
+Fixed-wing flight-model assembly composes the aircraft-specific surface/configuration graph and submits force/moment contributions to rigidbody. Aerodynamics owns local-flow/coefficient equations; propulsion owns engine-family behavior; aircraft packages provide installation/data. Flight-model assembly does not integrate motion.
+
+Rotorcraft rotor models submit rotor forces/moments and drivetrain power demand to the same rigidbody/propulsion/resource contracts. The rotorcraft platform supplies its rotor geometry, blade/airfoil data, transmission and installed control system.
 
 Rigid body integrates forces supplied by aero, propulsion, gravity and contact. Environment supplies ambient fields. Systems supply resources. Collision returns physical contacts. World supplies geometry/material input. Sensors consume propagation/optics but own receiver/detection logic.
 
 ## Validation
-Dimensional analysis, limiting cases, stability/conservation where relevant, analytical references, failure/boundary cases, timestep sensitivity, deterministic replay and representative browser performance. Do not call approximations CFD, full-wave EM or finite-element armor without validated solvers.
+Dimensional analysis, limiting cases, stability/conservation where relevant, analytical references, failure/boundary cases, timestep sensitivity, deterministic replay and representative browser performance. Do not call approximations CFD, full-wave EM or finite-element armour without validated solvers.
