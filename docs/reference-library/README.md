@@ -54,6 +54,10 @@ For each major system, Claude should produce a short source plan before coding:
 
 For example, a radar implementation needs more than one maximum-range number: it needs an architecture source, a signal-processing source, an applicable equipment baseline and test/validation cases. An aircraft flight model needs more than a three-view drawing: it needs geometry, mass properties, aerodynamic evidence, control-system evidence and an envelope/validation plan.
 
+## Platform-by-platform technical evidence program
+
+The first two full-fidelity aircraft have separate technical evidence packages: [F-16C Block 50](../platform-reference-program/aircraft/F-16C-Block-50.md) and [MiG-29 product 9.13](../platform-reference-program/aircraft/MiG-29-product-9-13.md). The [program index](../platform-reference-program/README.md) defines the common evidence matrix and data status vocabulary. Read the relevant aircraft dossier before adding platform facts; do not duplicate or merge its source register.
+
 ## Existing platform source registers
 
 These aircraft-specific registers already exist and must be extended rather than duplicated:
