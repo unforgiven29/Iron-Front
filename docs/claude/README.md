@@ -25,6 +25,8 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Rotor blade aerodynamics / helicopter dynamics | physics/rotorcraft/README.md and game/modules/rotorcraft/README.md | exact rotorcraft installation, propulsion, rigidbody, hydraulics, crew |
 | Aircraft FM assembly / panels / coefficient data / trim | physics/flight-model/README.md and relevant child guide | exact aircraft flight-model dossier, rigidbody, aerodynamics, propulsion, actuator/resources as involved |
 | Aircraft control surfaces / high-lift devices | physics/flight-model/control-surfaces/README.md and high-lift-devices/README.md | exact aircraft controls-and-actuators and systems dossiers |
+| New full-fidelity aircraft / platform research | docs/platform-reference-program/README.md and the exact aircraft dossier | exact platform source register, flight-model/system/sensor/store guides |
+| Movable aerodynamic devices / slats / flaps / spoilers / speedbrakes | physics/flight-model/high-lift-devices/README.md and control-surfaces/README.md | exact aircraft surfaces and actuator installation; acceptance FM-13 to FM-20 |
 | Flight-model verification / flight-log comparison | physics/flight-model/verification/README.md and tests/README.md | exact aircraft validation plan and acceptance suite |
 | Engine or motor | physics/propulsion/README.md | platform engine fit, fuel, cooling |
 | Electrical generation/distribution | game/systems/electrical/README.md | exact aircraft systems/electrical.md, propulsion/accessory drive, cooling, exact consumers/load list |
