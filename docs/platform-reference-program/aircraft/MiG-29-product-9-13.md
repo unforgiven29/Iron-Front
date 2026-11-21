@@ -120,4 +120,4 @@ Before enabling advanced effects, fill the product 9.13 evidence records for:
 - **Installed twin RD-33 propulsion:** each intake/engine's own position, flow recovery/distortion, response, nozzle/exhaust and asymmetric effects. Do not average both inlets or engines.
 - **Ground handling:** nose/main gear geometry, strut/tire/wheel properties, brakes/steering/anti-skid, emergency extension and landing-impact evidence.
 
-Use [Advanced flight physics references](../../../reference-library/advanced-flight-physics.md) for research and test methodology. The public sources currently registered do not establish a complete product 9.13 dataset for these advanced domains. Do not turn the absence of data into fabricated precision or a claim of full fidelity.
+Use [Advanced flight physics references](../../reference-library/advanced-flight-physics.md) for research and test methodology. The public sources currently registered do not establish a complete product 9.13 dataset for these advanced domains. Do not turn the absence of data into fabricated precision or a claim of full fidelity.
