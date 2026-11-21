@@ -46,6 +46,10 @@ A subsystem guide may define detailed intended behavior while the runtime remain
 
 A shared six-degree-of-freedom rigid-body integrator, reusable aerodynamic equations and force/moment contracts are **not** a shared aircraft flight model. Every aircraft owns its own validated aerodynamic model/data, geometry, mass/inertia, control laws, trim/actuator response, propulsion installation, configuration effects and operating envelope. Different aircraft may need different model structures. Never force the F-16 and MiG-29 into the same coefficient tables, panelization, control response or tuning. Reuse only the mathematical tools and interfaces whose assumptions are valid for the aircraft.
 
+## Engineering reference library
+
+Use `docs/reference-library/README.md` as the central annotated source index. Read the specific domain guide for flight dynamics, ground vehicles/infantry, sensors/EW, weapons/ballistics, aircraft systems, validation or tactical/campaign context. The references are intentionally annotated with what they establish and what they do not establish. They do not create implementation evidence or authorize copying restricted/copyrighted material. Keep exact variant applicability, page/table citations, units, provenance, uncertainty and validity envelope attached to every adopted datum.
+
 ## Current development stage
 
 The implementation-readiness checklist and roadmap put the next work at **Stage 0.5 — Foundation hardening**, followed by **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before the Stage 1 exit criteria pass.
