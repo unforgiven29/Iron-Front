@@ -87,11 +87,21 @@ The aircraft's claimed fidelity is limited by its weakest material input dataset
 - verification: standalone scenario/log comparison and validation evidence.
 - tests: unit, integration, acceptance, replay and performance test requirements.
 
-## Relationship to the A-4E-C reference
+## Flight-model reference hierarchy
 
-The A-4E-C ExternalFM codebase separates a flight-model coordinator, local aerodynamic elements, an airframe/control/actuator layer, aircraft state, propulsion/fuel components, a DCS host interface, unit tests and verification programs. Its FM computes local flow at individual element stations using aircraft angular motion and accumulates force/moment contributions. It also uses data tables for coefficient relationships and tests selected component behavior.
+**Primary public architecture reference: Falcon BMS.** Its developer notes describe a deliberate split between mechanical/mass properties, aerodynamics, input/output, engine, ground interaction and equations of motion. They also discuss keeping data-driven advanced-flight-model paths distinct from legacy/AI paths, using either distributed local-surface loads or validated global coefficient data, and recomputing mass, CG and inertia as fuel/weapons change. These are useful architectural decisions to study for Iron-Front.
 
-That is a valuable organizational pattern. However, its coefficient choices, aircraft constants, force equations, control assumptions and DCS callback sequencing are A-4-specific and are not Iron-Front specifications. The DCS DLL supplies state to and receives forces from an external host; Iron-Front's shared rigid-body solver owns its own integration. See the [A-4E-C ExternalFM source tree](https://github.com/Community-A-4E/community-a4e-c/tree/master/A-4E-C/ExternalFM).
+- [BMS physics-engine development and module boundaries](https://falcon-bms.com/blog/the-development-of-the-physics-engine)
+- [BMS aerodynamics: local surface loads and global coefficient models](https://www.falcon-bms.com/blog/the-aero-module)
+- [BMS mechanical model: mass, CG, inertia and fuel/store distribution](https://www.falcon-bms.com/blog/the-mechanical-module)
+
+Do not copy BMS private source, hidden data or aircraft-specific coefficients. Its published articles explain design intent, not a complete public implementation. Iron-Front should keep one canonical rigid-body truth and explicit fidelity profiles; an AI/low-cost approximation must not become a separate, inconsistent player-aircraft physics truth.
+
+**Secondary code-organization reference: Community A-4E-C ExternalFM.** Its public tree separates a flight-model coordinator, local aerodynamic elements, airframe/control/actuator classes, aircraft state, propulsion/fuel components, DCS host interface, unit tests and verification programs. Its FM computes local flow at individual element stations using aircraft angular motion and accumulates force/moment contributions. This is a valuable example of small classes and focused responsibilities.
+
+The A-4E's coefficient choices, aircraft constants, force equations, control assumptions and DCS callback sequencing are A-4-specific and are not Iron-Front specifications. The DCS DLL supplies state to and receives forces from an external host; Iron-Front's shared rigid-body solver owns its own integration. See the [A-4E-C ExternalFM source tree](https://github.com/Community-A-4E/community-a4e-c/tree/master/A-4E-C/ExternalFM).
+
+**Weapon-model caution from BMS:** its public [AIM-120 acquisition discussion](https://www.falcon-bms.com/blog/aim-120-bms-acquisition-model) is useful for staged midcourse/search/terminal acquisition and uncertainty propagation. The authors explicitly caution that the 4.37.3 model includes assumptions and estimates and is not an engineering-accurate missile simulation. Borrow the separation of phases and validation questions, not its numeric values or unverified behaviors.
 
 ## Implementation status and first slice
 
