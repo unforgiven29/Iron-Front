@@ -21,7 +21,7 @@ Do not treat a ground unit as a waypoint-following map marker. The simulation ne
 - [Chrono::Vehicle module](https://api.projectchrono.org/9.0.0/group__vehicle.html)
 - [Vehicle modeling overview](https://api.projectchrono.org/9.0.0/vehicle_overview.html)
 - [Tracked vehicle and subsystem documentation](https://api.projectchrono.org/9.0.0/group__vehicle.html)
-- [Terrain models](https://api.projectchrono.org/8.0.0/vehicle_terrain.html)
+- [Terrain models](https://api.projectchrono.org/9.0.0/vehicle_terrain.html)
 - [Soil Contact Model reference](https://api.projectchrono.org/development/classchrono_1_1vehicle_1_1_s_c_m_terrain.html)
 
 **Use for:** real examples of composable vehicle subsystems, powertrains, tracked/wheeled models, suspension templates, contact, terrain queries and deformable soil. The open-source project is a particularly valuable architecture reference for modular vehicle simulation. Its project site describes a BSD-3 license.
