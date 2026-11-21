@@ -12,21 +12,28 @@
 
 Use for study of modular rigid-body/contact, vehicle subsystem composition, tracked/wheeled mobility and terrain interaction. Chrono is C++ and its detailed models may be too heavy for browser execution. Inspect the current repository license and version before reusing any code; do not copy code without preserving required notices and attribution. A design reference is not automatically a browser-compatible dependency.
 
-### 2. Digital DATCOM
+### 2. JSBSim — flight-dynamics software reference
+
+- [JSBSim reference manual](https://jsbsim-team.github.io/jsbsim-reference-manual/)
+- [JSBSim source repository](https://github.com/JSBSim-Team/jsbsim)
+
+Use the programmer/formulation manual and the data-driven aircraft model organization to study 6-DoF flight dynamics, aircraft-specific controls, propulsion, gear, logging and configuration. It is C++ and LGPL, so license review is mandatory before code reuse. Included aircraft data are published approximations for educational/entertainment use, not authoritative real-aircraft data. It is an architecture/testing reference, not a drop-in web dependency.
+
+## 3. Digital DATCOM
 
 - [NTIS Digital DATCOM manual record](https://ntrl.ntis.gov/NTRL/dashboard/searchResults/titleDetail/ADA086557.xhtml)
 - [Reference bibliography](https://www.pdas.com/datcomrefs.html)
 
 Use to understand semi-empirical stability/aerodynamic estimation and legacy workflow. Do not present generated estimates as measured aircraft data or assume the tool covers the full nonlinear flight envelope.
 
-### 3. MIT Lincoln Laboratory radar courseware
+### 4. MIT Lincoln Laboratory radar courseware
 
 - [Introduction to Radar Systems](https://www.ll.mit.edu/outreach/web-based-course-radar-introduction-radar-systems)
 - [Graduate Radar Systems Engineering](https://www.ll.mit.edu/outreach/web-based-course-radar-graduate-level)
 
 Use as a structured learning/testing reference for the complete RF signal chain. Courseware is not equipment-specific performance data.
 
-### 4. RIT DIRSIG
+### 5. RIT DIRSIG
 
 - [Reference documentation](https://dirsig.cis.rit.edu/docs/new/)
 - [Validation studies and feature handbooks](https://dirsig.cis.rit.edu/docs/new/index.html)
