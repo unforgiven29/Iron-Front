@@ -39,3 +39,12 @@ Expose local flow vector/speed, dynamic pressure, AoA/sideslip, Mach, coefficien
 ## Tests
 
 Test area summation, station transforms, angular-rate local velocity, mirrored geometry, force/moment sign, panel contribution additivity in the linear regime, coefficient boundary behavior, symmetric trim, single-panel damage, asymmetric store loading, and no duplicate area/forces.
+
+
+## Movable device geometry and aerodynamic coupling
+
+An aircraft's element graph must identify the base lifting surface and every overlapping movable portion. Support independent element/control relationships for leading-edge devices, trailing-edge flaps, flaperons, ailerons, slats, spoilers, spoilerons, speedbrakes/airbrakes and tail/fin controls. Not every aircraft has every type.
+
+For each current achieved device state, the aerodynamic model must use one consistent area/geometry convention. Either a coefficient dataset already represents the whole configured wing, or the device/element decomposition supplies the increment; do not count the same surface area or coefficient increment twice.
+
+A movable surface can alter lift, drag, pitching moment, local flow, hinge loads and other control effectiveness. A spoiler may reduce local lift rather than simply add a generic drag term. A slat's slot flow is not interchangeable with a leading-edge flap's camber change. Fixed LERX/LEX is geometry/flow interaction, never a movable control surface unless the platform evidence says otherwise.
