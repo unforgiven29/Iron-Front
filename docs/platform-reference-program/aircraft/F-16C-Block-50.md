@@ -117,3 +117,72 @@ Before enabling advanced effects, fill the F-16C Block 50 evidence records for:
 - **Ground handling:** gear geometry, strut/tire curves, wheel properties, steering/braking/anti-skid, emergency extension and runway/contact limits.
 
 The common reference guide [Advanced flight physics](../../reference-library/advanced-flight-physics.md) contains NASA research, dynamic-stall methods, aeroelastic references and landing-gear research. Those sources establish mechanisms/test methods, not F-16C Block 50 values. Keep every platform number tied to exact manual/report page and applicability.
+
+
+## 9. Publicly documented baseline facts — usable starting evidence
+
+This section adds concrete facts for Claude to start with. It deliberately distinguishes aircraft-family figures from exact Block 50 data. A value does not become an authoritative F-16C Block 50 simulation parameter merely because an official source publishes it for the F-16 family.
+
+### Airframe and mass references
+
+| Parameter | Public value | Evidence status | How to use it |
+|---|---:|---|---|
+| Wingspan | 9.8 m | primary-published, F-16 family fact sheet | Geometry reference only; verify exact datum/variant before flight model |
+| Length | 14.8 m | primary-published, F-16 family fact sheet | Family-level geometry reference; confirm measurement datum |
+| Height | 4.8 m | primary-published, F-16 family fact sheet | Family-level reference only |
+| Weight without fuel | 8,936 kg | primary-published, F-16 family fact sheet | Do not treat as Block 50 empty/basic mass; definition and equipment fit differ |
+| Maximum takeoff weight | 16,875 kg | primary-published, F-16 family fact sheet | Family-level public figure; Shaw's Block 50/52 fact sheet gives an approximate maximum gross weight around 39,000 lb (about 17,690 kg). Preserve this discrepancy and resolve definitions/configuration before use |
+| Internal fuel | 3,175 kg | primary-published, F-16 family fact sheet | Family-level figure; do not create tank geometry/distribution from this aggregate |
+| Typical fuel with two external tanks | 5,443 kg | primary-published, F-16 family fact sheet | Broad mission reference only; tank types and fuel distribution must be specified |
+
+Sources:
+- [USAF — F-16 Fighting Falcon fact sheet](https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/)
+- [Shaw AFB — F-16C Fighting Falcon / Block 50-52 context](https://www.shaw.af.mil/About-Us/Fact-Sheets/Display/Article/663884/f-16c-fighting-falcon/)
+
+### Propulsion
+
+The selected project baseline is one GE F110-GE-129. Shaw AFB's Block 50/52 fact sheet identifies the F110-GE-129 and F100-PW-229 as the increased-performance engine choices and reports over 29,000 lbf afterburning thrust. Convert the source value only as a unit conversion (29,000 lbf ≈ 129 kN); do not fabricate dry thrust, spool time, fuel-flow maps, compressor maps, nozzle schedules or installed thrust losses from this single rating.
+
+The USAF family fact sheet lists several engine choices and gives a broader/general F-16 thrust figure. Do not average that value with the Block 50/52 fact sheet. The exact F110-GE-129 engine manual/map and installed inlet/nozzle data remain required.
+
+### Avionics and electronic warfare baseline
+
+| Equipment | Working project selection | Evidence status and caution |
+|---|---|---|
+| Fire-control radar | AN/APG-68(V)5 | Selected early Block 50 research baseline. The BMS avionics manual describes this equipment, but is a simulator manual and cannot validate exact real-world radar performance. Do not silently upgrade to APG-68(V)9 or APG-83. |
+| RWR | AN/ALR-56M family | Shaw AFB fact sheet identifies ALR-56M in Block 50/52 upgrade context. Exact receiver/software/antenna and date fit still need freezing. |
+| Countermeasure dispenser | ALE-47 family | Shaw AFB Block 50/52 fact sheet; exact dispenser configuration, software and inventory need source data. |
+| HARM targeting equipment | HTS pod / related mission equipment as configured | Optional mission fit, not permanently installed on every Block 50. Confirm exact pod, OFP, wiring and aircraft date. |
+| ECM / targeting pods / datalink | Fit-dependent | Do not assume all Block 50 aircraft carried the same pods, MIDS/Link 16 or mission equipment. |
+
+The published Shaw fact sheet describes Block 50/52 upgrade context and notes later Block 50/52 export aircraft with APG-68(V)9. It must not be used to claim that all early Block 50 aircraft carried V9. The selected early V5 baseline remains a research choice until the exact USAF operator, date and OFP are frozen.
+
+Simulator reference:
+- [Falcon BMS 4.37 avionics manual — AN/APG-68(V)5 section](https://cdn.falcon-bms.com/docs/4.37/TO%201F-16CMAM-34-1-1%20BMS.pdf). Useful for display/mode workflow in that simulator, not an independent measured radar specification.
+
+### Starter weapon and stores library
+
+These are supported research profiles, not a completed station-clearance matrix. Every weapon is linked to a separate product evidence page:
+
+| Product | Intended project role | Evidence / implementation restriction |
+|---|---|---|
+| [M61A1 Vulcan](../weapons/M61A1.md) | Internal 20 mm cannon | USAF family fact sheet reports 500 rounds. Keep 511-round secondary reports disputed until exact installation manual is checked. |
+| [AIM-9M](../weapons/AIM-9M.md) | Short-range IR AAM | NAVAIR and USAF publish dimensions/mass, motor family and IR/warhead class. Keep AIM-9X features out. |
+| [AIM-120C-5](../weapons/AIM-120C-5.md) | Active-radar BVR AAM | NAVAIR publishes C-5 family geometry/mass and AMRAAM architecture. Range/speed remain unavailable/classified in this source set. |
+| [AGM-88 HARM](../weapons/AGM-88-HARM.md) | Anti-radiation / SEAD weapon | USAF confirms F-16C use and family architecture. Select AGM-88C only after exact variant, CLC, launcher and OFP fit are documented. |
+| [AGM-65D Maverick](../weapons/AGM-65D.md) | IIR air-to-ground weapon | USAF identifies D variant IIR and variant mass. Exact station, launcher and Block 50/OFP clearance still needs evidence. |
+
+**Do not build a station map from these association facts.** A candidate weapon is not automatically cleared for every station, rack, date, OFP or operator. The aircraft data package still needs station positions/transforms, rack/launcher IDs, load limits, sway-brace/ejector behavior, power/data/umbilical needs, release interlocks, safe-separation envelopes and approved loading combinations.
+
+### Data gaps that remain mandatory
+
+Claude must still obtain or keep explicitly unknown:
+- Block 50-specific planform/airfoil and panel geometry; aerodynamic coefficient/derivative tables over Mach/AoA/beta/rates/control/configuration; validated high-AoA/transonic envelope.
+- Dry/basic mass definition, CG datum, full inertia tensor, tank capacity/position and fuel-transfer schedule for the selected operator/fit.
+- F110-GE-129 corrected engine maps, thrust/fuel-flow/transient data, installation recovery/distortion and nozzle schedules.
+- Exact FLCS software version, gains/schedules/limiters, per-surface geometry/rates/force limits and failure behavior.
+- APG-68(V)5 transmitter/receiver/antenna/processing parameters; ALR-56M receiver coverage/library; ALE-47 dispenser timing and exact inventory interface.
+- Exact weapon station/rack/launcher compatibility and the aircraft OFP/software release permissions.
+- Structural stiffness/load/fatigue data, tire/strut curves, brake/anti-skid behavior and emergency system thresholds.
+
+Never turn an aggregate fact-sheet number into a detailed physical map. Use these public facts to check units, scale and package identity; obtain exact technical data or maintain an explicit approximation tier.
