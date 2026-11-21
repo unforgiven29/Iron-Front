@@ -32,6 +32,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | RWR / ESM | sensors/RWR/README.md or sensors/ESM/README.md | physics/radar and exact receiver installation |
 | IRST, EO/FLIR, MAWS, IFF, NCTR, fusion | exact sensors/<system>/README.md; NCTR uses sensors/NCTR/README.md | physics/optics, equipment install and integration contracts |
 | Weapon product/variant composition | game/modules/weapons/README.md and the exact category guide | game/modules/weapons/components/README.md; platform launcher only when involved |
+| Anti-tank missile guidance and launcher sights | game/modules/weapons/missiles/anti-tank/README.md | exact infantry/vehicle launcher, seeker/guidance/ballistics and optics owners |
 | Weapon guidance architecture/law | game/modules/weapons/components/guidance/README.md and the matching physics/guidance page | exact seeker profile and permitted navigation/command producer |
 | Weapon seeker architecture/track | game/modules/weapons/components/seekers/README.md and only the relevant family page | sensors/weapon-seeker/README.md and its matching family processor |
 | Dynamic chaff/flare/decoy interaction | game/modules/weapons/countermeasures/README.md and only the relevant decoy profile | sensors/weapon-seeker/countermeasure-discrimination/README.md; physics/radar or optics/thermal only when directly relevant |
@@ -48,6 +49,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Strategic institutions / diplomacy / national decisions | game/modules/campaign/institutions/README.md | factions, world-war, intelligence, personnel |
 | Campaign intelligence / deception / media claims | game/modules/campaign/intelligence/README.md | sensors, communications, campaign/society |
 | Civilian society / news / humanitarian services | game/modules/campaign/society/README.md | world/infrastructure, logistics, personnel |
+| Justice / investigations / legal accountability | game/modules/campaign/justice/README.md | campaign/society, personnel and event evidence |
 | Personnel records / CSAR / POW / memorials | game/modules/campaign/personnel/README.md | game/systems/crew, infantry/medical-support, campaign/society |
 | Strategic bombers / ballistic or nuclear escalation | game/modules/campaign/strategic-operations/README.md | weapons, naval, air-defence, intelligence and campaign/institutions |
 | Logistics / production / trade / supply convoys | game/modules/logistics/README.md | world/infrastructure, campaign/world-war and persistence |
