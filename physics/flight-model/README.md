@@ -122,3 +122,24 @@ The A-4E's coefficient choices, aircraft constants, force equations, control ass
 ## Implementation status and first slice
 
 No runtime implementation is implied by this directory. First build schema-validated aircraft surface definitions and coefficient tables; implement a deterministic per-element local-flow/force result using physics/aerodynamics; aggregate forces and application-point moments; integrate the output through physics/rigidbody; then add actual actuator positions and propulsion installation. Test symmetric level trim and one controlled maneuver before adding high-AoA or flow-interaction features.
+
+## Advanced flight-physics task map
+
+The shared assembly is a framework for composing independently configured aircraft models. It does not replace the specialized physical owners.
+
+| Capability | Canonical owner | Aircraft-specific responsibility |
+|---|---|---|
+| Unsteady aerodynamics / dynamic stall | physics/aerodynamics/unsteady-aerodynamics | Section choice, coefficients, geometry, transient envelope and validation |
+| Compressibility / transonic / shock response | physics/aerodynamics/compressibility | Per-aircraft Mach/AoA/configuration data and validity |
+| LEX/LERX, downwash, wake and vortices | physics/flight-model/flow-interactions | Actual fixed geometry, affected elements and aircraft-specific evidence |
+| Flexibility / aeroelasticity / structural response | physics/flight-model/structural-response | Structure stations, mass/stiffness/damping/modes and load limits |
+| Installed inlet/exhaust/engine coupling | physics/flight-model/propulsion-integration plus physics/propulsion | Exact installed engine, inlet/nozzle geometry, maps and limits |
+| Movable high-lift/drag devices | physics/flight-model/high-lift-devices | Fitted device types, segments, schedules, interlocks and actuator installation |
+| Gear/tire/braking/ground handling | physics/ground-handling | Gear geometry, struts, tires, brakes, steering, emergency extension and limits |
+
+### State and data requirements
+
+Any stateful model must declare owner, schema/version, simulation update domain, initialization/reinitialization, save/replay, failure/degraded states, valid envelope and diagnostic outputs. A feature is not complete because a configuration field or visual effect exists.
+
+Aircraft packages select these capabilities independently. F-16C Block 50 and MiG-29 product 9.13 must not share coefficient tables, structural modes, inlet maps, control schedules, gear data or model calibration simply because both use the same underlying interfaces. If a reference does not cover the selected variant, retain the unknown/provisional state.
+
