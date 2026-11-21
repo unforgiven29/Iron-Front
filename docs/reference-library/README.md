@@ -17,6 +17,10 @@
 | Test strategy, code/tool references, numerical quality and browser performance | [Validation and open tools](validation-and-open-tools.md) | `game/tests/`, `physics/*/tests/`, `docs/testing-and-validation/` |
 | Tactical unit behavior, infantry/armor organization, campaign and logistics context | [Tactics and campaign context](tactics-and-campaign.md) | `game/modules/ai/`, `game/modules/ground-units/`, `game/modules/infantry/`, `game/modules/logistics/`, `game/modules/campaign/` |
 
+## Platform-specific equipment data
+
+For actual aircraft and weapon facts—not only general engineering references—start with [the platform-by-platform technical evidence program](../platform-reference-program/README.md). It contains separate F-16C Block 50 and MiG-29 product 9.13 packages plus an initial [weapon technical evidence library](../platform-reference-program/weapons/README.md). These contain public values, exact source links, applicability limits, simulator-reference flags and explicit data gaps. They are not runtime implementations or complete technical manuals.
+
 ## Source-quality hierarchy
 
 Claude must label each source by what it can legitimately establish:
