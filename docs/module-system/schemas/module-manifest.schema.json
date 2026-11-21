@@ -15,7 +15,7 @@
     "apiCompatibility": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["minimum"],
+      "required": ["minimum", "maximumExclusive"],
       "properties": {
         "minimum": { "$ref": "#/$defs/semver" },
         "maximumExclusive": { "oneOf": [{ "$ref": "#/$defs/semver" }, { "type": "null" }] }
