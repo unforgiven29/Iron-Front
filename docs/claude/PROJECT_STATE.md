@@ -8,7 +8,7 @@
 
 Iron-Front is a browser-based combat flight simulation project intended to grow into a Falcon BMS-inspired, systems-oriented simulator, with combined-arms and campaign capabilities developed on top of the flight-simulation foundation. Falcon BMS is an architectural and simulation-depth reference, not a source of copied constants, undocumented behavior or proprietary implementation.
 
-The first aircraft proof is the F-16C Block 50. The MiG-29A product 9.13 is the second-aircraft architecture proof: it must use the shared engines through a different aircraft installation, not an F-16 code fork.
+The first aircraft proof is the F-16C Block 50. The MiG-29A product 9.13 is the second-aircraft architecture proof. They must have independent aircraft-specific flight models, aerodynamic data, geometry, control response, installation and validation. They may reuse numerical physics infrastructure and stable interfaces; they must not share one universal flight model or inherit each other's handling.
 
 ## Reality check: what exists now
 
@@ -39,6 +39,12 @@ Do not describe or build on these as though they already exist:
 - A production 3D renderer, audio engine, asset pipeline or persistent authoritative multiplayer backend.
 
 A subsystem guide may define detailed intended behavior while the runtime remains absent. Keep that distinction explicit in code reviews, commits, documentation and user-facing status.
+
+
+
+### Flight-model independence is mandatory
+
+A shared six-degree-of-freedom rigid-body integrator, reusable aerodynamic equations and force/moment contracts are **not** a shared aircraft flight model. Every aircraft owns its own validated aerodynamic model/data, geometry, mass/inertia, control laws, trim/actuator response, propulsion installation, configuration effects and operating envelope. Different aircraft may need different model structures. Never force the F-16 and MiG-29 into the same coefficient tables, panelization, control response or tuning. Reuse only the mathematical tools and interfaces whose assumptions are valid for the aircraft.
 
 ## Current development stage
 
