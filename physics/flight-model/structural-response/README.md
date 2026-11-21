@@ -106,4 +106,4 @@ If a component separates or permanently deforms, update its mass, CG/inertia, ae
 - Flutter/dive/limit boundaries only against applicable test/reference evidence.
 - Deterministic replay, convergence and substep sensitivity.
 
-Research routes: [advanced flight physics references](../../../../docs/reference-library/advanced-flight-physics.md), especially the aeroelasticity/loads sources.
+Research routes: [advanced flight physics references](../../../docs/reference-library/advanced-flight-physics.md), especially the aeroelasticity/loads sources.
