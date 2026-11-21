@@ -108,3 +108,16 @@ Build separate tests from the F-16 suite:
 - deterministic replay, data provenance validation and browser performance.
 
 Do not copy F-16 test values or tune the MiG-29 until it resembles F-16 handling. The proof is that both aircraft behave differently for defensible, traceable reasons.
+
+
+## 8. Advanced dynamic flight physics evidence
+
+Before enabling advanced effects, fill the product 9.13 evidence records for:
+- **Unsteady aerodynamics:** wing/tail section applicability, static/dynamic coefficient evidence, pitch-rate range, separation/hysteresis and post-stall limits.
+- **Compressibility/transonic behavior:** local Mach/pressure/drag data, control-effectiveness changes, transonic buffet and validated Mach/AoA/configuration envelope.
+- **LERX/forebody vortices:** exact leading-edge/forebody geometry, vortex path/breakdown and interaction with vertical tails, control surfaces and inlets. Generic twin-tailed-fighter NASA flow surveys are mechanism references only, not MiG-29 values.
+- **Aeroelastic/structural response:** structural stations, stiffness/mass/damping, modal evidence, fatigue/load limits and component routing. Keep unknown data explicit; do not infer a flutter boundary from another fighter.
+- **Installed twin RD-33 propulsion:** each intake/engine's own position, flow recovery/distortion, response, nozzle/exhaust and asymmetric effects. Do not average both inlets or engines.
+- **Ground handling:** nose/main gear geometry, strut/tire/wheel properties, brakes/steering/anti-skid, emergency extension and landing-impact evidence.
+
+Use [Advanced flight physics references](../../../reference-library/advanced-flight-physics.md) for research and test methodology. The public sources currently registered do not establish a complete product 9.13 dataset for these advanced domains. Do not turn the absence of data into fabricated precision or a claim of full fidelity.
