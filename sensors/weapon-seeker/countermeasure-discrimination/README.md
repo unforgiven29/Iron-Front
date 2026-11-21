@@ -37,6 +37,22 @@ An older scanning seeker may respond to temporal modulation/track gates differen
 
 IRCCM is a family of seeker-specific discrimination features, not a single immunity percentage. Profile the actual supported mechanisms: spectral comparison; scan/track timing logic; spatial/shape/scene processing; kinematic/track continuity; background discrimination; rejection/hold-off logic; and other evidence-backed features. Unknown details remain unknown. Gameplay tuning must be a clearly labeled profile parameter with a test record, not disguised as real-world capability.
 
+## Candidate association model
+
+A practical implementation can use a track-prediction and measurement-association pipeline without pretending to reproduce classified seeker software:
+
+1. Predict the current track from its own last valid observations and motion model, advancing its state and uncertainty to the current seeker update.
+2. Receive zero or more candidate measurements from the physical seeker front end. Each candidate carries its own measurement covariance/quality and observable features.
+3. Apply architecture-specific gates. Radar profiles may use measured angle, range/range-rate, Doppler and scan/track consistency; IR profiles may use angular/image position, spectral/contrast features and scene/track continuity. Only use features the selected seeker can actually measure.
+4. Compute the innovation between each candidate and the predicted track, with an uncertainty-aware gate. A candidate outside the gate is not silently snapped onto the target.
+5. Evaluate a family-specific likelihood/association weight using the measurement residual, signal/scene quality, track continuity and decoy-discrimination features.
+6. Include explicit hypotheses for clutter/false alarm and no valid measurement. Normalize candidate/track hypotheses and apply track-management hysteresis or confirmation rules.
+7. Publish maintain, transfer, reject, coast, lost or reacquire with reason codes and uncertainty.
+
+For a measurement vector z_i and predicted measurement h(x^-), a standard starting point is innovation ν_i = z_i - h(x^-), innovation covariance S_i = H_i P^- H_i^T + R_i, and a normalized residual/gate such as d_i² = ν_i^T S_i⁻¹ ν_i. This is a generic estimation pattern, not a claim that every real seeker uses this exact implementation. Image, spectral and RF feature likelihoods require architecture-specific observation models; do not force every feature into one fake scalar.
+
+The prior probability/weight is conditioned on track continuity and candidate history. The likelihood is conditioned on the current measured scene, selected seeker profile and environmental state. A decoy can therefore be a strong candidate in one update and a poor candidate a moment later as its geometry/signature/age changes. Keep the no-detection/clutter hypothesis to avoid forcing a target-or-decoy choice when evidence is insufficient.
+
 ## Runtime outputs
 
 Per candidate and update, publish: detection validity; measurement quality; target/decoy hypothesis likelihood or association score; innovation/gate result; track continuity; discrimination reason code; confidence/uncertainty; and chosen transition (maintain/transfer/reject/coast/lost/reacquire). Preserve random seed and observation history for deterministic replay.
