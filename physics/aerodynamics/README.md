@@ -18,3 +18,16 @@ Every surface samples its own local flow; one aircraft-wide AoA/q is insufficien
 
 ## Outputs and tests
 Publish surface and total force/moment, intermediate coefficients, local flow, validity and uncertainty. Test dimensional/sign conventions, symmetric trim, lift/drag trends, controls, sideslip, local angular-rate effect, stall, asymmetry, stores/damage, timestep convergence and sourced reference conditions.
+
+
+## Advanced model owners
+
+Do not place every aerodynamic behavior in one `Aerodynamics` class. The main solver composes per-element loads from distinct optional model capabilities:
+- `unsteady-aerodynamics/`: attached-flow lag, dynamic separation, hysteresis and dynamic-stall response.
+- `compressibility/`: local Mach effects, compressibility, transonic drag rise, shock/separation and supported buffet response.
+- `physics/flight-model/flow-interactions/`: selected aircraft flow sources, LEX/LERX, wakes, downwash/sidewash and interaction configuration.
+- `physics/flight-model/aerodynamic-elements/`: panel/element graph, local station, geometry and contribution metadata.
+- `physics/flight-model/high-lift-devices/`: fitted flap/slat/LEF/spoiler/speedbrake definitions and schedules.
+- `physics/flight-model/structural-response/`: deformation/modal state and aeroelastic coupling.
+
+Every aircraft selects its own combination and provides its own data. Do not enable a feature merely because the code supports it. A model with no exact platform data must be marked estimated or synthetic-test-only and remain outside real configuration.
