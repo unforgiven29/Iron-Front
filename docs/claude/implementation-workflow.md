@@ -2,6 +2,14 @@
 
 Follow this sequence for every code change. The relevant system README remains authoritative for domain behavior.
 
+## Documentation shape for Claude
+
+Keep the global entry point short. The task router selects one canonical owner. The owner's README is a concise map of scope, ownership, inputs/outputs and links. Put deep technical detail in focused specialist guides that can be read independently. Do not put several systems into one mega-document, repeat the same technical explanation in multiple owners, or create a new folder for every small concept.
+
+Before adding documentation, search for the existing canonical owner. Extend its focused page when the concept belongs there; create a separate page only when it has a distinct interface, behavior, validation set or independent task route. Cross-link to the owner instead of duplicating its design. Every page states implementation status and unknowns.
+
+For a task, Claude should normally read: global entry/router/workflow (as required by the repo), one canonical owner README, and only the directly involved child guides. If a guide points to multiple unrelated children, read only the child matching the current task.
+
 ## 1. Scope
 Name the roadmap stage and exact acceptance criterion. Identify the canonical owner, direct consumers, existing code/data/contracts/tests and explicit non-goals. Split multi-domain requests into ordered vertical slices.
 
