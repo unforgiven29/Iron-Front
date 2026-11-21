@@ -4,6 +4,10 @@
 
 This directory defines weapon products and their installed component profiles. It does not own duplicate copies of propulsion, ballistics, sensor, guidance, rigid-body, collision, armour or damage algorithms.
 
+## Research references
+
+Use [the weapons, ballistics and effects reference guide](../../../docs/reference-library/weapons-ballistics-and-effects.md) for AIAA guidance references, small-arms publication routes, armour test standards and explicit cautions about simulator-derived weapon models and restricted documents. Do not treat the cited simulator material as real weapon performance data.
+
 ## Read by task
 
 - New weapon type/variant: this guide, the relevant category under missiles/bombs/rockets/guns/naval, and [component composition](components/README.md).
