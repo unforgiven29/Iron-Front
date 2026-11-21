@@ -20,6 +20,8 @@ Not all missiles have every phase. Each transition has explicit conditions, timi
 
 ## Shared component owners
 
+For a concrete, typed profile-composition shape, see [the weapon profile contract](../components/profile-contract.md).
+
 Read [weapon composition](../components/README.md), [seeker profiles](../components/seekers/README.md), [guidance profiles](../components/guidance/README.md), [motor](../components/motors/README.md), [fuze/warhead](../components/fuzes-warheads/README.md), and [launcher/store](../components/launchers-and-stores/README.md) only as needed. Dynamic decoy response belongs in sensors/weapon-seeker/countermeasure-discrimination.
 
 Each product is data-driven; shared code must never branch on weapon display name.
