@@ -78,3 +78,39 @@ Test rate/force limits, pressure/flow/electrical dependency, hinge-load effects,
 
 ### FM-20 — Cross-device coupling and no double counting
 Test interactions among LEF/slats, flaps, ailerons/flaperons, stabilators/tailerons, spoilers, speedbrakes, gear and stores. Verify the model does not count the same panel area or coefficient increment twice.
+
+
+## Advanced dynamic flight-physics acceptance cases
+
+### FM-21 — Unsteady aerodynamic state and hysteresis
+For elements with a selected unsteady model, test attached-flow lag, dynamic separation onset, force/moment overshoot, increasing/decreasing AoA hysteresis and reattachment. The quasi-steady limit must converge to the baseline. Reject unsupported geometry/Mach/Reynolds/rate combinations explicitly.
+
+### FM-22 — Compressibility and transonic validity
+Test local versus free-stream Mach on swept/rotated surfaces, critical-Mach/drag-rise trend, lift/pitch moment changes, shock/separation/buffet outputs where implemented, table boundaries and out-of-domain rejection. No single global Mach correction or copied cross-aircraft curve is permitted.
+
+### FM-23 — LEX/LERX and coherent vortex field
+Test geometry-linked vortex source, induced-flow direction at each affected element, finite-core regularization, convection/decay, tail/fin/inlet sampling, high-AoA state transition and declared breakdown envelope. Visual vapour/streamlines must not affect force.
+
+### FM-24 — Inter-aircraft wake encounter
+Use at least two aircraft with controlled initial separation, source lift/load state, ambient wind and fixed ticks. Verify wake is emitted/consumed in a deterministic staged order; the receiver's own element flow and forces respond; results do not depend on entity update order.
+
+### FM-25 — Structural flexibility and aeroelastic coupling
+Test rigid versus static-flex versus modal-flex profiles. Validate modal state, stiffness/damping, load-to-deflection, local geometry feedback, generalized force conservation and stability under controlled input. Flutter/divergence boundaries are not accepted without applicable structural/aero test evidence.
+
+### FM-26 — Structural load spectrum and fatigue persistence
+Test maneuver/gust/landing load logging, cycle-counting inputs, cumulative damage state, inspection/repair and save/replay persistence. A sortie reset must not erase campaign-maintained fatigue state unless a documented maintenance event does so.
+
+### FM-27 — Installed inlet and propulsion interaction
+Test local AoA/sideslip/Mach and forebody/wake effects on inlet state, pressure-recovery/distortion trends where data exists, spillage drag exactly once, engine response interface, transient throttle and asymmetric twin-engine installation. Do not claim surge prediction from a generic scalar.
+
+### FM-28 — Gear, strut and tire contact
+Test static gear loads, strut compression/rebound, wheel spin, longitudinal/lateral/combined tire slip, runway material change, contact transition, touchdown impulse and bounce. Check equal/opposite forces and no position teleportation.
+
+### FM-29 — Brake, anti-skid and steering causality
+Test brake pressure/torque, wheel slip feedback, anti-skid modulation latency, brake temperature/derating if implemented, nosewheel steering limits, asymmetric brake failure and electrical/hydraulic supply faults. Requested braking is not guaranteed achieved deceleration.
+
+### FM-30 — Ground/air transition and failure
+Test takeoff roll, rotation, liftoff, gear retraction, landing, rollout and repeated bounce/settling. Test gear-door/lock/weight-on-wheels feedback faults, emergency extension and gear/strut/tire damage with exact platform behavior.
+
+### FM-31 — Dynamic model budget and no hidden fidelity degradation
+Profile each enabled advanced model separately. Verify declared substeps, bounded iterations, deterministic replay and identical results under different render frame rates. Performance pressure must never silently disable dynamic stall, aeroelasticity, vortices, inlet effects or gear contact.
