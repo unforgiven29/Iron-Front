@@ -11,6 +11,27 @@ The physical chain to research is:
 
 Do not use pilot input to directly set pitch, bank, speed or altitude. Do not make the renderer authoritative.
 
+## Open flight-dynamics implementation reference
+
+### JSBSim — data-driven nonlinear 6-DoF FDM
+
+- [JSBSim project](https://jsbsim.sourceforge.net/)
+- [Current JSBSim reference manual](https://jsbsim-team.github.io/jsbsim-reference-manual/)
+- [Programmer/formulation and aircraft-model documentation](https://jsbsim-team.github.io/jsbsim-reference-manual/preface/)
+- [Source repository](https://github.com/JSBSim-Team/jsbsim)
+
+**Use for:** studying a mature data-driven FDM structure, aircraft-specific XML configuration, nonlinear 6-DoF equations, flight controls, propulsion, landing gear, logging and how different aircraft can be configured without hardcoding every platform into the common runtime. Read the programmer and formulation portions, not just the aircraft examples.
+
+**Critical limitations:** JSBSim is a C++ library/application, not a browser-native TypeScript dependency. The project states that its included military/commercial aircraft data are approximations derived from public information for education/entertainment, not proprietary engineering datasets. Its license is LGPL; review and comply with it before incorporating any code. Use it to study architecture, test fixtures and equation organization—not as proof of F-16C Block 50 or MiG-29 product 9.13 performance, and not as a universal flight model.
+
+### UIUC Airfoil Coordinates Database
+
+- [University of Illinois Airfoil Data Site](https://m-selig.web.engr.illinois.edu/ads/coord_database.html)
+
+**Use for:** public 2D airfoil coordinate datasets when building generic aero geometry tools, visualizing sections or validating coordinate ingestion/interpolation.
+
+**Limitations:** an airfoil coordinate set is not a complete aircraft aerodynamic dataset. It does not supply the fighter's 3D interference, control-law behavior, high-AoA separation, transonic effects, installed geometry or validated flight envelope. Check individual dataset provenance and terms.
+
 ## Recommended engineering references
 
 ### 1. USAF Stability and Control Digital DATCOM — methods and derivative estimation
@@ -48,7 +69,15 @@ Do not use pilot input to directly set pitch, bank, speed or altitude. Do not ma
 
 **Limitations:** it is a reference atmosphere, not a weather generator or local terrain-flow model.
 
-### 5. Flight Dynamics — Robert F. Stengel, 2nd edition
+### 5. Aircraft Control and Simulation — Stevens, Lewis and Johnson
+
+- *Aircraft Control and Simulation: Dynamics, Controls Design, and Autonomous Systems*, 3rd edition, Wiley.
+
+**Use for:** 6-DoF aircraft equations, aerodynamic/propulsion/control-system integration, simulation architecture and control-system analysis. It is a strong theoretical companion to the JSBSim manual and NASA flight-test reports.
+
+**Limitations:** commercial textbook; do not copy figures or prose. It is not a source of exact aircraft-specific coefficients.
+
+### 6. Flight Dynamics — Robert F. Stengel, 2nd edition
 
 - [Princeton University Press book page](https://press.princeton.edu/books/hardcover/9780691220253/flight-dynamics)
 
@@ -56,7 +85,7 @@ Do not use pilot input to directly set pitch, bank, speed or altitude. Do not ma
 
 **Limitations:** commercial textbook; do not copy its figures/text into the repository. It is not aircraft-specific data.
 
-### 6. FAA AC 23-8C — flight-test methodology
+### 7. FAA AC 23-8C — flight-test methodology
 
 - [FAA AC 23-8C: Flight Test Guide for Certification of Part 23 Airplanes](https://www.faa.gov/regulations_policies/advisory_circulars/index.cfm/go/document.information/documentid/1019676)
 
