@@ -88,4 +88,4 @@ The F-16 single-engine installation and MiG-29 twin RD-33 installations have dif
 - Inlet/engine damage, fire and restart/relight paths where supported.
 - Energy/force accounting, deterministic replay and browser cost.
 
-Research routes: [advanced flight physics references](../../../../docs/reference-library/advanced-flight-physics.md), especially NASA inlet performance/distortion reports.
+Research routes: [advanced flight physics references](../../../docs/reference-library/advanced-flight-physics.md), especially NASA inlet performance/distortion reports.
