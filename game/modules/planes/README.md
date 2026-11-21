@@ -14,9 +14,15 @@ The legacy game includes a broad multi-era hangar rather than only two fighters.
 
 Supported task profiles should include CAP, intercept, BVR/WVR combat, escort, strike, CAS, SEAD, reconnaissance, anti-ship, ferry, refuelling, carrier operations, emergency recovery and training where the exact aircraft fit permits them. A role label does not grant an aircraft equipment it does not carry.
 
+## Flight-model independence — mandatory
+
+Every aircraft has its **own flight model**. The shared layer is the physics toolkit and integration framework, not the aircraft's aerodynamic behavior. Each platform package owns its chosen aircraft-specific model, geometry, coefficient data/equations, mass properties, control laws, trim/stability augmentation, actuator/surface mapping, propulsion installation, configuration effects and validated operating envelope.
+
+Different aircraft may use different aerodynamic model structures when their design and available data require it. Do not force all aircraft into an identical panel layout, coefficient lookup scheme or handling model merely to maximize code reuse. Share mathematical primitives and interfaces where valid; preserve aircraft-specific behavior and uncertainty. In particular, the F-16C Block 50 and MiG-29 product 9.13 must have independent flight-model data and validation. A common rigid-body integrator does not mean a common flight model.
+
 ## Required aircraft flight-model dossier
 
-Every aircraft package must also maintain a focused flight-model directory. It records aircraft-specific aerodynamic geometry/panelization, coefficient datasets and valid envelope, control-surface mapping, actual actuator interfaces, high-lift devices, engine installation transforms, damage/structural coupling and validation cases. Shared assembly and equations remain in physics/flight-model and physics/aerodynamics. Do not create private copies of shared solvers or store authoritative values as hard-coded constants inside an FM coordinator.
+Every aircraft package must also maintain a focused flight-model directory. It records aircraft-specific aerodynamic geometry/panelization, coefficient datasets and valid envelope, control-surface mapping, actual actuator interfaces, high-lift devices, engine installation transforms, damage/structural coupling and validation cases. Reusable framework, mathematical primitives and force/moment contracts remain in physics/flight-model and physics/aerodynamics; the aircraft-specific model and its data remain in that aircraft's package. Do not create private copies of shared solvers or store authoritative values as hard-coded constants inside an FM coordinator.
 
 The F-16C Block 50 first package is under game/modules/planes/F-16/flight-model/; the MiG-29 product 9.13 architecture proof is under game/modules/planes/MiG-29A/flight-model/.
 
