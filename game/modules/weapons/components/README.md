@@ -17,6 +17,8 @@ A weapon is composed from small, typed profiles. This directory describes compon
 
 ## Component guides
 
+- [Weapon profile composition contract](profile-contract.md)
+
 - [Airframe, vehicle and aerodynamic data](airframe-and-aerodynamics/README.md)
 - [Control system, autopilot and actuators](control-systems/README.md)
 - [Motors and propulsion profiles](motors/README.md)
