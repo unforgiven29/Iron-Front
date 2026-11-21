@@ -104,3 +104,16 @@ Use the F-16 vertical-slice suite plus shared flight-model acceptance. Required 
 - deterministic replay and measured browser cost per panel/surface.
 
 Never tune aero coefficients to disguise wrong FLCS logic, actuator lag or incorrect device scheduling.
+
+
+## 8. Advanced dynamic flight physics evidence
+
+Before enabling advanced effects, fill the F-16C Block 50 evidence records for:
+- **Unsteady aerodynamics:** surface/section applicability, static and dynamic coefficient evidence, pitch-rate/reduced-frequency range, separation/hysteresis and reattachment limits.
+- **Compressibility/transonic behavior:** local Mach/pressure or coefficient data, drag-divergence/transonic buffet evidence, AoA/control/configuration axes and tested envelope.
+- **Flow interactions:** exact fixed forebody/strake/wing geometry, downstream affected surfaces, high-AoA flow evidence and limitations. NASA high-AoA modified F-16 configurations are not baseline Block 50 data.
+- **Aeroelastic/structural response:** structural stations, stiffness/mass/damping evidence, load paths, allowable loads, fatigue/inspection information and modal/fluter evidence where publicly supported. Do not invent flutter boundaries.
+- **Installed propulsion:** inlet geometry, recovery/distortion/allowed operating data if public, spillage effects, F110 installed engine behavior and nozzle/exhaust interaction.
+- **Ground handling:** gear geometry, strut/tire curves, wheel properties, steering/braking/anti-skid, emergency extension and runway/contact limits.
+
+The common reference guide [Advanced flight physics](../../../reference-library/advanced-flight-physics.md) contains NASA research, dynamic-stall methods, aeroelastic references and landing-gear research. Those sources establish mechanisms/test methods, not F-16C Block 50 values. Keep every platform number tied to exact manual/report page and applicability.
