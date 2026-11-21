@@ -11,6 +11,10 @@ This is a research/data program, not an implementation claim. The two aircraft p
 | 1 | F-16C Block 50 | Single-seat Block 50, GE F110-GE-129; exact operator/OFP/equipment fit still to be frozen | [F-16 evidence package](aircraft/F-16C-Block-50.md) and [existing source register](../../game/modules/planes/F-16/docs/references/README.md) |
 | 2 | MiG-29 product 9.13 | Single-seat product 9.13; do not merge 9.12, 9.13S, 9.13B, 9.13SE or later modernizations | [MiG-29 evidence package](aircraft/MiG-29-product-9-13.md) and [existing source register](../../game/modules/planes/MiG-29A/docs/references/README.md) |
 
+## Initial weapon/product evidence
+
+The first weapon library is [here](weapons/README.md). It contains source-linked public profiles for AIM-9M, AIM-120C-5, AGM-88 HARM, AGM-65D, R-27R, R-27T, R-73A, M61A1 and GSh-30-1. Treat each profile's provenance and variant caveats as binding. Do not interpret this starter set as a complete loadout or station-clearance database.
+
 "Full fidelity" means a complete causal model over an explicitly validated envelope, with sourced/traceable data and truthful limitations. It does not mean every aerodynamic coefficient, circuit value or classified performance parameter is publicly known. Do not fill data gaps with invented precision.
 
 ## Evidence package contents
