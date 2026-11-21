@@ -10,6 +10,10 @@ F-16 is a family, not one configuration. Do not blend Block 50/52 engine, radar,
 
 Exact geometry/datum, mass/CG/inertia and fuel/store locations; aero surface layout/coefficient data; FLCS schedule, mixing, trim, actuator limits/feedback and failures; F110 installation/inlet/nozzle/accessories/control mapping; installed fuel/electrical/hydraulic/pneumatic/cooling topology; landing gear/brakes; actual sensor/avionics fit and installation; hardpoints/store transforms; damage zones/routing; crew/escape equipment; cockpit control/display mappings; model/asset metadata.
 
+## Platform technical evidence package
+
+Use the [F-16C Block 50 technical evidence package](../../../docs/platform-reference-program/aircraft/F-16C-Block-50.md) as the cross-domain research checklist. It covers airframe/flight model, movable surfaces, FLCS, actuation/resources, aircraft systems, avionics/EW, stores and validation. Extend the [F-16 source register](docs/references/README.md) with page-level records rather than duplicating references elsewhere.
+
 ## Flight-model dossier
 
 Read [the F-16 flight-model index](flight-model/README.md) for the aircraft-specific geometry, coefficient-data, control/actuator and validation structure. The shared physics/flight-model and physics/aerodynamics layers provide reusable numerical infrastructure and interfaces, not a universal aircraft flight model. This package owns the F-16C Block 50's distinct aerodynamic model, geometry, coefficient data, FLCS/control response, mass properties and validity/validation envelope, with exact Block 50/GE installation data and provenance. Do not export F-16 handling or coefficients as shared defaults for other aircraft.
