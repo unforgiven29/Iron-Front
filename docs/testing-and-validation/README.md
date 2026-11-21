@@ -17,4 +17,6 @@ Renderer cannot write state; sensor cannot read hidden truth; RWR cannot access 
 ## Reference discipline
 Reference case includes exact variant/configuration, conditions, units, source/revision/page, uncertainty and tolerance. Distinguish sourced, derived, estimated, synthetic and gameplay-tuned. A fixture is not evidence of real-world fidelity.
 
+Aircraft flight-model validation also uses physics/flight-model/verification/README.md, physics/flight-model/tests/README.md and game/tests/acceptance/Flight-model-verification.md. Flight-log comparisons must preserve source columns, normalize units/frames explicitly, and separate calibration cases from held-out validation.
+
 Completion needs reproducible scenarios, causal assertions, failure cases, performance evidence and supported/unsupported conditions.

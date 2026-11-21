@@ -8,6 +8,12 @@ A package describes an exact aircraft configuration: variant/block/operator/soft
 
 Each aircraft has its own installed systems architecture. A shared electrical or hydraulic solver does not mean aircraft share the same generators, batteries, buses, pump count, reservoirs, pressure ratings, accumulator arrangements, crossfeed, emergency sources or consumers. The platform package selects and wires exact equipment; shared solvers execute that hardware configuration.
 
+## Required aircraft flight-model dossier
+
+Every aircraft package must also maintain a focused flight-model directory. It records aircraft-specific aerodynamic geometry/panelization, coefficient datasets and valid envelope, control-surface mapping, actual actuator interfaces, high-lift devices, engine installation transforms, damage/structural coupling and validation cases. Shared assembly and equations remain in physics/flight-model and physics/aerodynamics. Do not create private copies of shared solvers or store authoritative values as hard-coded constants inside an FM coordinator.
+
+The F-16C Block 50 first package is under game/modules/planes/F-16/flight-model/; the MiG-29 product 9.13 architecture proof is under game/modules/planes/MiG-29A/flight-model/.
+
 ## Required aircraft systems dossier
 
 Every aircraft package must maintain a focused systems directory with an index and separate guides where the installation is materially different. At minimum cover:

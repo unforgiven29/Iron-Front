@@ -10,6 +10,9 @@ Surface geometry (wing panels, tails, fins, control surfaces) → ambient/local 
 
 Include angular-rate velocity at offset surfaces (ω × r), downwash/sidewash, induced flow and wake effects where supported. Nonlinear stall/separation, hysteresis, high-AoA, ground effect, propwash/jet interaction and damage/store effects require explicit data or declared approximations.
 
+## Flight-model boundary
+The aircraft flight-model assembly lives in [physics/flight-model](../flight-model/README.md). It creates aircraft-specific element configurations and gathers their contributions; this folder remains the canonical owner of reusable local-flow, coefficient-evaluation and aerodynamic force equations. Do not duplicate the solver inside an aircraft package or in the FM assembly.
+
 ## Rules
 Every surface samples its own local flow; one aircraft-wide AoA/q is insufficient. Coefficient tables state sign conventions, Mach/AoA/sideslip/configuration axes, uncertainty and valid envelope. Do not use one lift curve or an arbitrary handling multiplier. Out-of-envelope input returns a documented degraded/unsupported result, not hidden extrapolation.
 
