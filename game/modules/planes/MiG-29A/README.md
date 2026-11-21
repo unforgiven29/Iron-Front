@@ -10,6 +10,10 @@ Product 9.13 is the enlarged-spine aircraft selected for the second-platform pro
 
 Exact geometry/mass/CG/inertia including spine fuel; surface/aero data; control/stability augmentation and actuators; twin RD-33 installations; fuel/feed/transfer topology; electrical/hydraulic/pneumatic/cooling and auxiliary system topology; gear/brakes; confirmed N019/RLPK-29 fit; provisional/confirmed RWR and optical equipment; avionics/cockpit/weapon-control; stores/hardpoints; damage routing, assets and sources.
 
+## Flight-model dossier
+
+Read [the MiG-29 flight-model index](flight-model/README.md) for product 9.13-specific geometry, coefficient-data, control/actuator and validation structure. Keep the GAF source's applicability limitations explicit; the shared solver architecture must not inherit F-16 geometry, control logic or engine installation.
+
 ## Aircraft systems dossier
 
 Read [the MiG-29 systems index](systems/README.md) and its focused [electrical](systems/electrical.md), [hydraulic](systems/hydraulics.md), [pneumatic](systems/pneumatics.md) and [auxiliary/environmental](systems/auxiliary-environmental.md) guides. The GAF T.O. 1F-MIG29-1 is a useful installation reference, but its exact applicability to selected product 9.13 is not established. Treat transferred values and topology as provisional until confirmed by exact 9.13 documentation.
