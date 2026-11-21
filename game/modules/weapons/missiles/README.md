@@ -8,9 +8,10 @@ All missile variants compose physical vehicle data, motor, aerodynamic/control m
 
 - [Air-to-air](air-to-air/README.md)
 - [Air-to-ground](air-to-ground/README.md)
+- [Anti-tank guided missiles](anti-tank/README.md)
 - [Anti-radiation](anti-radiation/README.md)
 - [Anti-ship](anti-ship/README.md)
-- [Surface-to-air](surface-to-air/README.md)
+- [Surface-to-air and MANPADS](surface-to-air/README.md)
 
 ## Shared missile lifecycle
 
