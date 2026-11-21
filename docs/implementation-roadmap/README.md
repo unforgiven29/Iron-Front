@@ -32,9 +32,22 @@ Exit: analytical rigid-body/force tests, coordinate transforms, timestep sensiti
 
 ## Stage 3 — F-16C Block 50 vertical slice
 
-Implement exact module manifest and sourced data; geometry/mass/aero surfaces and coefficients; flight-control laws/actuators; F110-GE-129 installation and shared turbofan model; fuel/electrical/hydraulic/cooling topology; gear/brakes/cockpit controls/instruments; connected damage/failures.
+Implement an end-to-end F-16C Block 50 using its own geometry, mass/inertia, aerodynamic representation and sourced coefficient data; flight-control laws/actuators; F110-GE-129 installation and engine model; fuel/electrical/hydraulic/pneumatic/cooling topology; high-lift/control devices; landing gear/brakes/tires and cockpit controls/instruments; connected damage/failures.
 
-Exit: F-16 acceptance scenarios pass, no F-16 branch exists in shared physics, and unknown values remain explicit.
+Build advanced physical behaviors incrementally, in dependency order, not as a single feature dump:
+1. local surface airflow, per-element forces/moments and actual actuator feedback;
+2. fitted flaps/LEF/TEF/speedbrake scheduling and asymmetric/failure behavior;
+3. aircraft-specific compressibility/transonic behavior and explicit Mach envelope;
+4. selected unsteady aerodynamic response/dynamic stall with hysteresis and state;
+5. aircraft-specific vortex/flow interactions and wake sampling where validated;
+6. reduced-order structural flexibility/aeroelastic coupling only where structural evidence supports it;
+7. installed inlet/distortion and nozzle/exhaust coupling where exact engine/installation data supports it;
+8. aircraft-specific landing-gear/tire/strut/braking/anti-skid/steering and ground transitions;
+9. structural loads, fatigue persistence and damage coupling only to the level supported by evidence.
+
+Each capability may remain explicitly unsupported or estimated outside its validated envelope. Never fabricate a coefficient, flutter boundary, inlet surge limit or structural limit to make the roadmap look complete.
+
+Exit: F-16 acceptance scenarios and applicable advanced cases pass; no F-16 branch or data defaults exist in shared physics; the aircraft model remains independently configurable; unsupported/unknown values and envelopes remain explicit; fixed-render-rate comparisons produce the same authoritative simulation results.
 
 ## Stage 4 — Cockpit and asset pipeline
 
@@ -56,7 +69,9 @@ Exit: supported weapon scenarios pass from release through flight, impact and da
 
 ## Stage 7 — Second aircraft proof
 
-Use MiG-29 product 9.13 to prove the shared engines support materially different geometry, propulsion, control, system, sensor and cockpit configurations without copying F-16 code.
+Use MiG-29 product 9.13 to prove the shared physical infrastructure supports a materially different aircraft without copying F-16 code. Build its independent geometry/mass/aerodynamic model, control/stability augmentation, LEF/flap/taileron/aileron/rudder/speedbrake behavior, twin RD-33 installations and inlet states, systems topology, gear/ground handling, sensors, cockpit and its own advanced flow/structural data where evidence permits. Do not reuse F-16 coefficient tables, model structure assumptions, FLCS schedules, inlet maps, gear data or calibration.
+
+Exit: F-16 and MiG-29 have distinct validated model configurations and data packages, and cross-platform tests prove there is no data/handling leakage between them. Each is independently tested for its supported envelope and known unsupported areas remain visible.
 
 ## Stage 8 — Combined arms and rotorcraft
 
