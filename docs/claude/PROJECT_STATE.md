@@ -58,17 +58,19 @@ The flight-model specification now has dedicated owner guides for unsteady aerod
 
 
 
-The implementation-readiness checklist and roadmap put the next work at **Stage 0.5 — Foundation hardening**, followed by **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before the Stage 1 exit criteria pass. After that, build the F-16C Block 50 as the first full vertical slice, including staged advanced flight physics; then use the MiG-29 product 9.13 as a second, independent flight-model proof.
+**Stage 0.5 — Foundation hardening is complete and CI-verified on `main` as of 21 November 2026.** The successful [GitHub Actions quality run](https://github.com/unforgiven29/Iron-Front/actions/runs/44963589879) passed lint, TypeScript, schema validation, unit tests, production build and Playwright browser smoke tests. The next permitted work is **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before Stage 1 exit criteria pass. After that, build the F-16C Block 50 as the first full vertical slice, including staged advanced flight physics; then use the MiG-29 product 9.13 as a second, independent flight-model proof.
 
-### Stage 0.5 — finish these contract checks first
+### Stage 0.5 — completed foundation hardening
 
-1. Make the TypeScript module-manifest types and JSON Schema agree. Add positive and negative validation tests.
-2. Validate message envelopes by message kind. Commands, committed events, observations and immutable snapshots must not accept each other's required fields by accident.
-3. Verify coordinate conventions with reference-attitude tests: ENU world axes, FRD body axes, all cardinal level-flight attitudes, gravity direction and rejection of non-finite vectors.
-4. Make seeded random streams independently derivable from stable scenario/entity/subsystem identity. Prove repeatability and prove that entity creation/query order does not alter another stream.
-5. Complete the versioned antenna-aperture schema with valid parabolic-reflector and flat slotted-waveguide examples plus invalid-record tests. This is data-contract work, not antenna physics.
+All Stage 0.5 exit criteria are implemented and CI-verified on `main`. The validation evidence is:
 
-Use the Stage 0.5 exit criteria in `docs/implementation-roadmap/README.md` and the implementation-readiness gate. Do not mark a criterion complete without executable test evidence.
+1. **Module manifest parity:** TypeScript contracts and JSON Schema agree on required/optional fields. The API compatibility upper bound is explicit: `maximumExclusive: null` means unbounded; omission is rejected. Positive and negative schema cases run in CI.
+2. **Message kinds:** command, event, observation and snapshot envelopes each have positive schema cases; malformed command, event and observation cases are rejected.
+3. **Coordinate conventions:** unit tests cover east/north/south/west level attitudes, FRD body axes, gravity direction, vector round trips, zero quaternions and non-finite vector rejection.
+4. **Random streams:** scoped streams derive from stable scenario/entity/subsystem identities; tests cover repeatability, isolation and independence from unrelated scope creation.
+5. **Antenna aperture data:** versioned parabolic-reflector and flat slotted-waveguide examples validate; invalid configuration is rejected. This is data-contract validation, not implemented antenna physics.
+
+The successful CI run above executed `npm run check` and `npm run test:e2e`. Keep these checks in place; reopen Stage 0.5 only to fix a regression or contract change. Do not spend further implementation time redoing completed checks.
 
 ### Stage 1 — implement the smallest useful runtime
 
