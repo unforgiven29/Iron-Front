@@ -51,3 +51,30 @@ Measure assembly cost per aircraft and per aerodynamic element separately from r
 ## Required evidence
 
 For each case record test ID, aircraft identity, dataset provenance, initial state, input sequence, seed, tick, assertions, tolerance, result, limitation and report artifact. Distinguish synthetic unit tests, internal consistency, comparison against game logs, comparison against DCS logs and independent real-aircraft validation. One successful maneuver or visual demo does not validate the full envelope.
+
+
+## Movable aerodynamic device acceptance cases
+
+### FM-13 — Device taxonomy and fit
+Validate that each aircraft declares only its fitted movable devices. Reject a slat/LEF, spoiler/speedbrake or flap/flaperon substitution when the physical mechanism differs. An unconfirmed device remains unknown rather than becoming a default surface.
+
+### FM-14 — Slat versus leading-edge flap
+For a slot-forming slat, verify slot gap/overlap and the supported slot-flow/separation model. For an LEF, verify the camber/shape-change model. Test that a source/configuration cannot silently switch between these device types.
+
+### FM-15 — Trailing-edge flap family
+Validate actual geometry/type (plain, split, single-/double-slotted, Fowler or other fitted type), deployment travel/time, lift/drag/pitch trends, schedule, control effectiveness changes and supported envelope.
+
+### FM-16 — Flaperon dual function
+Prove scheduled symmetric TEF displacement and differential roll-control command are combined without double-counting area or overriding one another. Test asymmetric actuator response and roll/yaw moment.
+
+### FM-17 — Spoiler and lift-dump behavior
+For aircraft fitted with spoilers, test local lift reduction, drag increase, roll/yaw/pitch coupling, deployment sequence, ground/flight interlocks and asymmetric deployment. For aircraft without spoilers, ensure no spoiler force or control path is generated.
+
+### FM-18 — Speedbrake/airbrake behavior
+Test drag and pitching/yawing moments, panel-by-panel actual motion, finite deployment time, hinge/load effects, blow-back if fitted, configuration interlocks and asymmetric faults. Do not model an airbrake as a spoiler.
+
+### FM-19 — Actuator and hinge-load response
+Test rate/force limits, pressure/flow/electrical dependency, hinge-load effects, stops, lag, free play/backlash where supported, jam/runaway, damage and failed position feedback. Actual surface state must differ from command when constraints/faults require it.
+
+### FM-20 — Cross-device coupling and no double counting
+Test interactions among LEF/slats, flaps, ailerons/flaperons, stabilators/tailerons, spoilers, speedbrakes, gear and stores. Verify the model does not count the same panel area or coefficient increment twice.
