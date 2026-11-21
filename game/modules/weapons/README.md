@@ -53,6 +53,10 @@ Commands are not state. A release request is not a successful release; a cue is 
 | Decoy physical product and release | game/modules/weapons/countermeasures |
 | Decoy-versus-target discrimination | sensors/weapon-seeker/countermeasure-discrimination |
 
+## Acceptance and validation
+
+Use [weapon guidance, seeker and countermeasure acceptance](../../tests/acceptance/Weapon-guidance-seeker-countermeasures.md) as the cross-family integration checklist. It is a requirements document, not evidence that the runtime exists.
+
 ## Non-negotiable weapon rules
 
 - Guidance source, navigation source, terminal sensor, angle/range measurement method, guidance law and control method are separate fields.
