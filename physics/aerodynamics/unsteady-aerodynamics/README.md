@@ -93,4 +93,4 @@ Outside the domain, return explicit unsupported/estimated status or a declared l
 
 ## Research references
 
-Use [Advanced flight physics references](../../../../docs/reference-library/advanced-flight-physics.md) and the general [flight dynamics reference guide](../../../../docs/reference-library/flight-dynamics.md). The cited dynamic-stall sources are methods and research examples; they are not aircraft-specific coefficient sets.
+Use [Advanced flight physics references](../../../docs/reference-library/advanced-flight-physics.md) and the general [flight dynamics reference guide](../../../../docs/reference-library/flight-dynamics.md). The cited dynamic-stall sources are methods and research examples; they are not aircraft-specific coefficient sets.
