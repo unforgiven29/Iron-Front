@@ -12,7 +12,7 @@ Exact geometry/datum, mass/CG/inertia and fuel/store locations; aero surface lay
 
 ## Platform technical evidence package
 
-Use the [F-16C Block 50 technical evidence package](../../../docs/platform-reference-program/aircraft/F-16C-Block-50.md) as the cross-domain research checklist. It covers airframe/flight model, movable surfaces, FLCS, actuation/resources, aircraft systems, avionics/EW, stores and validation. Extend the [F-16 source register](docs/references/README.md) with page-level records rather than duplicating references elsewhere.
+Use the [F-16C Block 50 technical evidence package](../../../../docs/platform-reference-program/aircraft/F-16C-Block-50.md) as the cross-domain research checklist. It covers airframe/flight model, movable surfaces, FLCS, actuation/resources, aircraft systems, avionics/EW, stores and validation. Extend the [F-16 source register](docs/references/README.md) with page-level records rather than duplicating references elsewhere.
 
 ## Flight-model dossier
 
