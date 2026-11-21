@@ -26,7 +26,9 @@
 | Cooling network and delivered thermal capacity | game/systems/cooling | equipment model or renderer |
 | Crew availability/workload/injury interfaces | game/systems/crew | campaign history or renderer |
 | Generic component damage/repair state | game/systems/damage | render mesh or individual platform duplicate |
-| Six-DoF rigid body | physics/rigidbody | aircraft package or renderer |
+| Generic six-DoF rigid-body solver/integrator | physics/rigidbody | aircraft package or renderer |
+| Shared flight-model framework and force/moment interfaces | physics/flight-model | aircraft-specific model data or renderer |
+| Actual aircraft flight model (aero model, geometry, coefficients, control response and validity envelope) | each game/modules/planes/<aircraft> package | one universal F-16/MiG-29/shared aircraft model |
 | Fixed-wing FM assembly and force/moment composition | physics/flight-model | aircraft package duplicate solver or renderer |
 | Local aerodynamic flow and coefficient equations | physics/aerodynamics | aircraft package or FM assembly duplicate |
 | Rotor blade/rotor-disk aerodynamics and hub loads | physics/rotorcraft | rotorcraft product module or renderer |
@@ -45,6 +47,12 @@
 | Legal cases, investigations and accountability | game/modules/campaign/justice | society news projection or tactical truth |
 | Persistent campaign personnel/fate/history | game/modules/campaign/personnel | live crew/infantry state |
 | Rendering/audio/UI/assets | game/graphics-engine | authoritative systems |
+
+## Flight-model separation — critical rule
+
+Iron-Front does **not** use one shared flight model for every aircraft. Every aircraft has its own flight-model implementation/configuration and its own validated data. The shared physics layer provides reusable mathematical tools, numerical integration, force/moment interfaces and model infrastructure; it does not prescribe a universal aerodynamic model or universal handling.
+
+An aircraft package owns its aerodynamic geometry/panelization, aircraft-specific coefficient datasets or model equations, control-law behavior, trim/stability augmentation, actuator mapping, mass/inertia configuration, propulsion installation, ground-effect/drag configuration and validated flight envelope. Different aircraft may require materially different model structures. Reuse a model component only when its assumptions and validity are appropriate and the aircraft data supports it. The F-16C Block 50 and MiG-29 product 9.13 are deliberately separate flight models and must never inherit one another's coefficients, geometry, control laws or handling characteristics.
 
 ## State and information boundaries
 Definitions/configuration are immutable during a scenario except explicit reconfiguration boundaries. Runtime state is changed only by its owner. Other systems receive typed commands, committed events, resource grants, observations and immutable snapshots. Preserve observation source, acquisition time, frame, age, uncertainty and quality through fusion/datalink/AI/presentation. Diagnostics are developer-only and not a hidden information API.
