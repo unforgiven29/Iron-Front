@@ -3,18 +3,27 @@
 **Owner:** game/modules/campaign. **Status:** optional planned gameplay module; no campaign runtime exists. Campaign must not become a global mode or a source of hidden sensor truth.
 
 ## Responsibility
-Own long-running strategic state/rules: factions, diplomacy/war/peace state, territory/frontline, objectives, mission generation, resources/economy, civilian/civil infrastructure consequences, news/history, outcomes and campaign-specific save data. Physical units/world/sensors remain with their owners.
+Own long-running strategic state/rules: factions, diplomacy/war/peace state, territory/frontline, objectives, mission generation, resources/economy, civilian/civil infrastructure consequences, news/history, personnel outcomes and campaign-specific save data. Physical units/world/sensors remain with their owners.
 
-## Inputs
-Consume committed world/unit/logistics events and permitted reconnaissance/intelligence reports. Campaign owns strategic knowledge; tactical AI/sensors receive only permitted observations. Fog-of-war is not a bypass.
+## Inputs and authority
+Consume committed world/unit/logistics/personnel events and permitted reconnaissance/intelligence reports. Campaign owns strategic knowledge; tactical AI/sensors receive only permitted observations. Fog-of-war is not a bypass. Tactical simulation may continue during a player sortie/infantry battle; distant regions may use an explicitly lower-detail aggregate update, but time, ownership and event ordering remain coherent.
 
-## Packages
-factions = data-driven identities/doctrine/equipment pools/relations. missions = templates/objectives/task/debrief. scenarios = initial world/force/seed. persistence = campaign schemas/migrations coordinated by core. logistics = stock/production/transport/repair.
+## Focused packages
+- factions: data-driven identities, doctrine, equipment pools, alliances, relations and private military contracts.
+- scenarios: generated operational theatres, world-war start state, geography/seed and initial force/economy state.
+- world-war: global alignments, fronts/sectors, country state and real-Earth theatre orchestration.
+- missions: air/ground/naval/infantry tasks, objectives and debrief.
+- institutions: government, general staff, service commands, intelligence, finance, diplomacy and civil defence decisions.
+- intelligence: strategic estimates, signals/intercepts, deception, information integrity and public claims.
+- society: population, media, local government, humanitarian services, infrastructure and civic consequences.
+- personnel: named service histories, crew/soldier fate, rescue/capture/prisoners, casualty archive and memorial records.
+- strategic-operations: long-range missions, strategic strikes, warning/verification and escalation.
+- persistence: campaign schemas and migrations coordinated by core.
 
 ## Strategic model
-Frontline/territory, airfield/port control, fuel/industry, supply routes, manpower/reserves, infrastructure damage, civilian displacement and negotiation are explicit state transitions with traceable events and declared update rates. Avoid hidden side effects in one giant daily tick.
+Frontline/territory and occupied-area changes; airfield/port control and damage; force readiness/reserves; typed fuel/ammunition/spares/food/medical stock; production, trade and sanctions; road/rail/sea supply routes; manpower and mobilisation; energy/industry/communications infrastructure; civilian displacement and public services; diplomacy, alliances, ceasefire/peace and post-war recovery are explicit state transitions with traceable events and declared update rates. Avoid hidden side effects in one giant daily tick.
 
-## Narrative constraints
-Casualties, injuries, capture, displacement, civilian harm and damaged communities are human consequences, not merely score rewards. Medals/achievements do not erase cost. Credits/memorial/history consume campaign records; they do not affect physics.
+## Human-cost and narrative constraints
+Casualties, injuries, capture, displacement, civilian harm, destroyed communities and long-term damage are consequences, not score rewards. Medals/achievements do not erase cost. Credits, memorials, war histories, investigations and post-war epilogues consume authoritative event/personnel records; they do not affect physics or convert deaths into bonuses.
 
-Validate deterministic seeds, stock accounting, territory transitions, supply denial, mission generation, civilian consequences, peace/ceasefire transitions and save/migration.
+Validate deterministic seeds; event/ledger reconciliation; territory and alliance transitions; supply denial; mission generation; civilian consequences; false-report handling; ceasefire/peace transitions; casualty estimates versus confirmed identities; reconstruction and save/migration.
