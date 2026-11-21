@@ -14,6 +14,10 @@ The repository contains the executable app shell, initial core primitives, exten
 - Read [docs/claude/implementation-workflow.md](docs/claude/implementation-workflow.md) for the required coding/test/reporting process.
 - Do not load every README. Read the owner guide and only direct dependencies/consumers for the task.
 
+## Engineering reference library
+
+Claude's annotated technical research index is [docs/reference-library/README.md](docs/reference-library/README.md). It routes flight dynamics, ground vehicle physics, sensors/EW, weapons/ballistics, aircraft systems, validation and tactical/campaign research to curated references with applicability and source-quality caveats.
+
 ## Architecture authority
 
 - [docs/ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md) — canonical ownership and dependency direction.
