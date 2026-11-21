@@ -121,3 +121,67 @@ Before enabling advanced effects, fill the product 9.13 evidence records for:
 - **Ground handling:** nose/main gear geometry, strut/tire/wheel properties, brakes/steering/anti-skid, emergency extension and landing-impact evidence.
 
 Use [Advanced flight physics references](../../reference-library/advanced-flight-physics.md) for research and test methodology. The public sources currently registered do not establish a complete product 9.13 dataset for these advanced domains. Do not turn the absence of data into fabricated precision or a claim of full fidelity.
+
+
+## 9. Publicly reported product 9.13 facts — evidence and limitations
+
+This section gives Claude a concrete starting point while preserving source quality. The MiG-29 has particularly serious variant and translation issues. A generic MiG-29 fact sheet, export R-73E specification or MiG-29S/9.13S description must not silently become product 9.13 data.
+
+### Airframe and fuel references
+
+| Parameter | Publicly reported value / description | Evidence status | How to use it |
+|---|---|---|---|
+| Length | 17.3 m reported for MiG-29 family | secondary/government guide-level, exact product applicability unresolved | Scale/context check only; verify datum and product 9.13 geometry |
+| Wingspan | 11.4 m reported for MiG-29 family | secondary/government guide-level | Do not use as exact model mesh or wing station data |
+| Height | 4.8 m reported for MiG-29 family | secondary/government guide-level | Verify landing gear/attitude datum before use |
+| Internal fuel | 4,300 L reported in a U.S. Army Worldwide Equipment Guide table for MiG-29 family | government reference, exact product/production applicability unresolved | Do not apply without confirming the 9.13 spine/tank configuration |
+| Product 9.13 spine | Enlarged dorsal spine associated with additional avionics and internal fuel; one secondary source reports +75 L versus earlier 9.12 baseline | secondary-reported | Research lead only; primary product drawing/manual required |
+| Optional centerline tank | 1,500 L external tank reported for product 9.13 family | secondary-reported | Candidate configuration only; exact station/clearance/source required |
+| External load | Up to 3,200 kg reported for product 9.13 | secondary-reported | Not a flight-model limit or approved loadout until corroborated |
+
+Sources:
+- [U.S. Army Worldwide Equipment Guide portal](https://odin.t2com.mil/WEG) — use the exact MiG-29 entry/revision and preserve its product-level limitations.
+- [MiG Alley — MiG-29 product/variant overview](https://toad-design.com/migalley/index.php/jet-aircraft/mig29/mig29-variants/) — secondary source; useful to locate product 9.13 distinctions, not an authoritative type certificate/manual.
+
+### Powerplant and installed systems
+
+The working baseline has two RD-33 engines. Exact engine series, production batch, corrected maps, dry/afterburning thrust, fuel-flow, spool transient, bleed/accessory extraction and installation losses are not established by the present product 9.13 source package. Do not fill these with generic RD-33 family numbers.
+
+The working avionics/equipment research baseline remains:
+- N019 / RLPK-29 family radar; exact hardware/software fit and processing modes require product 9.13 evidence.
+- OEPS-29/KOLS optical/infrared family; exact detector and equipment revision require confirmation.
+- Shchel-3UM helmet sight as a research candidate; exact installation/revision must be verified.
+- Beryoza/SPO-15 family RWR; the exact equipment designation and production fit remain disputed.
+- L-203BE Gardenyia-1 active jammer is associated with the 9.13 spine in secondary material; verify equipment, antenna layout, wiring and date before adopting as a firm installation.
+
+Do not infer sensor detection ranges, scan rates, receiver bands, threat library contents or jamming performance from a broad family label.
+
+### Product 9.13 weapon evidence
+
+The starter product library is linked below. Exact station/launcher and production/operator compatibility remain separate from general weapon association.
+
+| Product | Research status for product 9.13 | Evidence restriction |
+|---|---|---|
+| [R-27R Alamo-A](../weapons/R-27R.md) | Candidate medium-range SARH weapon | ODIN describes R-27R family/seeker; the DCS manual is simulator evidence for the standard 2-R-27R loadout, not primary 9.13 proof. |
+| [R-27T Alamo-B](../weapons/R-27T.md) | Optional candidate IR variant | Do not assume every product 9.13 unit/fit carried it; exact store clearance needed. |
+| [R-73A Archer](../weapons/R-73A.md) | Candidate short-range IR weapon | Preserve domestic R-73A; do not use R-73E export or R-73M/R-74 upgrades. DCS standard loadout is simulator-reference only. |
+| [GSh-30-1](../weapons/GSh-30-1.md) | Internal 30 mm cannon | NLR identifies MiG-29 family with GSh-301 and 150 rounds; DCS manual gives 1,500 rounds/min but is simulator-reference only. |
+
+The DCS English MiG-29 manual describes a standard simulator loadout of two R-27R plus four R-73, six external guided-weapon stations, and a 30 mm GSh-30-1 with 150 rounds. Store this as a named **simulator-reference scenario loadout**, not as proof that every real product 9.13 aircraft had that clearance. Do not add R-77 to plain product 9.13: the repository's baseline excludes later 9.13S and modernization capabilities unless exact evidence says otherwise.
+
+Simulator reference:
+- [DCS MiG-29 Flight Manual](https://www.digitalcombatsimulator.com/en/downloads/documentation/dcs-mig-29_flight_manual_en/). Useful for the DCS loadout and cockpit workflow being simulated; not independent technical proof of the exact product 9.13 aircraft.
+
+### Data gaps Claude must leave open
+
+- Product 9.13-specific three-view geometry, exact stations/hinges, LERX/wing/tail section shapes, datum and equipment mass stations.
+- Product 9.13 mass/CG/inertia and fuel distribution, including spine and any optional external tanks.
+- RD-33 exact series and engine installation maps for left and right engines independently.
+- Full aerodynamic coefficient/derivative tables and measured flight-test envelope; DCS CFD or flight-model results are not independent validation.
+- Exact control-system schematic, augmentation law, limiter/trim behavior and hydraulic actuator details.
+- N019 radar hardware/software, antenna pattern and waveform/processing data; OEPS/KOLS detector data; exact RWR and jammer fit.
+- R-27R/R-27T/R-73A motor, aero, actuator, seeker, fuze and warhead data at the exact product variant/production standard.
+- Station-specific pylon/rail interface, release impulse, permissible asymmetric stores and aircraft software/indication behavior.
+- Gear/strut/tire/brake/drag-chute details and connected hydraulic/pneumatic failure behavior.
+
+Where primary public data are missing, the correct implementation is a bounded and clearly labeled approximation, not a fabricated "accurate" dataset.
