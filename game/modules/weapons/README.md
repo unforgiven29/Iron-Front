@@ -8,6 +8,10 @@ This directory defines weapon products and their installed component profiles. I
 
 Use [the weapons, ballistics and effects reference guide](../../../docs/reference-library/weapons-ballistics-and-effects.md) for AIAA guidance references, small-arms publication routes, armour test standards and explicit cautions about simulator-derived weapon models and restricted documents. Do not treat the cited simulator material as real weapon performance data.
 
+## Product evidence before implementation
+
+Before creating a specific missile, bomb, rocket, gun or ammunition variant, read the [platform-reference weapon library](../../../docs/platform-reference-program/weapons/README.md) and the matching product profile. The library provides published facts, variant boundaries, source quality, unknowns and initial simulation requirements. It is not a substitute for the exact platform station/launcher clearance record.
+
 ## Read by task
 
 - New weapon type/variant: this guide, the relevant category under missiles/bombs/rockets/guns/naval, and [component composition](components/README.md).
