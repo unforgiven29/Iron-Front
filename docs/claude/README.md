@@ -24,10 +24,16 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Fixed-wing aircraft forces / 6-DoF | physics/README.md, rigidbody, aerodynamics, environment | exact aircraft, propulsion, collision |
 | Rotor blade aerodynamics / helicopter dynamics | physics/rotorcraft/README.md and game/modules/rotorcraft/README.md | exact rotorcraft installation, propulsion, rigidbody, hydraulics, crew |
 | Aircraft FM assembly / panels / coefficient data / trim | physics/flight-model/README.md and relevant child guide | exact aircraft flight-model dossier, rigidbody, aerodynamics, propulsion, actuator/resources as involved |
+| Unsteady aerodynamics / dynamic stall / hysteresis | physics/aerodynamics/unsteady-aerodynamics/README.md | exact aircraft coefficient profile, local flow, compressibility and device states |
+| Compressibility / transonic / shock / buffet | physics/aerodynamics/compressibility/README.md | exact aircraft Mach/AoA/configuration data and aerodynamic validation |
+| Aeroelasticity / flexible structure / fatigue | physics/flight-model/structural-response/README.md | aircraft structural evidence, unsteady aero and damage owner |
+| LEX/LERX vortices / wake / downwash / flow interaction | physics/flight-model/flow-interactions/README.md | exact aircraft geometry, wake field and element sampling |
+| Installed inlet / distortion / exhaust coupling | physics/flight-model/propulsion-integration/README.md | exact engine/inlet installation, atmosphere and engine-family model |
+| Aircraft landing gear / tire / brakes / ground handling | physics/ground-handling/README.md | exact aircraft gear installation, collision, rigidbody, hydraulic/electrical and damage owners |
 | Aircraft control surfaces / high-lift devices | physics/flight-model/control-surfaces/README.md and high-lift-devices/README.md | exact aircraft controls-and-actuators and systems dossiers |
 | New full-fidelity aircraft / platform research | docs/platform-reference-program/README.md and the exact aircraft dossier | exact platform source register, flight-model/system/sensor/store guides |
 | Movable aerodynamic devices / slats / flaps / spoilers / speedbrakes | physics/flight-model/high-lift-devices/README.md and control-surfaces/README.md | exact aircraft surfaces and actuator installation; acceptance FM-13 to FM-20 |
-| Flight-model verification / flight-log comparison | physics/flight-model/verification/README.md and tests/README.md | exact aircraft validation plan and acceptance suite |
+| Flight-model verification / flight-log comparison | physics/flight-model/verification/README.md and tests/README.md | exact aircraft validation plan and acceptance suite, including FM-13 to FM-31 |
 | Engine or motor | physics/propulsion/README.md | platform engine fit, fuel, cooling |
 | Electrical generation/distribution | game/systems/electrical/README.md | exact aircraft systems/electrical.md, propulsion/accessory drive, cooling, exact consumers/load list |
 | Hydraulic pressure/flow/actuators | game/systems/hydraulics/README.md | exact aircraft systems/hydraulics.md, pneumatics if coupled, flight controls/gear/brakes, cooling |
