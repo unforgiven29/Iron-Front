@@ -1,40 +1,43 @@
-# Radar runtime entry point
+# Radar simulation source area
 
-This is the executable TypeScript source for radar equipment and processing. Requirements, architecture decisions and research remain in [docs/radar](../../../../docs/radar/README.md), the source scaffold in [sensors/Radar](../../../../sensors/Radar/README.md), and shared physics notes in [physics/radar](../../../../physics/radar/README.md).
+**Status: folder scaffold and README only for this task. No radar runtime code was added or retained from this task.**
 
-## Implemented modules
+This directory is reserved for the future executable radar equipment and processing implementation. The requirements and architecture authority is [docs/radar](../../../../docs/radar/README.md); the top-level equipment ownership map is [sensors/Radar](../../../../sensors/Radar/README.md); shared world/physics requirements are [physics/radar](../../../../physics/radar/README.md).
 
-| Source | Current responsibility |
+## Intended module boundaries
+
+| Planned module area | Responsibility |
 |---|---|
-| `RadarRuntime.ts` | Waveform timing/ambiguity calculations; warm-up, electrical-power and thermal lifecycle; reduced-order range-Doppler frame path |
-| `PulseDopplerSimulation.ts` | Pulse-by-pulse complex baseband synthesis, matched-filter range correlation and coherent radix-2 Doppler FFT |
-| `RadarProcessing.ts` | Two-dimensional cell-averaging CFAR, false-alarm threshold under exponential-noise assumptions, measurement outputs and uncertainty estimates |
-| `RadarTracking.ts` | Radar-local Cartesian measurement conversion, nearest-neighbour gating, alpha-beta estimation, tentative/confirmed/coasting lifecycle |
-| `RadarScheduler.ts` | Stable priority scheduling with mechanical slew, electronic settling and finite AESA channel/T/R-module capacity |
-| `AesaArray.ts` | Finite planar array factor with phase error, element weights and individual module health |
-| `RadarSystem.ts` | Composes radar power/thermal state, selected frame-generation path, CFAR and track update |
-| `AesaRadarIntegration.ts` | Couples transmit/receive planar AESA array factors into physical echo power |
-| `../../physics/radar/RadarClutter.ts` | Generates profile-driven, distributed surface-clutter returns with platform/wind Doppler spread |
-| `../esm/RwrRuntime.ts` and `../esm/RwrTracking.ts` | Passive radar interception, nose-relative bearing, RF pulse-trait/signature classification and bearing-only new/established/coasting tracks |
+| equipment profiles | Exact radar hardware/software variant, fitted modes, limits, installation interfaces and evidence |
+| waveform and timing | Pulse families, PRF/PRI, pulse width, modulation, bandwidth, coherent intervals and ambiguity |
+| RF hardware | Exciter, transmitter, receiver, power, cooling, warm-up, calibration, BIT and failures |
+| antenna and beam control | Aperture, element/subarray structure, antenna pattern, steering, scan, dwell, revisit and scheduling |
+| signal processing | I/Q samples, filtering, matched processing, pulse compression, Doppler, integration and clutter rejection |
+| detection | Noise/interference estimates, CFAR family, thresholds, Pd/Pfa assumptions and uncertain measurement reports |
+| tracking | Measurement association, track initiation, filtering, uncertainty, coast, merge/split and deletion |
+| integration | RWR/ESM, datalink, IFF, sensor fusion, aircraft systems, cockpit displays and diagnostics |
 
-Shared RF equations and target/interference boundary: `game/src/physics/radar/RadarPhysics.ts`. Limited terrain/refraction and atmospheric screening models are in `game/src/physics/radar/RadarPropagation.ts`.
+## Required architectural behavior
 
-## Signal path
+- Mechanical, PESA and AESA architectures must have genuinely distinct hardware and resource constraints.
+- A radar must not know perfect campaign/world entity state. It receives physical returns and produces uncertain measurements.
+- Transmit power, receive sensitivity, aperture, waveform, scan geometry, resource limits, noise, clutter, interference and target aspect must affect the result.
+- AESA capacity must be finite: T/R-module count/health, subarray topology, channels, phase/amplitude control, thermal limits, power and task scheduling all matter.
+- RWR observations remain passive measurements. Do not fabricate emitter range or identity from hidden world state.
+- Use shared physics interfaces while keeping aircraft/radar-specific data and software variants separate.
+- All values require source provenance, units, variant applicability and uncertainty; synthetic test values must be labelled.
 
-`equipment profile + resources → waveform/hardware readiness → physical RF returns → pulse/IQ or reduced-order range-Doppler frame → CFAR → uncertain measurements → track lifecycle`
+## Suggested implementation order
 
-The optional sample-level pulse-Doppler path is selected with `RadarEquipmentConfiguration.pulseDomain`; it requires a power-of-two coherent pulse count equal to `floor(PRF × CPI)`. The faster reduced-order frame model remains available for cheaper test/scenario cases. Physical echoes should be created by `computePhysicalRadarEcho` or `computeEnvironmentCoupledRadarEcho`, not by inserting entity IDs or perfect track truth.
+1. Radar equipment profile and units/coordinate contracts.
+2. Shared RF path and target-scattering interfaces.
+3. Waveform timing and hardware resource lifecycle.
+4. Antenna/aperture/beam-control models.
+5. Receiver noise/interference and sample representation.
+6. Range/Doppler processing and detector.
+7. Measurement/track lifecycle.
+8. Terrain/weather/clutter integration.
+9. ESM/RWR, fusion, datalink and cockpit presentation.
+10. Aircraft-specific radar profiles and validation.
 
-## Deliberate limits
-
-- The antenna envelope is a smooth approximation; the planar AESA routine is a reduced array-factor model. Neither is a full-wave solver or measured radome/embedded-element model.
-- The sample-level processor is a single-channel complex-baseband model. It does not yet model ADC quantization, receiver compression, phase noise, frequency-agile waveform scheduling, full pulse ambiguity resolution, matched-filter bank optimization or calibrated clutter covariance.
-- The reduced-order frame path is useful for performance tests, but it is not an FFT-derived pulse-Doppler implementation.
-- A sampled-profile terrain LOS check, effective-Earth-radius curvature, first-Fresnel clearance, knife-edge screening and coefficient-driven gas/rain/cloud/fog/foliage attenuation are implemented. They are not a full terrain/environment pipeline: no terrain tile sampling, refractivity profile, ducting, multipath, building/vegetation geometry, distributed land/sea/weather clutter or calibrated diffraction field is integrated.
-- A passive RWR/ESM receiver and bearing-only tracker are implemented in `game/src/sensors/esm/`; they estimate nose-relative bearing, in-band power/SNR, pulse traits, signature-library matches, bearing rate and coast state. There is no RWR alert prioritization, cockpit display, ESM geolocation, angle-difference network, validated emitter library or full radar-to-RWR scenario composition yet.
-- The beam scheduler and AESA array model exist as independent kernels but are not yet coupled to RadarSystem's live scan controller or aircraft hardware state.
-- Mechanical and PESA beam scheduling are currently single-beam abstractions; AESA concurrency is bounded by configured channels and healthy module counts, not unlimited.
-- No aircraft-specific radar installation, F-16/MiG equipment profile, cockpit display, startup/BIT sequence, electrical bus or cooling-loop adapter is integrated.
-- Unit tests verify numerical and state-transition properties under declared assumptions. They do not establish real-world probability of detection, false-alarm calibration or fidelity for any real radar. RWR bearing accuracy and signature library entries are configurable estimates until calibrated against exact receiver/emitter variants.
-
-All equipment values must be attached to exact aircraft/radar/software variants with sourced provenance or an explicit `synthetic-test-only` label. Unknown values stay unknown; do not clone another radar's capability table.
+This document is a design guide. It does not claim any of these systems are implemented, tested or aircraft-calibrated.
