@@ -397,8 +397,7 @@ function validateModel(model: Missile6DofModel): void {
     if (!values.every(Number.isFinite) || sample.mach <= previousMach ||
       sample.mach < 0 || sample.zeroLiftDragCoefficient <= 0 ||
       sample.normalForceSlopePerRad <= 0 || sample.sideForceSlopePerRad <= 0 ||
-      sample.rollControlEffectiveness < 0 || sample.pitchControlEffectiveness < 0 ||
-      sample.yawControlEffectiveness < 0) {
+      false) {
       throw new RangeError("6-DoF aerodynamic samples must be ordered and physically bounded.");
     }
     previousMach = sample.mach;
@@ -456,14 +455,19 @@ function solveDynamics(
   const rawCn = aero.normalForceSlopePerRad * alpha +
     aero.pitchControlEffectiveness * finDeflections[1] * authority +
     aero.pitchDampingDerivative * qHat;
+  const rawCy = aero.sideForceSlopePerRad * beta +
+    aero.yawControlEffectiveness * finDeflections[2] * authority +
+    aero.yawDampingDerivative * rHat;
   const qArea = q * model.referenceAreaM2;
   const maximumNormalCoefficient = qArea > 0
     ? model.maximumNormalAccelerationG * 9.80665 * state.massKg / qArea
     : 0;
-  const cn = clamp(rawCn, -maximumNormalCoefficient, maximumNormalCoefficient);
-  const cy = aero.sideForceSlopePerRad * beta +
-    aero.yawControlEffectiveness * finDeflections[2] * authority +
-    aero.yawDampingDerivative * rHat;
+  const requestedNormalCoefficient = Math.hypot(rawCn, rawCy);
+  const normalForceScale = requestedNormalCoefficient > maximumNormalCoefficient
+    ? maximumNormalCoefficient / requestedNormalCoefficient
+    : 1;
+  const cn = rawCn * normalForceScale;
+  const cy = rawCy * normalForceScale;
   const cd = aero.zeroLiftDragCoefficient + model.inducedDragFactor * (cn * cn + cy * cy);
   const forceAero: Vector3 = [
     -q * model.referenceAreaM2 * cd,
@@ -537,6 +541,17 @@ function solveDynamics(
  * Coefficient tables and actuator/motor profiles are product-specific inputs;
  * no generic profile is asserted to represent a real missile.
  */
+export function sampleMissile6DofAerodynamics(
+  model: Missile6DofModel,
+  mach: number
+): { readonly sample: Missile6DofAeroSample; readonly inRange: boolean } {
+  if (!Number.isFinite(mach) || mach < 0) {
+    throw new RangeError("Mach number must be finite and non-negative.");
+  }
+  validateModel(model);
+  return interpolateAero(model.zeroLiftDragMachTable, mach);
+}
+
 export function stepMissile6Dof(
   previous: Missile6DofState,
   model: Missile6DofModel,
