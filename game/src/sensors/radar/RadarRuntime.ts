@@ -5,6 +5,7 @@ import {
 } from "../../physics/radar/RadarPhysics.js";
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
 import type { RadarRangeDopplerFrame } from "./RadarProcessing.js";
+import type { PulseDopplerWaveform } from "./PulseDopplerSimulation.js";
 
 export interface RadarWaveformConfiguration {
   readonly family: "pulse" | "pulse-doppler";
@@ -29,6 +30,13 @@ export interface RadarEquipmentConfiguration {
   readonly rangeBinCount: number;
   readonly dopplerBinCount: number;
   readonly maximumDutyCycle: number;
+  /** Optional sample-level pulse-Doppler path; omitted for the faster reduced-order frame model. */
+  readonly pulseDomain?: Omit<PulseDopplerWaveform,
+    "centerFrequencyHz" | "pulseWidthSeconds" | "pulseRepetitionIntervalSeconds" |
+    "coherentPulseCount" | "rangeBinCount"> & {
+      readonly coherentPulseCount: number;
+      readonly rangeBinCount: number;
+    };
 }
 
 export interface RadarHardwareThermalModel {
@@ -72,6 +80,7 @@ export interface RadarSceneReturn {
   readonly azimuthDeg: number;
   readonly elevationDeg: number;
   readonly receivedPowerW: number;
+  readonly phaseRadians?: number;
 }
 
 export interface RadarRangeDopplerScene {
