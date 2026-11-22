@@ -9,6 +9,9 @@ const model: MissileAerodynamicModel = {
     { mach: 2, dragCoefficient: 0.35 }
   ],
   maximumNormalAccelerationG: 20,
+  normalForceCoefficientSlopePerRad: 10,
+  maximumAngleOfAttackRad: 0.3,
+  inducedDragFactor: 0.05,
   controlResponseTimeSeconds: 0.1,
   maximumNormalJerkMps3: 1000,
   motorStages: [
@@ -46,7 +49,7 @@ describe("3-DoF staged missile flight dynamics", () => {
 
   it("limits normal acceleration using command response, jerk and maximum G", () => {
     const result = stepMissile3Dof(state, model, {
-      airDensityKgPerM3: 0,
+      airDensityKgPerM3: 1,
       speedOfSoundMps: 340,
       windWorldMps: [0, 0, 0],
       gravityMps2: 0
