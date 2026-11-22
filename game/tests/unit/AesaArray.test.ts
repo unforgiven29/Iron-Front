@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createUniformAesaTestArray, evaluatePlanarAesaArrayFactor } from "../../src/sensors/radar/AesaArray.js";
+import { computeAesaRadarEcho } from "../../src/sensors/radar/AesaRadarIntegration.js";
 
 describe("finite planar AESA array factor", () => {
   it("forms a coherent main beam at its steering direction", () => {
@@ -27,6 +28,49 @@ describe("finite planar AESA array factor", () => {
     expect(failedModules.healthyElementCount).toBe(32);
     expect(failedModules.effectiveApertureFraction).toBeCloseTo(0.5, 10);
     expect(failedModules.relativeGainDb).toBeCloseTo(-6.0206, 3);
+  });
+
+  it("couples electronic steering and module health into the radar link budget", () => {
+    const array = createUniformAesaTestArray(16, 16);
+    const physical = {
+      transmitPowerW: 10_000,
+      frequencyHz: 10e9,
+      antenna: {
+        peakGainDb: 40,
+        horizontalHalfPowerBeamwidthDeg: 40,
+        verticalHalfPowerBeamwidthDeg: 40,
+        firstSidelobeLevelDb: -13,
+        sidelobeFloorDb: -40,
+        backlobeLevelDb: -50
+      },
+      targetRcsByAspect: [{ aspectDeg: 0, rcsM2: 1 }],
+      targetAspectDeg: 0,
+      rangeM: 10_000,
+      rangeRateMps: 0,
+      azimuthDeg: 10,
+      elevationDeg: 0,
+      beamAzimuthDeg: 10,
+      beamElevationDeg: 0
+    };
+    const incorrectlySteered = computeAesaRadarEcho({
+      physical,
+      array,
+      transmitSteeringAzimuthDeg: 0,
+      transmitSteeringElevationDeg: 0,
+      receiveSteeringAzimuthDeg: 0,
+      receiveSteeringElevationDeg: 0
+    });
+    const correctlySteered = computeAesaRadarEcho({
+      physical,
+      array,
+      transmitSteeringAzimuthDeg: 10,
+      transmitSteeringElevationDeg: 0,
+      receiveSteeringAzimuthDeg: 10,
+      receiveSteeringElevationDeg: 0
+    });
+    expect(correctlySteered.echo.receivedPowerW)
+      .toBeGreaterThan(incorrectlySteered.echo.receivedPowerW);
+    expect(correctlySteered.transmitArray.relativeGainDb).toBeCloseTo(0, 8);
   });
 
   it("rejects invalid and duplicate element locations", () => {
