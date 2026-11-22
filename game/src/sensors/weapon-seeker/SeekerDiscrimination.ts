@@ -12,6 +12,9 @@ export interface SeekerFeatureObservation {
   readonly measurementId: string;
   readonly azimuthOffBoresightDeg: number;
   readonly elevationOffBoresightDeg: number;
+  /** Required gimbal pointing in the missile-body frame, degrees. */
+  readonly azimuthFromBodyDeg: number;
+  readonly elevationFromBodyDeg: number;
   readonly rangeM: number;
   readonly features: Readonly<Partial<Record<SeekerFeature, number>>>;
 }
@@ -98,7 +101,8 @@ export function discriminateSeekerCandidates(
 
   for (const observation of observations) {
     if (!observation.measurementId ||
-      ![observation.azimuthOffBoresightDeg, observation.elevationOffBoresightDeg, observation.rangeM].every(Number.isFinite) ||
+      ![observation.azimuthOffBoresightDeg, observation.elevationOffBoresightDeg,
+        observation.azimuthFromBodyDeg, observation.elevationFromBodyDeg, observation.rangeM].every(Number.isFinite) ||
       Object.values(observation.features).some((value) => value !== undefined && !Number.isFinite(value))) {
       throw new RangeError("Seeker observation contains invalid measurements.");
     }
