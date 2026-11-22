@@ -47,6 +47,34 @@ describe("3-DoF staged missile flight dynamics", () => {
     expect(result.diagnostics.dynamicPressurePa).toBeGreaterThan(0);
   });
 
+  it("integrates a time-varying two-pulse motor thrust and mass-flow curve", () => {
+    const curvedMotorModel: MissileAerodynamicModel = {
+      ...model,
+      motorStages: [{
+        startTimeSeconds: 0,
+        endTimeSeconds: 0.2,
+        thrustN: 0,
+        massFlowKgPerSecond: 0,
+        thrustCurve: [
+          { timeSinceStageStartSeconds: 0, thrustN: 1000, massFlowKgPerSecond: 0.1 },
+          { timeSinceStageStartSeconds: 0.1, thrustN: 2000, massFlowKgPerSecond: 0.2 },
+          { timeSinceStageStartSeconds: 0.2, thrustN: 0, massFlowKgPerSecond: 0 }
+        ]
+      }]
+    };
+    const result = stepMissile3Dof(state, curvedMotorModel, {
+      airDensityKgPerM3: 0,
+      speedOfSoundMps: 340,
+      windWorldMps: [0, 0, 0],
+      gravityMps2: 0
+    }, {
+      deltaTimeSeconds: 0.2,
+      commandedAccelerationWorldMps2: [0, 0, 0]
+    });
+    expect(result.diagnostics.thrustN).toBeCloseTo(1250, 6);
+    expect(result.diagnostics.propellantConsumedKg).toBeCloseTo(0.025, 8);
+  });
+
   it("limits normal acceleration using command response, jerk and maximum G", () => {
     const result = stepMissile3Dof(state, model, {
       airDensityKgPerM3: 1,
