@@ -1,24 +1,30 @@
-# Weapon seeker and countermeasure runtime
+# Weapon seeker and countermeasure simulation
 
-The executable seeker-related kernels are kept separate from product-specific missile data.
+**Status: architecture README only for this task. No seeker or countermeasure runtime code was added or retained from this task.**
 
-## Modules
+This directory is reserved for weapon-mounted sensor front ends, acquisition/tracking state, discrimination interfaces and sensor-specific countermeasure interaction. Keep weapon product definitions separate from reusable seeker physics and signal-processing algorithms.
 
-- `SeekerDiscrimination.ts`: scores observed signal, spectral, angular, thermal-decay, kinematic and track-continuity cues against a configurable seeker feature envelope. Outputs uncalibrated relative weights, not real probability of target identity.
-- `SeekerRuntime.ts`: gimbal travel and rate, acquisition dwell, track/coast memory, power/cooling/health, and external illumination/command-link dependency state.
-- `CountermeasurePhysics.ts`: band-integrated Planck radiance, lumped thermal flare cooling/chemical heat input, IR seeker power/features, chaff advection/dispersal/particle depletion and wavelength-dependent cloud RCS.
-- `RadarMissileSeeker.ts`: active and semi-active radar seeker link budgets, illuminator dependency, receiver noise/SNR, pulse-compression/coherent processing, range/Doppler ambiguity gates and noisy range/range-rate/angle measurements. No detection returns null measurements rather than leaking the target's true state.
+## Planned module boundaries
 
-## Data boundaries
+- **Infrared / imaging infrared:** optical bands, detector physics, optics, FOV, gimbal travel/rate, thermal scene inputs, background/clutter, image/feature extraction, track memory and acquisition limits.
+- **Active radar seeker:** independent transmitter/receiver, waveform, antenna/array, RF link budget, target scattering, clutter/interference, range-Doppler processing, detection, monopulse/angle estimation where fitted, and terminal tracking.
+- **Semi-active radar seeker:** receiver-only missile front end, external illumination dependency, illuminator waveform compatibility, pulse/track continuity, range/angle measurement and illumination-loss behavior.
+- **Passive RF / laser / EO:** architecture-specific observations, geometry, signal limits, track quality and external dependencies.
+- **Seeker control:** gimbal, servo, scan pattern, stabilization, rate/acceleration limits, acquisition dwell, memory, coast, reacquisition and failure.
+- **Discrimination:** candidate feature observations and uncertainty; target/decoy classification must not receive hidden target/decoy entity labels.
+- **Countermeasure physical models:** flare thermal history and spectrum; chaff particle/cloud distribution, orientation, wavelength/polarization response and dispersion; towed/active decoys where supported.
+- **ECCM:** product-specific logic and limitations. Do not grant generic immunity to countermeasures.
 
-The seeker sees observations, not hidden entity labels. Target and decoy candidate records share the same numeric observation shape. Flare thermal properties, chaff dimensions/particle RCS, seeker band filters and discrimination expectations must be profile-specific, sourced or explicitly synthetic-test-only.
+## Required separation
 
-## Limits
+A seeker measurement method is not a guidance law. Guidance must consume timestamped, uncertain seeker/navigation reports. The missile dynamics determine the actual trajectory. The fuze and warhead are separate components and must not infer a hit from a seeker lock alone.
 
-- The flare model is a lumped thermal body. It omits detailed chemical reaction kinetics, multi-layer material ablation, fragmented plume combustion and calibrated spectral line emission.
-- IR propagation is coefficient-driven per band; the model is not a full atmosphere/radiative-transfer solver.
-- The chaff model uses a configurable resonance envelope and incoherent particle-RCS sum. It is not a full electromagnetic scattering solver and does not currently resolve individual dipoles, orientation distributions, polarization or turbulent particle trajectories.
-- Seeker discrimination profile scores are uncalibrated. No AIM-9/ASRAAM/IRIS-T/R-73 or radar-seeker variant is validated by the generic kernels alone.
-- The active/semi-active radar seeker front end is an initial link-budget and measurement kernel. It is not a full RF pulse/IQ seeker simulation, monopulse angle tracker, range-Doppler processor, coherent/DRFM ECCM model, seeker-specific track filter or fuze/warhead interaction. Its probability-of-false-alarm threshold is an idealized single-cell exponential-noise threshold, not a calibrated product seeker detector.
+## Countermeasure susceptibility
 
-Tests: `game/tests/unit/SeekerRuntime.test.ts`, `game/tests/unit/CountermeasurePhysics.test.ts` and `game/tests/unit/RadarMissileSeeker.test.ts`.
+Do not reduce susceptibility to a single scalar. Model the causal chain: decoy release and physical state → propagation/scene → seeker observation → filtering and discrimination → track update/track break/reacquisition → guidance response. Include geometry, aspect, range, closing rate, background, spectral band, seeker generation, scan/gimbal state, target signature and countermeasure timing where supported by evidence.
+
+## Data quality and validation
+
+Every seeker/decoy profile must identify exact product and software variant, applicable aircraft/launcher, source provenance, confidence and unsupported areas. Unknown values stay unknown. Synthetic test profiles are explicitly labelled. Build analytic tests and controlled scenarios before making claims about real missile performance.
+
+This document defines future module ownership and behavior. It does not assert that generic seeker or countermeasure algorithms are implemented or calibrated.
