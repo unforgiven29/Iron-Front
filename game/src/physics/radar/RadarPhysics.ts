@@ -1,4 +1,10 @@
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
+import {
+  computeAtmosphericPathTransmission,
+  evaluateTerrainLineOfSight,
+  type AtmosphericPathRequest,
+  type TerrainLineOfSightRequest
+} from "./RadarPropagation.js";
 
 export const SPEED_OF_LIGHT_MPS = 299_792_458;
 export const BOLTZMANN_CONSTANT_J_PER_K = 1.380649e-23;
@@ -382,4 +388,36 @@ export function computeRadarInterference(
     totalReceivedPowerW: contributions.reduce((sum, item) => sum + item.receivedPowerW, 0),
     contributions
   };
+}
+
+
+export interface EnvironmentCoupledRadarEchoRequest {
+  readonly physical: PhysicalRadarEchoRequest;
+  readonly terrain: TerrainLineOfSightRequest;
+  readonly atmosphere: AtmosphericPathRequest;
+}
+
+export interface EnvironmentCoupledRadarEchoResult {
+  readonly echo: PhysicalRadarEcho | null;
+  readonly terrain: ReturnType<typeof evaluateTerrainLineOfSight>;
+  readonly atmosphere: ReturnType<typeof computeAtmosphericPathTransmission>;
+  readonly blocked: boolean;
+}
+
+/** Applies sampled terrain visibility and one-way environment losses to an RF echo. */
+export function computeEnvironmentCoupledRadarEcho(
+  request: EnvironmentCoupledRadarEchoRequest
+): EnvironmentCoupledRadarEchoResult {
+  const terrain = evaluateTerrainLineOfSight(request.terrain);
+  const atmosphere = computeAtmosphericPathTransmission(request.atmosphere);
+  if (!terrain.geometricallyVisible) {
+    return { echo: null, terrain, atmosphere, blocked: true };
+  }
+  const existingTransmission = request.physical.oneWayPathTransmission ?? 1;
+  const combinedTransmission = existingTransmission * atmosphere.oneWayTransmissionFraction;
+  const echo = computePhysicalRadarEcho({
+    ...request.physical,
+    oneWayPathTransmission: combinedTransmission
+  });
+  return { echo, terrain, atmosphere, blocked: false };
 }
