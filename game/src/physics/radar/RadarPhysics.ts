@@ -58,6 +58,9 @@ export interface PhysicalRadarEchoRequest {
   readonly elevationDeg: number;
   readonly beamAzimuthDeg: number;
   readonly beamElevationDeg: number;
+  /** Optional element-resolved array factor relative to its ideal coherent peak. */
+  readonly transmitArrayFactorRelativeGainDb?: number;
+  readonly receiveArrayFactorRelativeGainDb?: number;
   readonly oneWayPathTransmission?: number;
   readonly systemLossLinear?: number;
   readonly swerlingModel?: SwerlingModel;
@@ -296,15 +299,24 @@ export function computePhysicalRadarEcho(
   }
   const azimuthOffAxis = signedAngleDifferenceDeg(request.azimuthDeg, request.beamAzimuthDeg);
   const elevationOffAxis = request.elevationDeg - request.beamElevationDeg;
-  const gainDb = evaluateAntennaGainDb(request.antenna, azimuthOffAxis, elevationOffAxis);
+  const envelopeGainDb = evaluateAntennaGainDb(request.antenna, azimuthOffAxis, elevationOffAxis);
+  const transmitGainDb = request.transmitArrayFactorRelativeGainDb === undefined
+    ? envelopeGainDb
+    : request.antenna.peakGainDb + request.transmitArrayFactorRelativeGainDb;
+  const receiveGainDb = request.receiveArrayFactorRelativeGainDb === undefined
+    ? envelopeGainDb
+    : request.antenna.peakGainDb + request.receiveArrayFactorRelativeGainDb;
+  if (![transmitGainDb, receiveGainDb].every(Number.isFinite)) {
+    throw new RangeError("Radar array-factor gain must be finite.");
+  }
   const meanRcsM2 = evaluateAspectRcsM2(request.targetRcsByAspect, request.targetAspectDeg);
   const sampledRcsM2 = request.swerlingModel && request.swerlingModel !== "swerling-0"
     ? sampleSwerlingRcsM2(meanRcsM2, request.swerlingModel, requireRandom(request.random))
     : meanRcsM2;
   const link = computeMonostaticEchoPower({
     transmitPowerW: request.transmitPowerW,
-    transmitGainDb: gainDb,
-    receiveGainDb: gainDb,
+    transmitGainDb,
+    receiveGainDb,
     frequencyHz: request.frequencyHz,
     rcsM2: sampledRcsM2,
     rangeM: request.rangeM,
