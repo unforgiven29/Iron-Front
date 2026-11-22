@@ -70,6 +70,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Terrain, world generation, streaming, interiors | game/world/README.md and exact child guide | core/spatial, collision, propagation, renderer |
 | Renderer, cockpit, audio, assets | game/graphics-engine/README.md and docs/assets-and-pipeline/README.md | exact cockpit/asset owner, renderer ADR |
 | Tests and benchmarks | docs/testing-and-validation/README.md and exact game/tests/<type>/README.md | subsystem's acceptance scenarios |
+| Legacy game feature migration/parity audit | docs/legacy-game-feature-inventory.md and docs/legacy-game-feature-crosswalk.md | inspect old source files linked by the `LEG-*` entry; identify active/partial/catalogue-only behavior, source quality, target owner and missing acceptance tests |
 | Legacy game feature migration/parity audit | docs/legacy-game-feature-crosswalk.md | only the canonical owners for features being migrated |
 
 ## Expected content in every owner README
