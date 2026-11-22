@@ -4,7 +4,10 @@ export interface RadarRangeDopplerFrame {
   /** Row-major range x Doppler power samples in watts. */
   readonly powerWatts: readonly number[];
   readonly rangeStartM: number;
+  /** Physical two-way range resolution set by the processed bandwidth. */
   readonly rangeResolutionM: number;
+  /** Range-axis sample spacing; defaults to rangeResolutionM when not oversampled. */
+  readonly rangeBinSpacingM?: number;
   /** Positive values mean increasing range / receding target. */
   readonly radialVelocityStartMps: number;
   readonly radialVelocityResolutionMps: number;
@@ -62,6 +65,7 @@ function validateFrame(frame: RadarRangeDopplerFrame): void {
   }
   const positive = [
     frame.rangeResolutionM,
+    frame.rangeBinSpacingM ?? frame.rangeResolutionM,
     frame.dopplerResolutionMps,
     frame.coherentProcessingIntervalSeconds,
     frame.wavelengthM,
@@ -151,7 +155,7 @@ export function detectCaCfar(
         measurementId: "rd-" + frame.acquiredAtSeconds.toFixed(6) + "-" + rangeIndex + "-" + dopplerIndex,
         rangeBin: rangeIndex,
         dopplerBin: dopplerIndex,
-        rangeM: frame.rangeStartM + rangeIndex * frame.rangeResolutionM,
+        rangeM: frame.rangeStartM + rangeIndex * (frame.rangeBinSpacingM ?? frame.rangeResolutionM),
         radialVelocityMps: frame.radialVelocityStartMps + dopplerIndex * frame.radialVelocityResolutionMps,
         azimuthDeg: frame.beamAzimuthDeg,
         elevationDeg: frame.beamElevationDeg,
