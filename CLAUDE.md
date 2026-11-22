@@ -22,6 +22,7 @@ Iron-Front is a browser-based combat flight simulation project inspired by the s
 - Technical data requires exact applicability, units, provenance, uncertainty and review state. Unknown is not zero; do not invent precision.
 - Model connected causal systems, not generic working/not-working booleans.
 - Do not create a module for every helper, a monolithic manager, or batches of empty placeholder folders.
+- Preserve the full legacy game's intended capability scope. Before migrating, removing, replacing or declaring parity, consult `docs/legacy-game-feature-inventory.md` and `docs/legacy-game-feature-crosswalk.md`; every `LEG-*` capability stays tracked unless an explicit decision defers or removes it.
 - A README, schema, folder, mock, visual or manifest is not proof of a working implementation.
 
 ## Before adding or moving code
