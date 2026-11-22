@@ -1,11 +1,13 @@
 # Shared Radar Physics
 
-**Status:** Initial shared RF kernels are implemented in `game/src/physics/radar/RadarPhysics.ts`: antenna-pattern envelope, aspect-table RCS interpolation, Swerling 0/1/3 fluctuation, monostatic radar equation, Doppler, round-trip delay, spectral jammer coupling and an environment-coupled echo boundary. `game/src/physics/radar/RadarPropagation.ts` adds sampled terrain/effective-Earth-radius LOS, first-Fresnel screening, knife-edge loss and coefficient-driven one-way gas/rain/cloud/fog/foliage attenuation. The `physics/radar/` tree remains the requirements owner. Terrain tile sampling, measured refractivity/ducting, multipath, urban/vegetation interaction, distributed clutter and full-wave scattering are not yet implemented.
+**Status: specification and folder scaffold only for this task. No shared RF runtime code was added or retained from this task.**
 
 ## Purpose
+
 `sensors/Radar/` represents radar equipment and its processing chain. `physics/radar/` represents reusable models of geometry, propagation, target scattering and environmental clutter. This prevents every radar/aircraft from implementing incompatible environment models.
 
 ## Folder responsibilities
+
 | Folder | Responsibility |
 |---|---|
 | geometry/coordinate-frames | Transformations, coordinate conventions, direction vectors and unit-safe geometry |
@@ -30,7 +32,15 @@
 | numerics/approximations | Named fast models, validity envelopes and limitations |
 
 ## Boundaries
+
 Geometry determines where paths can exist and what they intersect. Propagation determines how energy changes along a path. Target scattering determines how an object responds. Clutter describes distributed environmental returns. Receiver noise/hardware stays in `sensors/Radar/receiver/`; detection and tracking stay in their sensor folders.
 
+## Required modeling questions
+
+For every RF path, define frequency, polarization, transmit/receive antenna response, range, atmospheric state, terrain/building/vegetation obstruction, multipath assumptions and path loss. For every target, define aspect convention, configuration, frequency/polarization applicability, RCS fluctuation model and evidence status. For every clutter model, define surface class, sea state/moisture, grazing angle, cell area, Doppler behavior and data provenance.
+
 ## Fidelity and performance
+
 Use explicit model/fidelity selection, not silent equation changes based on frame rate. Fast gameplay approximations may serve many objects; detailed calculations may serve selected objects or lab cases. Both expose assumptions and validity limits. Do not claim full-wave EM accuracy without a validated numerical solver. Use spatial acceleration/cached queries, avoid per-frame terrain scans, and make queries reproducible for fixed scenarios and seeds.
+
+This README defines intended ownership and future work. It is not a runtime implementation or validation report.
