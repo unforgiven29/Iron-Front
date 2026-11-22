@@ -1,6 +1,8 @@
 # Radar Simulation Documentation
 
-This directory defines the planned radar-simulation domain for Iron-Front. It is documentation and organization only; none of the described systems are implemented by these files.
+This directory defines the radar-simulation requirements and validation plan. An initial executable numerical kernel now lives in `game/src/sensors/radar/` and `game/src/physics/radar/`. Those modules implement a subset of the signal chain; this directory remains the requirements source of truth and **does not claim a complete aircraft-installed radar suite**.
+
+Read [the radar runtime entry point](../../game/src/sensors/radar/README.md) for current code, tests, assumptions and unsupported behavior.
 
 ## Research references
 
