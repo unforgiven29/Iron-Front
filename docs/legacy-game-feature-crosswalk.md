@@ -4,6 +4,10 @@
 
 **Target:** Iron-Front. This file is a migration index and parity checklist, not a duplicate system specification and not proof that a runtime exists.
 
+## Full source inventory
+
+This concise owner crosswalk is paired with the [detailed legacy capability inventory](legacy-game-feature-inventory.md). The inventory assigns stable `LEG-*` IDs, cites the actual old source files, records legacy maturity/data quality and states the parity requirement. Claude must consult it before migrating, replacing or declaring parity for any old capability.
+
 ## Migration rule
 
 Transfer player-facing capabilities, scenario concepts and causal interactions—not the old JavaScript implementation. The legacy project uses classic scripts sharing global state, load-order dependencies and multiple wrappers around a large central game file. Iron-Front must use typed contracts, fixed simulation time, data-driven platform modules, explicit authority and the canonical owners below. Do not copy legacy numeric tuning or treat a game-level approximation as engineering data.
