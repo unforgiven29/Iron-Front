@@ -64,6 +64,7 @@ export interface RwrEmitterSignature {
 export interface RwrEmitterObservation {
   readonly observationId: string;
   readonly acquiredAtSeconds: number;
+  /** Bearing relative to receiver nose/heading, clockwise from forward. */
   readonly bearingDeg: number;
   readonly bearingStandardDeviationDeg: number;
   readonly bearingArchitecture: RwrBearingArchitecture;
@@ -314,7 +315,9 @@ export function interceptRadarEmissions(
     observations.push({
       observationId: "rwr-" + acquiredAtSeconds.toFixed(6) + "-" + index,
       acquiredAtSeconds,
-      bearingDeg: wrapDegrees(azimuthFromReceiverDeg + bearingNoise),
+      bearingDeg: wrapDegrees(
+        azimuthFromReceiverDeg - receiverHeadingWorldDeg + bearingNoise
+      ),
       bearingStandardDeviationDeg: bearingAccuracy,
       bearingArchitecture: receiver.bearingArchitecture,
       receivedPowerDbm,
