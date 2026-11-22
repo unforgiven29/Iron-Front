@@ -28,6 +28,7 @@ Claude's annotated technical research index is [docs/reference-library/README.md
 - [docs/simulation-conventions/README.md](docs/simulation-conventions/README.md) — time, coordinate frames, precision and determinism.
 - [docs/testing-and-validation/README.md](docs/testing-and-validation/README.md) — test layers, causal validation and performance evidence.
 - [docs/legacy-game-feature-crosswalk.md](docs/legacy-game-feature-crosswalk.md) — migration index for capabilities from the user's HTML-Flight-Combat game.
+- [docs/legacy-game-feature-inventory.md](docs/legacy-game-feature-inventory.md) — detailed code-informed inventory of the old game's aircraft, sensors, weapons, rotorcraft, ground war, campaign, world, society, multiplayer and developer tools, including source paths and evidence-quality warnings.
 
 ## System entry points
 
