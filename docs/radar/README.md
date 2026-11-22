@@ -1,8 +1,8 @@
 # Radar Simulation Documentation
 
-This directory defines the radar-simulation requirements and validation plan. An initial executable numerical kernel now lives in `game/src/sensors/radar/` and `game/src/physics/radar/`. Those modules implement a subset of the signal chain; this directory remains the requirements source of truth and **does not claim a complete aircraft-installed radar suite**.
+**Status: requirements and design documentation only. No new radar implementation code is included in this task.**
 
-Read [the radar runtime entry point](../../game/src/sensors/radar/README.md) for current code, tests, assumptions and unsupported behavior.
+This directory defines the radar-simulation architecture, requirements, validation plan and research references. The source-oriented README markers under `game/src/sensors/radar/` and `game/src/sensors/esm/` identify intended future code ownership; they are folder markers, not runtime evidence.
 
 ## Research references
 
@@ -35,6 +35,7 @@ Start with [the sensors and electronic-warfare reference guide](../reference-lib
 ## Architecture classification axes
 
 Do not represent a radar with one mutually exclusive "type" field. At minimum, keep these related but independent:
+
 - Waveform/processing family: pulse, pulse-Doppler, CW/FMCW, coherent/non-coherent processing.
 - RF/beamforming architecture: mechanically scanned, PESA, AESA, hybrid or equipment-specific.
 - Physical aperture construction: parabolic reflector dish, flat slotted-waveguide planar array, horn, phased planar array, conformal array, reflectarray or documented specialized aperture.
@@ -43,7 +44,7 @@ Do not represent a radar with one mutually exclusive "type" field. At minimum, k
 
 A parabolic dish is a curved reflector with a feed; a flat slotted-waveguide planar array is a flat slot-radiating aperture with a waveguide feed network. Neither construction alone identifies the waveform or establishes AESA/PESA electronics. A mechanically scanned radar can use either aperture when its installation supports it. A conventional fixed-feed slotted array is not automatically electronically steered.
 
-The versioned aperture-data schema is docs/radar/schemas/antenna-aperture.schema.json; its synthetic examples are docs/radar/examples/antenna-apertures.example.json. They define data shape only, not implemented antenna physics.
+The versioned aperture-data schema is `docs/radar/schemas/antenna-aperture.schema.json`; its synthetic examples are `docs/radar/examples/antenna-apertures.example.json`. They define data shape only, not implemented antenna physics.
 
 ## Folder guide
 
@@ -82,11 +83,12 @@ Signal processing should expose intermediate quantities for validation: waveform
 - Propagation describes the path through the environment; target interaction describes scattering from the object.
 - Receiver produces conditioned samples; signal processing analyzes them.
 - Detection creates measurement reports; tracking maintains estimates over time.
-- Operating modes schedule capabilities but must not bypass the signal chain.
-- Displays present system outputs and must not create detections.
-- Electronic warfare changes the signal environment through defined interfaces, not arbitrary range multipliers.
-- IRST is a separate passive infrared sensor; radar may cue it, but cannot guarantee an IRST detection.
+- Operating modes schedule functions; displays present only what the sensors have actually measured.
+- Electronic attack/deception modifies the signal environment; ECCM is a bounded response, not immunity.
+- Aircraft integration supplies actual power, cooling, installation geometry, controls and software baseline.
 
-## Status
+## Validation rules
 
-Every folder and explanation here is a planning reference. It does not indicate that the corresponding simulation is implemented or validated.
+Every test must state the model fidelity, input assumptions, seed, units, coordinate conventions and expected uncertainty. Separate equation/unit tests, signal-processing tests, detector performance tests, scenario tests, platform integration and held-out comparison. A green unit test does not establish real-world Pd/Pfa or exact radar fidelity.
+
+No generic radar profile is a substitute for a specific radar variant dossier. Unknown PRFs, pulse widths, aperture dimensions, gain, sidelobes, noise figure, T/R-module counts and processing limits must remain unknown until sourced or explicitly represented as synthetic tests.
