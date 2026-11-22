@@ -1,6 +1,6 @@
 # Shared weapon guidance physics
 
-**Owner:** physics/guidance. **Status:** architecture specification; no general guidance-law runtime is implemented.
+**Owner:** physics/guidance. **Status:** initial executable laws are in `game/src/physics/guidance/GuidanceLaws.ts`: true proportional navigation, augmented PN and pure pursuit, using timestamped uncertain estimates and acceleration bounds. These laws are not a complete autopilot or weapon package.
 
 This is the platform-neutral guidance calculation owner. It transforms navigation estimates and seeker/command observations into bounded steering requests. It does not own weapon definitions, seeker hardware, target truth, missile propulsion, aerodynamic control surfaces or rigid-body integration.
 
