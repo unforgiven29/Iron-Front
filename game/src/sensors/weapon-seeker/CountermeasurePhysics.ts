@@ -300,7 +300,6 @@ export function observeInfraredEmitters(
       throw new RangeError("Infrared path must supply one atmospheric value per sensor band.");
     }
     const powers: number[] = [];
-    const snrs: number[] = [];
     for (let bandIndex = 0; bandIndex < optics.spectralBands.length; bandIndex += 1) {
       const band = optics.spectralBands[bandIndex]!;
       const transmission = path.atmosphericTransmissionByBand[bandIndex]!;
@@ -323,7 +322,6 @@ export function observeInfraredEmitters(
       const signalPower = Math.max(0, sourcePower - backgroundPower);
       const snr = signalPower / optics.detectorNoisePowerW;
       powers.push(signalPower);
-      snrs.push(snr);
       weakestBandSnrDb = Math.min(weakestBandSnrDb, db10(snr));
     }
 
@@ -360,6 +358,10 @@ export function observeInfraredEmitters(
     bandSignalPowerW,
     weakestBandSnrDb: weakestBandSnrDb === Infinity ? -Infinity : weakestBandSnrDb
   };
+}
+
+function validateChaffCloudModel(model: ChaffCloudModel): void {
+  validateChaffCloudModel(model);
 }
 
 /** Creates the initial dispersed chaff cloud state after ejection. */
@@ -410,9 +412,12 @@ export function stepChaffCloud(
     throw new RangeError("Chaff cloud state or integration interval is invalid.");
   }
   const dt = input.deltaTimeSeconds;
-  const wind = input.windWorldMps;
+  validateChaffCloudModel(model);
   const coupling = 1 - Math.exp(-dt / model.windCouplingTimeConstantSeconds);
-  const windAcceleration = scale(subtract(environment.windWorldMps, previous.velocityWorldMps), coupling / dt);
+  const windAcceleration = scale(
+    subtract(environment.windWorldMps, previous.velocityWorldMps),
+    coupling / dt
+  );
   const acceleration: Vector3 = [
     windAcceleration[0],
     windAcceleration[1],
@@ -445,6 +450,7 @@ export function evaluateChaffCloudRadarReturn(
   radarFrequencyHz: number,
   radarToCloudUnitVector: Vector3
 ): ChaffCloudRadarReturn {
+  validateChaffCloudModel(model);
   validatePositive(radarFrequencyHz, "Radar frequency");
   validateFiniteVector(radarToCloudUnitVector, "Radar line of sight");
   const losLength = magnitude(radarToCloudUnitVector);
