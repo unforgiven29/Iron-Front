@@ -23,7 +23,9 @@ The executable TypeScript is concentrated in `game/src/`. The current source tre
 | Message shapes | `game/src/core/contracts/Messages.ts` | Not a validated message bus, dispatcher or event journal |
 | Module types | `game/src/core/modules/ModuleTypes.ts` | Not a manifest loader, registry, dependency resolver or lifecycle host |
 | Rendering boundary | `game/src/rendering/RendererPort.ts` | Not a selected or implemented rendering engine |
-| Tests | Unit tests for the clock, coordinates and seeded random; browser smoke test for the shell | Not aircraft, physics, radar, weapons or campaign acceptance coverage |
+| Tests | Foundation unit tests plus new deterministic radar, missile, seeker and guidance unit suites; browser smoke test for the shell | Numerical unit coverage is not scenario acceptance, real-world fidelity evidence or aircraft integration |
+| Radar kernels | `game/src/physics/radar/` and `game/src/sensors/radar/`: radar equation, antenna/RCS, jammer coupling, hardware readiness, optional pulse/IQ + matched filter + Doppler FFT, CFAR, uncertain tracks, beam scheduling and planar AESA array factor | Not a complete sensor suite, terrain/world integration, calibrated Pd/Pfa, aircraft fit, cockpit or RWR |
+| Missile kernels | `game/src/physics/guidance/`, `game/src/physics/ballistics/MissileDynamics.ts`, `game/src/sensors/weapon-seeker/` and `game/src/weapons/MissileRuntime.ts`: PN/APN/pursuit, 3-DoF motor/drag/steering, seeker cue discrimination/lifecycle and fuze event gate | Not a 6-DoF flight model, verified weapon variant data, aircraft/launcher integration, calibrated CM susceptibility or warhead effects |
 
 The README files under `physics/`, `sensors/`, `game/modules/`, `game/systems/` and much of `game/world/` are architecture specifications, data plans or task routers. Many directories are intentionally empty scaffolds. A directory, README, schema, example manifest, test plan, placeholder or visual mock is not evidence of a working runtime capability.
 
@@ -34,8 +36,8 @@ Do not describe or build on these as though they already exist:
 - Module manifest validation/loading, capability resolution, dependency graph, module lifecycle and runtime composition.
 - Deterministic event dispatcher/journal, multi-rate scheduler, entity store, resource allocator, diagnostics service, persistence, replay and complete spatial services.
 - Six-degree-of-freedom aircraft flight model, aerodynamic surface integration, propulsion simulation, flight controls/actuators, ground handling or aircraft-specific system networks.
-- Environment/atmosphere field, terrain/collision runtime, RF propagation, radar transmitter/receiver/signal processing/tracking, RWR/ESM, IRST/EO, sensor fusion or datalink runtime.
-- Aircraft installations, accurate clickable cockpits, startup procedures, operational aircraft, weapons, countermeasure interaction, ground units, infantry, naval units, AI, logistics or campaign simulation.
+- Complete environment/atmosphere and terrain/collision runtime. Shared radar RF kernels and a single-channel pulse-Doppler sample path exist, but there is no complete environment-coupled propagation service, terrain masking, refraction/multipath/weather field, distributed clutter model, calibrated detector, RWR/ESM, IRST/EO, sensor fusion or datalink runtime.
+- Aircraft installations, accurate clickable cockpits, startup procedures, operational aircraft, complete missile variants, full 6-DoF weapon aerodynamics, calibrated seeker/countermeasure interaction, fuze/warhead effects, ground units, infantry, naval units, AI, logistics or campaign simulation.
 - A production 3D renderer, audio engine, asset pipeline or persistent authoritative multiplayer backend.
 
 A subsystem guide may define detailed intended behavior while the runtime remains absent. Keep that distinction explicit in code reviews, commits, documentation and user-facing status.
@@ -58,7 +60,11 @@ The flight-model specification now has dedicated owner guides for unsteady aerod
 
 
 
-**Stage 0.5 — Foundation hardening is complete and CI-verified on `main` as of 21 November 2026.** The successful [GitHub Actions quality run](https://github.com/unforgiven29/Iron-Front/actions/runs/44963589879) passed lint, TypeScript, schema validation, unit tests, production build and Playwright browser smoke tests. The next permitted work is **Stage 1 — Runtime contracts and core services**. Do not jump to aircraft, radar or weapon implementation before Stage 1 exit criteria pass. After that, build the F-16C Block 50 as the first full vertical slice, including staged advanced flight physics; then use the MiG-29 product 9.13 as a second, independent flight-model proof.
+**Stage 0.5 — Foundation hardening is complete and CI-verified on `main` as of 21 November 2026.** The successful [GitHub Actions quality run](https://github.com/unforgiven29/Iron-Front/actions/runs/44963589879) passed lint, TypeScript, schema validation, unit tests, production build and Playwright browser smoke tests.
+
+**Implementation exception:** at the user's explicit request, isolated radar and missile numerical kernels have now been added under `game/src/` with unit tests. This is deliberately early, bounded domain work; it does **not** complete Stage 1, Stage 5 sensors/EW or Stage 6 weapons, and it does not authorize aircraft/platform integration ahead of the roadmap gates. Treat the new code as reusable algorithm slices, not as a playable radar/missile suite. Their current limits are recorded in the owning READMEs.
+
+The next permitted foundation work remains **Stage 1 — Runtime contracts and core services**. Do not attach these kernels to aircraft, campaign entities, UI or authoritative simulation scheduling before the Stage 1 exit criteria pass. After the foundation, complete the F-16C Block 50 as the first aircraft vertical slice, then use the MiG-29 product 9.13 as a second, independent flight-model proof.
 
 ### Stage 0.5 — completed foundation hardening
 
