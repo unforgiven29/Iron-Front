@@ -1,22 +1,23 @@
 # Weapon systems — entry point
 
-**Owner:** game/modules/weapons. **Status:** product/content architecture remains the owner; early reusable post-launch kernels now exist in `game/src/weapons/MissileRuntime.ts`, `game/src/physics/ballistics/MissileDynamics.ts`, `game/src/physics/guidance/GuidanceLaws.ts` and `game/src/sensors/weapon-seeker/`. No complete aircraft-installed weapon package or real missile variant fit is yet integrated.
+**Owner:** game/modules/weapons. **Status:** product/content architecture and README scaffolding only for the missile/radar task. This task added no executable weapon, missile, seeker or countermeasure code.
 
 This directory defines weapon products and their installed component profiles. It does not own duplicate copies of propulsion, ballistics, sensor, guidance, rigid-body, collision, armour or damage algorithms.
 
-## Current executable kernel
+## Planned subsystem architecture (documentation only)
 
-- `game/src/weapons/MissileRuntime.ts`: post-launch phase, guidance-law selection, externally supplied seeker state, fuze arming/event gate and maximum-flight-time self-destruct.
-- `game/src/physics/ballistics/MissileDynamics.ts`: deterministic translational 3-DoF dynamics, staged constant or time-varying motor thrust/flow profile, propellant mass flow, Mach-dependent drag, dynamic-pressure-limited normal force, induced drag and control lag/jerk/G limits.
-- `game/src/physics/ballistics/Missile6DofDynamics.ts`: six-degree rigid-body translation/rotation, quaternion attitude, body-rate/gyroscopic coupling, Mach-interpolated force/moment coefficients, fin actuators, moving CG/inertia, aerodynamic/thrust moment arms and structural normal-load limits.
-- `game/src/physics/guidance/Missile6DofController.ts` plus `game/src/weapons/Missile6DofSimulation.ts`: guidance acceleration → body-axis force demand → fin commands → 6-DoF body integration.
-- `game/src/sensors/weapon-seeker/CountermeasurePhysics.ts`: dynamic flare thermal emission/cooling, band-resolved IR observation and wind-dispersed chaff radar return.
-- `game/src/sensors/weapon-seeker/RadarMissileSeeker.ts`: active/semi-active seeker RF link budget, external illumination dependency, range/Doppler gates and noisy measurements; no target-state leakage on missed detection.
-- `game/src/weapons/MissileNavigation.ts`: inertial drift/uncertainty growth, seeded accelerometer noise/bias, gated GNSS/datalink correction and uncertain target-track composition for guidance.
-- `game/src/physics/guidance/GuidanceLaws.ts`: PN, APN and pure-pursuit calculations from uncertain state estimates.
-- `game/src/sensors/weapon-seeker/SeekerRuntime.ts` and `SeekerDiscrimination.ts`: gimbal, dwell, track memory/coast, feature-envelope discrimination and resource dependencies.
+A future weapon package is expected to reference reusable, independently owned modules for:
 
-These are general numerical kernels. They do not supply verified AIM-9M/AIM-120C/R-27/R-73 values, seeker calibration, 6-DoF aerodynamics, fuze/warhead fragmentation, exact countermeasure susceptibility or aircraft/launcher release integration. Variant data must remain separate, sourced and explicitly quality-labelled.
+- Missile post-launch lifecycle and phase transitions.
+- 3-DoF and 6-DoF body/trajectory dynamics, with a declared fidelity tier and explicit aerodynamic/motor data.
+- Guidance laws, navigation estimate and bounded autopilot/fin actuator control.
+- Seeker hardware and processing: active radar, semi-active radar, IR/imaging IR, EO/laser, passive RF or command guidance as fitted.
+- Seeker acquisition, gimbal/scan, track memory, coast/reacquisition and failure states.
+- Countermeasure physical models and evidence-based discrimination.
+- Fuze, safe/arm logic, warhead and damage-effect model.
+- Launcher/station compatibility, release impulse, separation and carrier interface.
+
+These are planned boundaries and responsibilities, not current runtime modules. Their data must remain variant-specific, sourced and quality-labelled.
 
 ## Research references
 
