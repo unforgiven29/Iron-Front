@@ -37,7 +37,7 @@ Do not describe or build on these as though they already exist:
 - Module manifest validation/loading, capability resolution, dependency graph, module lifecycle and runtime composition.
 - Deterministic event dispatcher/journal, multi-rate scheduler, entity store, resource allocator, diagnostics service, persistence, replay and complete spatial services.
 - Six-degree-of-freedom aircraft flight model, aerodynamic surface integration, propulsion simulation, flight controls/actuators, ground handling or aircraft-specific system networks.
-- Complete environment/atmosphere and terrain/collision runtime. Limited sampled-profile terrain LOS and coefficient-driven attenuation exist for radar echo screening, but there is no complete environment-coupled propagation service, terrain tile sampling, refraction/ducting/multipath/weather field, distributed clutter model, calibrated detector, RWR ESM tracker/alerts, IRST/EO, sensor fusion or aircraft datalink runtime.
+- Complete environment/atmosphere and terrain/collision runtime, RF propagation, radar waveform/receiver/processing/detection/tracking chain, RWR/ESM and passive emitter tracking, IRST/EO, sensor fusion or aircraft datalink runtime. Radar/ESM README files describe intended ownership only.
 - Aircraft installations, accurate clickable cockpits, startup procedures, operational aircraft, complete missile variant data, validated 6-DoF coefficient tables, full pulse-IQ radar missile seeker, calibrated monopulse seeker/CM susceptibility, fuze/warhead effects, ground units, infantry, naval units, AI, logistics or campaign simulation.
 - A production 3D renderer, audio engine, asset pipeline or persistent authoritative multiplayer backend.
 
@@ -63,9 +63,9 @@ The flight-model specification now has dedicated owner guides for unsteady aerod
 
 **Stage 0.5 — Foundation hardening is complete and CI-verified on `main` as of 21 November 2026.** The successful [GitHub Actions quality run](https://github.com/unforgiven29/Iron-Front/actions/runs/44963589879) passed lint, TypeScript, schema validation, unit tests, production build and Playwright browser smoke tests.
 
-**Implementation exception:** at the user's explicit request, isolated radar and missile numerical kernels have now been added under `game/src/` with unit tests. This is deliberately early, bounded domain work; it does **not** complete Stage 1, Stage 5 sensors/EW or Stage 6 weapons, and it does not authorize aircraft/platform integration ahead of the roadmap gates. Treat the new code as reusable algorithm slices, not as a playable radar/missile suite. Their current limits are recorded in the owning READMEs.
+**Radar/missile scope update:** this task is documentation-only. Runtime code and tests mistakenly added during the task have been removed. The remaining source-area README files are folder markers and architecture guides; they must not be treated as evidence of implemented radar, missile, seeker, guidance, countermeasure or ESM behavior.
 
-The next permitted foundation work remains **Stage 1 — Runtime contracts and core services**. Do not attach these kernels to aircraft, campaign entities, UI or authoritative simulation scheduling before the Stage 1 exit criteria pass. After the foundation, complete the F-16C Block 50 as the first aircraft vertical slice, then use the MiG-29 product 9.13 as a second, independent flight-model proof.
+The project remains at the previously documented foundation stage. Implementation order and stage gates remain governed by the roadmap and implementation workflow.
 
 ### Stage 0.5 — completed foundation hardening
 
