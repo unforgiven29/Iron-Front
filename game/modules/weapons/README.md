@@ -11,6 +11,7 @@ This directory defines weapon products and their installed component profiles. I
 - `game/src/physics/ballistics/Missile6DofDynamics.ts`: six-degree rigid-body translation/rotation, quaternion attitude, body-rate/gyroscopic coupling, Mach-interpolated force/moment coefficients, fin actuators, moving CG/inertia, aerodynamic/thrust moment arms and structural normal-load limits.
 - `game/src/physics/guidance/Missile6DofController.ts` plus `game/src/weapons/Missile6DofSimulation.ts`: guidance acceleration → body-axis force demand → fin commands → 6-DoF body integration.
 - `game/src/sensors/weapon-seeker/CountermeasurePhysics.ts`: dynamic flare thermal emission/cooling, band-resolved IR observation and wind-dispersed chaff radar return.
+- `game/src/sensors/weapon-seeker/RadarMissileSeeker.ts`: active/semi-active seeker RF link budget, external illumination dependency, range/Doppler gates and noisy measurements; no target-state leakage on missed detection.
 - `game/src/weapons/MissileNavigation.ts`: inertial drift/uncertainty growth, seeded accelerometer noise/bias, gated GNSS/datalink correction and uncertain target-track composition for guidance.
 - `game/src/physics/guidance/GuidanceLaws.ts`: PN, APN and pure-pursuit calculations from uncertain state estimates.
 - `game/src/sensors/weapon-seeker/SeekerRuntime.ts` and `SeekerDiscrimination.ts`: gimbal, dwell, track memory/coast, feature-envelope discrimination and resource dependencies.
