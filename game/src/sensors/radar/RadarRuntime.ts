@@ -1,7 +1,6 @@
 import {
   BOLTZMANN_CONSTANT_J_PER_K,
   SPEED_OF_LIGHT_MPS,
-  evaluateAntennaGainDb,
   type AntennaPatternProfile
 } from "../../physics/radar/RadarPhysics.js";
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
@@ -275,11 +274,6 @@ export function synthesizeRangeDopplerFrame(
       echo.rangeM < 0 || echo.receivedPowerW < 0) {
       throw new RangeError("Radar scene return is invalid.");
     }
-    const azimuthError = echo.azimuthDeg - scene.beamAzimuthDeg;
-    const elevationError = echo.elevationDeg - scene.beamElevationDeg;
-    const transmitReceivePatternGainDb =
-      evaluateAntennaGainDb(equipment.antenna, azimuthError, elevationError) -
-      equipment.antenna.peakGainDb;
     const rangeBin = Math.round((echo.rangeM - rangeStartM) / derived.rangeResolutionM);
     let foldedVelocity = echo.rangeRateMps;
     const ambiguityVelocity = 2 * derived.unambiguousRadialVelocityMps;
@@ -292,9 +286,8 @@ export function synthesizeRangeDopplerFrame(
     );
     if (rangeBin < 0 || rangeBin >= equipment.rangeBinCount ||
       dopplerBin < 0 || dopplerBin >= equipment.dopplerBinCount) continue;
-    const antennaPowerFactor = 10 ** (2 * transmitReceivePatternGainDb / 10);
-    const signalPowerW = echo.receivedPowerW * antennaPowerFactor *
-      transmitterPowerFraction * pulses;
+    // PhysicalRadarEcho already includes two-way transmit/receive antenna gain.
+    const signalPowerW = echo.receivedPowerW * transmitterPowerFraction * pulses;
     const primaryIndex = rangeBin * equipment.dopplerBinCount + dopplerBin;
     powerBuffer[primaryIndex] = powerBuffer[primaryIndex]! + signalPowerW;
     const leakageFraction = equipment.waveform.family === "pulse-doppler" ? 0.08 : 0.02;
