@@ -1,6 +1,6 @@
 # Ballistics and projectile trajectory physics
 
-**Owner:** physics/ballistics. **Status:** architecture only; no general ballistic solver is implemented.
+**Owner:** physics/ballistics. **Status:** an initial deterministic 3-DoF missile point-mass integrator is in `game/src/physics/ballistics/MissileDynamics.ts`, including staged thrust/mass flow, Mach drag, wind/gravity and bounded normal-acceleration response. This is not a general projectile library or a 6-DoF missile/body solver.
 
 **Research:** [Weapons, ballistics and effects reference guide](../../docs/reference-library/weapons-ballistics-and-effects.md) provides guidance, small-arms and test-standard references with explicit cautions about model class, variant applicability and simulator-only data.
 
