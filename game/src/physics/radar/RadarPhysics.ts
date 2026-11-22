@@ -39,6 +39,69 @@ export interface RadarEchoPower {
   readonly freeSpacePathLossDb: number;
 }
 
+export interface PhysicalRadarEchoRequest {
+  readonly transmitPowerW: number;
+  readonly frequencyHz: number;
+  readonly antenna: AntennaPatternProfile;
+  readonly targetRcsByAspect: readonly RcsAspectSample[];
+  readonly targetAspectDeg: number;
+  readonly rangeM: number;
+  /** Positive range rate is receding. */
+  readonly rangeRateMps: number;
+  readonly azimuthDeg: number;
+  readonly elevationDeg: number;
+  readonly beamAzimuthDeg: number;
+  readonly beamElevationDeg: number;
+  readonly oneWayPathTransmission?: number;
+  readonly systemLossLinear?: number;
+  readonly swerlingModel?: SwerlingModel;
+  readonly random?: SeededRandom;
+}
+
+export interface PhysicalRadarEcho {
+  /** No entity ID is carried across the RF measurement boundary. */
+  readonly rangeM: number;
+  readonly rangeRateMps: number;
+  readonly azimuthDeg: number;
+  readonly elevationDeg: number;
+  readonly receivedPowerW: number;
+  readonly meanRcsM2: number;
+  readonly sampledRcsM2: number;
+  readonly roundTripTimeSeconds: number;
+  readonly dopplerHz: number;
+  readonly wavelengthM: number;
+  readonly freeSpacePathLossDb: number;
+}
+
+export interface RadarJammerEmission {
+  readonly transmitPowerW: number;
+  readonly transmitGainDb: number;
+  readonly centerFrequencyHz: number;
+  readonly bandwidthHz: number;
+  readonly rangeM: number;
+  readonly azimuthDeg: number;
+  readonly elevationDeg: number;
+  readonly oneWayPathTransmission?: number;
+}
+
+export interface RadarInterferenceRequest {
+  readonly receiverCenterFrequencyHz: number;
+  readonly receiverBandwidthHz: number;
+  readonly receiverAntenna: AntennaPatternProfile;
+  readonly receiverBeamAzimuthDeg: number;
+  readonly receiverBeamElevationDeg: number;
+  readonly receiverSystemLossLinear?: number;
+  readonly jammers: readonly RadarJammerEmission[];
+}
+
+export interface RadarInterferenceResult {
+  readonly totalReceivedPowerW: number;
+  readonly contributions: readonly {
+    readonly receivedPowerW: number;
+    readonly spectralOverlapFraction: number;
+  }[];
+}
+
 function assertFinitePositive(value: number, name: string): void {
   if (!Number.isFinite(value) || value <= 0) {
     throw new RangeError(name + " must be finite and greater than zero.");
@@ -201,4 +264,122 @@ export function computeMonostaticDopplerHz(rangeRateMps: number, wavelengthM: nu
 export function computeRoundTripTimeSeconds(rangeM: number): number {
   assertFiniteNonNegative(rangeM, "Range");
   return (2 * rangeM) / SPEED_OF_LIGHT_MPS;
+}
+
+
+function signedAngleDifferenceDeg(angleDeg: number, referenceDeg: number): number {
+  let difference = (angleDeg - referenceDeg) % 360;
+  if (difference > 180) difference -= 360;
+  if (difference < -180) difference += 360;
+  return difference;
+}
+
+/**
+ * Converts an aspect-dependent physical target response into an RF echo.
+ * Peak antenna gain and off-axis pattern are both applied in the radar equation;
+ * the returned sample contains no target identity.
+ */
+export function computePhysicalRadarEcho(
+  request: PhysicalRadarEchoRequest
+): PhysicalRadarEcho {
+  if (!Number.isFinite(request.rangeRateMps) ||
+    ![request.azimuthDeg, request.elevationDeg, request.beamAzimuthDeg, request.beamElevationDeg].every(Number.isFinite) ||
+    request.elevationDeg < -90 || request.elevationDeg > 90 ||
+    request.beamElevationDeg < -90 || request.beamElevationDeg > 90) {
+    throw new RangeError("Radar echo geometry is invalid.");
+  }
+  const azimuthOffAxis = signedAngleDifferenceDeg(request.azimuthDeg, request.beamAzimuthDeg);
+  const elevationOffAxis = request.elevationDeg - request.beamElevationDeg;
+  const gainDb = evaluateAntennaGainDb(request.antenna, azimuthOffAxis, elevationOffAxis);
+  const meanRcsM2 = evaluateAspectRcsM2(request.targetRcsByAspect, request.targetAspectDeg);
+  const sampledRcsM2 = request.swerlingModel
+    ? sampleSwerlingRcsM2(meanRcsM2, request.swerlingModel, requireRandom(request.random))
+    : meanRcsM2;
+  const link = computeMonostaticEchoPower({
+    transmitPowerW: request.transmitPowerW,
+    transmitGainDb: gainDb,
+    receiveGainDb: gainDb,
+    frequencyHz: request.frequencyHz,
+    rcsM2: sampledRcsM2,
+    rangeM: request.rangeM,
+    ...(request.oneWayPathTransmission === undefined ? {} : {
+      oneWayPathTransmission: request.oneWayPathTransmission
+    }),
+    ...(request.systemLossLinear === undefined ? {} : {
+      systemLossLinear: request.systemLossLinear
+    })
+  });
+  return {
+    rangeM: request.rangeM,
+    rangeRateMps: request.rangeRateMps,
+    azimuthDeg: request.azimuthDeg,
+    elevationDeg: request.elevationDeg,
+    receivedPowerW: link.receivedPowerW,
+    meanRcsM2,
+    sampledRcsM2,
+    roundTripTimeSeconds: link.roundTripTimeSeconds,
+    dopplerHz: computeMonostaticDopplerHz(request.rangeRateMps, link.wavelengthM),
+    wavelengthM: link.wavelengthM,
+    freeSpacePathLossDb: link.freeSpacePathLossDb
+  };
+}
+
+function requireRandom(random: SeededRandom | undefined): SeededRandom {
+  if (!random) throw new RangeError("Swerling fluctuation requires an explicit seeded random stream.");
+  return random;
+}
+
+/**
+ * One-way jammer coupling into the radar receiver. It integrates only spectral
+ * overlap with the receiver passband and applies the radar's receive antenna
+ * pattern, path transmission and receiver loss.
+ */
+export function computeRadarInterference(
+  request: RadarInterferenceRequest
+): RadarInterferenceResult {
+  assertFinitePositive(request.receiverCenterFrequencyHz, "Receiver center frequency");
+  assertFinitePositive(request.receiverBandwidthHz, "Receiver bandwidth");
+  const receiverLower = request.receiverCenterFrequencyHz - request.receiverBandwidthHz / 2;
+  const receiverUpper = request.receiverCenterFrequencyHz + request.receiverBandwidthHz / 2;
+  const systemLoss = request.receiverSystemLossLinear ?? 1;
+  if (!Number.isFinite(systemLoss) || systemLoss < 1 ||
+    ![request.receiverBeamAzimuthDeg, request.receiverBeamElevationDeg].every(Number.isFinite)) {
+    throw new RangeError("Receiver beam geometry or system loss is invalid.");
+  }
+
+  const contributions = request.jammers.map((jammer) => {
+    assertFinitePositive(jammer.transmitPowerW, "Jammer transmit power");
+    assertFinitePositive(jammer.centerFrequencyHz, "Jammer center frequency");
+    assertFinitePositive(jammer.bandwidthHz, "Jammer bandwidth");
+    assertFinitePositive(jammer.rangeM, "Jammer range");
+    if (![jammer.transmitGainDb, jammer.azimuthDeg, jammer.elevationDeg].every(Number.isFinite)) {
+      throw new RangeError("Jammer geometry and gain must be finite.");
+    }
+    const jammerLower = jammer.centerFrequencyHz - jammer.bandwidthHz / 2;
+    const jammerUpper = jammer.centerFrequencyHz + jammer.bandwidthHz / 2;
+    const overlapHz = Math.max(0, Math.min(receiverUpper, jammerUpper) - Math.max(receiverLower, jammerLower));
+    const spectralOverlapFraction = overlapHz / jammer.bandwidthHz;
+    const pathTransmission = jammer.oneWayPathTransmission ?? 1;
+    if (!Number.isFinite(pathTransmission) || pathTransmission < 0 || pathTransmission > 1) {
+      throw new RangeError("Jammer one-way path transmission must be within [0, 1].");
+    }
+    if (spectralOverlapFraction === 0 || pathTransmission === 0) {
+      return { receivedPowerW: 0, spectralOverlapFraction };
+    }
+    const wavelengthM = SPEED_OF_LIGHT_MPS / jammer.centerFrequencyHz;
+    const receiveGainDb = evaluateAntennaGainDb(
+      request.receiverAntenna,
+      signedAngleDifferenceDeg(jammer.azimuthDeg, request.receiverBeamAzimuthDeg),
+      jammer.elevationDeg - request.receiverBeamElevationDeg
+    );
+    const receivedPowerW = jammer.transmitPowerW * toLinearPowerGain(jammer.transmitGainDb) *
+      toLinearPowerGain(receiveGainDb) * wavelengthM ** 2 *
+      pathTransmission * spectralOverlapFraction /
+      (((4 * Math.PI * jammer.rangeM) ** 2) * systemLoss);
+    return { receivedPowerW, spectralOverlapFraction };
+  });
+  return {
+    totalReceivedPowerW: contributions.reduce((sum, item) => sum + item.receivedPowerW, 0),
+    contributions
+  };
 }
