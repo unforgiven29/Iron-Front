@@ -1,7 +1,6 @@
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
 import {
-  computeMonostaticEchoPower,
-  SPEED_OF_LIGHT_MPS
+  computeMonostaticEchoPower
 } from "./RadarPhysics.js";
 
 export interface SurfaceBackscatterSample {
@@ -145,7 +144,6 @@ export function generateSurfaceClutterReturns(
     !Number.isInteger(configuration.scatterersPerCell) || configuration.scatterersPerCell < 1) {
     throw new RangeError("Surface clutter generation configuration is invalid.");
   }
-  const wavelengthM = SPEED_OF_LIGHT_MPS / model.centerFrequencyHz;
   const sigmaReferenceFrequencyHz = 10e9;
   const frequencyScale = (model.centerFrequencyHz / sigmaReferenceFrequencyHz) ** model.frequencyExponent;
   const returns: SurfaceClutterReturn[] = [];
