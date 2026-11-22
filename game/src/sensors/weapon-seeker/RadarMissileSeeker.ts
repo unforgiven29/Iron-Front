@@ -60,10 +60,6 @@ export interface RadarMissileSeekerCandidate {
   readonly azimuthOffBoresightDeg: number;
   readonly elevationOffBoresightDeg: number;
   readonly pathTransmission: number;
-  readonly angularRateDegPerSecond: number;
-  readonly apparentAngularSizeDeg: number;
-  readonly thermalSpectralRatio: number;
-  readonly thermalDecayRatePerSecond: number;
 }
 
 export interface RadarMissileSeekerRequest {
@@ -141,12 +137,9 @@ function validateCandidate(candidate: RadarMissileSeekerCandidate): void {
   if (!candidate.measurementId ||
     ![candidate.rangeM, candidate.rangeRateMps, candidate.targetAspectDeg,
       candidate.azimuthOffBoresightDeg, candidate.elevationOffBoresightDeg,
-      candidate.pathTransmission, candidate.angularRateDegPerSecond,
-      candidate.apparentAngularSizeDeg, candidate.thermalSpectralRatio,
-      candidate.thermalDecayRatePerSecond].every(Number.isFinite) ||
+      candidate.pathTransmission].every(Number.isFinite) ||
     candidate.rangeM <= 0 || candidate.pathTransmission < 0 ||
-    candidate.pathTransmission > 1 || candidate.apparentAngularSizeDeg < 0 ||
-    candidate.thermalSpectralRatio < 0 || candidate.elevationOffBoresightDeg < -90 ||
+    candidate.pathTransmission > 1 || candidate.elevationOffBoresightDeg < -90 ||
     candidate.elevationOffBoresightDeg > 90) {
     throw new RangeError("Radar seeker candidate observation is invalid.");
   }
