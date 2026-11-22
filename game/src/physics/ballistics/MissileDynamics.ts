@@ -16,6 +16,11 @@ export interface MissileAerodynamicModel {
   readonly referenceAreaM2: number;
   readonly dragCoefficientByMach: readonly MachDragSample[];
   readonly maximumNormalAccelerationG: number;
+  /** Small-disturbance normal-force coefficient slope, per radian. */
+  readonly normalForceCoefficientSlopePerRad: number;
+  readonly maximumAngleOfAttackRad: number;
+  /** Parabolic induced-drag increment: ΔCD = factor × CN². */
+  readonly inducedDragFactor: number;
   readonly controlResponseTimeSeconds: number;
   readonly maximumNormalJerkMps3: number;
   readonly motorStages: readonly MissileMotorStage[];
@@ -50,6 +55,9 @@ export interface MissileFlightDiagnostics {
   readonly thrustN: number;
   readonly normalAccelerationMps2: number;
   readonly normalAccelerationG: number;
+  readonly maximumAerodynamicNormalAccelerationMps2: number;
+  readonly effectiveAngleOfAttackRad: number;
+  readonly normalForceCoefficient: number;
   readonly activeMotorStageIndices: readonly number[];
   readonly dragDataInRange: boolean;
   readonly propellantConsumedKg: number;
@@ -85,7 +93,15 @@ export function stepMissile3Dof(
   }
 
   const dt = input.deltaTimeSeconds;
-  const maximumNormal = model.maximumNormalAccelerationG * 9.80665 * controlAuthority;
+  const airVelocity = subtract(state.velocityWorldMps, environment.windWorldMps);
+  const initialDynamicPressurePa = 0.5 * environment.airDensityKgPerM3 *
+    vectorMagnitude(airVelocity) ** 2;
+  const maximumStructuralNormal = model.maximumNormalAccelerationG * 9.80665;
+  const maximumAerodynamicNormal = initialDynamicPressurePa * model.referenceAreaM2 *
+    model.normalForceCoefficientSlopePerRad * model.maximumAngleOfAttackRad /
+    state.massKg;
+  const maximumNormal = Math.min(maximumStructuralNormal, maximumAerodynamicNormal) *
+    controlAuthority;
   const desiredNormal = clampMagnitude(
     projectPerpendicular(input.commandedAccelerationWorldMps2, airDirection(state.velocityWorldMps, environment.windWorldMps)),
     maximumNormal
@@ -152,6 +168,9 @@ export function stepMissile3Dof(
       thrustN: motorOutput.averageThrustN,
       normalAccelerationMps2: vectorMagnitude(controlAcceleration),
       normalAccelerationG: vectorMagnitude(controlAcceleration) / 9.80665,
+      maximumAerodynamicNormalAccelerationMps2: maximumAerodynamicNormal,
+      effectiveAngleOfAttackRad: midpointAcceleration.effectiveAngleOfAttackRad,
+      normalForceCoefficient: midpointAcceleration.normalForceCoefficient,
       activeMotorStageIndices: motorOutput.activeStageIndices,
       dragDataInRange: midpointAcceleration.dragDataInRange,
       propellantConsumedKg: motorOutput.propellantConsumedKg
@@ -162,6 +181,10 @@ export function stepMissile3Dof(
 function validateModel(model: MissileAerodynamicModel): void {
   if (!Number.isFinite(model.referenceAreaM2) || model.referenceAreaM2 <= 0 ||
     !Number.isFinite(model.maximumNormalAccelerationG) || model.maximumNormalAccelerationG <= 0 ||
+    !Number.isFinite(model.normalForceCoefficientSlopePerRad) || model.normalForceCoefficientSlopePerRad <= 0 ||
+    !Number.isFinite(model.maximumAngleOfAttackRad) || model.maximumAngleOfAttackRad <= 0 ||
+    model.maximumAngleOfAttackRad >= Math.PI / 2 ||
+    !Number.isFinite(model.inducedDragFactor) || model.inducedDragFactor < 0 ||
     !Number.isFinite(model.controlResponseTimeSeconds) || model.controlResponseTimeSeconds < 0 ||
     !Number.isFinite(model.maximumNormalJerkMps3) || model.maximumNormalJerkMps3 <= 0) {
     throw new RangeError("Missile aerodynamic/control model values are invalid.");
@@ -311,6 +334,8 @@ function calculateAcceleration(
   readonly dynamicPressurePa: number;
   readonly dragForceN: number;
   readonly dragDataInRange: boolean;
+  readonly effectiveAngleOfAttackRad: number;
+  readonly normalForceCoefficient: number;
 } {
   const airVelocity = subtract(velocityWorldMps, environment.windWorldMps);
   const speedMps = vectorMagnitude(airVelocity);
@@ -318,12 +343,31 @@ function calculateAcceleration(
   const mach = speedMps / environment.speedOfSoundMps;
   const dynamicPressurePa = 0.5 * environment.airDensityKgPerM3 * speedMps * speedMps;
   const drag = interpolateDragCoefficient(model.dragCoefficientByMach, mach);
-  const dragForceN = dynamicPressurePa * model.referenceAreaM2 * drag.coefficient;
+  const qArea = dynamicPressurePa * model.referenceAreaM2;
+  const normalAccelerationMps2 = vectorMagnitude(normalControlAcceleration);
+  const normalForceCoefficient = qArea > 0
+    ? (massKg * normalAccelerationMps2) / qArea
+    : 0;
+  const effectiveAngleOfAttackRad = Math.min(
+    model.maximumAngleOfAttackRad,
+    normalForceCoefficient / model.normalForceCoefficientSlopePerRad
+  );
+  const totalDragCoefficient = drag.coefficient +
+    model.inducedDragFactor * normalForceCoefficient * normalForceCoefficient;
+  const dragForceN = qArea * totalDragCoefficient;
   const axialAcceleration = thrustN / massKg - dragForceN / massKg;
   const gravity: Vector3 = [0, 0, -environment.gravityMps2];
   const acceleration = add(
     add(scale(direction, axialAcceleration), gravity),
     normalControlAcceleration
   );
-  return { acceleration, mach, dynamicPressurePa, dragForceN, dragDataInRange: drag.inRange };
+  return {
+    acceleration,
+    mach,
+    dynamicPressurePa,
+    dragForceN,
+    dragDataInRange: drag.inRange,
+    effectiveAngleOfAttackRad,
+    normalForceCoefficient
+  };
 }
