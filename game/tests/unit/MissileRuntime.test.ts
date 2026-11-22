@@ -6,6 +6,9 @@ const aero: MissileAerodynamicModel = {
   referenceAreaM2: 0.01,
   dragCoefficientByMach: [{ mach: 0, dragCoefficient: 0.3 }, { mach: 2, dragCoefficient: 0.4 }],
   maximumNormalAccelerationG: 15,
+  normalForceCoefficientSlopePerRad: 10,
+  maximumAngleOfAttackRad: 0.3,
+  inducedDragFactor: 0.05,
   controlResponseTimeSeconds: 0.1,
   maximumNormalJerkMps3: 500,
   motorStages: []
