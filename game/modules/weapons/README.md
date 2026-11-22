@@ -1,8 +1,17 @@
 # Weapon systems — entry point
 
-**Owner:** game/modules/weapons. **Status:** content architecture and documentation; most weapon runtime behavior is not implemented.
+**Owner:** game/modules/weapons. **Status:** product/content architecture remains the owner; early reusable post-launch kernels now exist in `game/src/weapons/MissileRuntime.ts`, `game/src/physics/ballistics/MissileDynamics.ts`, `game/src/physics/guidance/GuidanceLaws.ts` and `game/src/sensors/weapon-seeker/`. No complete aircraft-installed weapon package or real missile variant fit is yet integrated.
 
 This directory defines weapon products and their installed component profiles. It does not own duplicate copies of propulsion, ballistics, sensor, guidance, rigid-body, collision, armour or damage algorithms.
+
+## Current executable kernel
+
+- `game/src/weapons/MissileRuntime.ts`: post-launch phase, guidance-law selection, externally supplied seeker state, fuze arming/event gate and maximum-flight-time self-destruct.
+- `game/src/physics/ballistics/MissileDynamics.ts`: deterministic translational 3-DoF dynamics, staged motor profile, propellant mass flow, Mach-dependent drag and control lag/jerk/G limits.
+- `game/src/physics/guidance/GuidanceLaws.ts`: PN, APN and pure-pursuit calculations from uncertain state estimates.
+- `game/src/sensors/weapon-seeker/SeekerRuntime.ts` and `SeekerDiscrimination.ts`: gimbal, dwell, track memory/coast, feature-envelope discrimination and resource dependencies.
+
+These are general numerical kernels. They do not supply verified AIM-9M/AIM-120C/R-27/R-73 values, seeker calibration, 6-DoF aerodynamics, fuze/warhead fragmentation, exact countermeasure susceptibility or aircraft/launcher release integration. Variant data must remain separate, sourced and explicitly quality-labelled.
 
 ## Research references
 
