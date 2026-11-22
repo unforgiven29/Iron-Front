@@ -1,5 +1,5 @@
 import type { SeededRandom } from "../core/random/SeededRandom.js";
-import type { Vector3 } from "../physics/guidance/GuidanceLaws.js";
+import type { GuidanceStateEstimate, Vector3 } from "../physics/guidance/GuidanceLaws.js";
 
 export type NavigationCorrectionSource = "gnss" | "datalink";
 
@@ -277,4 +277,52 @@ function gaussian(random: SeededRandom): number {
   const first = Math.max(Number.MIN_VALUE, 1 - random.nextFloat());
   const second = random.nextFloat();
   return Math.sqrt(-2 * Math.log(first)) * Math.cos(2 * Math.PI * second);
+}
+
+
+export interface TargetNavigationEstimate {
+  readonly positionWorldM: Vector3;
+  readonly velocityWorldMps: Vector3;
+  readonly measurementAgeSeconds: number;
+  readonly positionStandardDeviationM: number;
+  readonly velocityStandardDeviationMps: number;
+  readonly targetAccelerationEstimateWorldMps2?: Vector3;
+}
+
+/** Combines missile INS uncertainty and an external target-track estimate for guidance. */
+export function composeGuidanceStateEstimate(
+  missileNavigation: MissileNavigationSolution,
+  target: TargetNavigationEstimate,
+  currentTimeSeconds: number
+): GuidanceStateEstimate {
+  validateVector(target.positionWorldM, "Target estimate position");
+  validateVector(target.velocityWorldMps, "Target estimate velocity");
+  if (!Number.isFinite(currentTimeSeconds) || currentTimeSeconds < 0 ||
+    !Number.isFinite(target.measurementAgeSeconds) || target.measurementAgeSeconds < 0 ||
+    !Number.isFinite(target.positionStandardDeviationM) || target.positionStandardDeviationM < 0 ||
+    !Number.isFinite(target.velocityStandardDeviationMps) || target.velocityStandardDeviationMps < 0) {
+    throw new RangeError("Target navigation estimate metadata is invalid.");
+  }
+  if (target.targetAccelerationEstimateWorldMps2) {
+    validateVector(target.targetAccelerationEstimateWorldMps2, "Target acceleration estimate");
+  }
+  return {
+    missilePositionWorldM: missileNavigation.positionWorldM,
+    missileVelocityWorldMps: missileNavigation.velocityWorldMps,
+    targetPositionEstimateWorldM: target.positionWorldM,
+    targetVelocityEstimateWorldMps: target.velocityWorldMps,
+    estimateTimeSeconds: currentTimeSeconds,
+    measurementAgeSeconds: target.measurementAgeSeconds,
+    positionStandardDeviationM: Math.hypot(
+      missileNavigation.positionStandardDeviationM,
+      target.positionStandardDeviationM
+    ),
+    velocityStandardDeviationMps: Math.hypot(
+      missileNavigation.velocityStandardDeviationMps,
+      target.velocityStandardDeviationMps
+    ),
+    ...(target.targetAccelerationEstimateWorldMps2 === undefined ? {} : {
+      targetAccelerationEstimateWorldMps2: target.targetAccelerationEstimateWorldMps2
+    })
+  };
 }
