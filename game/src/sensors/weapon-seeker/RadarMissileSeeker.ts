@@ -2,7 +2,6 @@ import type { SeededRandom } from "../../core/random/SeededRandom.js";
 import {
   BOLTZMANN_CONSTANT_J_PER_K,
   computeMonostaticDopplerHz,
-  computeMonostaticEchoPower,
   computePhysicalRadarEcho,
   type AntennaPatternProfile,
   type PhysicalRadarEchoRequest
