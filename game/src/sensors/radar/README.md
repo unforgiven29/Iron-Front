@@ -13,6 +13,8 @@ This is the executable TypeScript source for radar equipment and processing. Req
 | `RadarScheduler.ts` | Stable priority scheduling with mechanical slew, electronic settling and finite AESA channel/T/R-module capacity |
 | `AesaArray.ts` | Finite planar array factor with phase error, element weights and individual module health |
 | `RadarSystem.ts` | Composes radar power/thermal state, selected frame-generation path, CFAR and track update |
+| `AesaRadarIntegration.ts` | Couples transmit/receive planar AESA array factors into physical echo power |
+| `../../physics/radar/RadarClutter.ts` | Generates profile-driven, distributed surface-clutter returns with platform/wind Doppler spread |
 | `../esm/RwrRuntime.ts` and `../esm/RwrTracking.ts` | Passive radar interception, nose-relative bearing, RF pulse-trait/signature classification and bearing-only new/established/coasting tracks |
 
 Shared RF equations and target/interference boundary: `game/src/physics/radar/RadarPhysics.ts`. Limited terrain/refraction and atmospheric screening models are in `game/src/physics/radar/RadarPropagation.ts`.
