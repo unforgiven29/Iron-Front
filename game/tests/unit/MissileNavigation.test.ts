@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createScopedRandom } from "../../src/core/random/SeededRandom.js";
 import {
+  composeGuidanceStateEstimate,
   createMissileNavigationState,
   stepMissileNavigation,
   type MissileNavigationModel
@@ -46,6 +47,25 @@ describe("missile inertial navigation and corrections", () => {
     expect(result.solution.correctionSource).toBe("datalink");
     expect(result.state.positionVarianceM2).toBeLessThan(initial.positionVarianceM2);
     expect(result.state.velocityVarianceM2PerS2).toBeLessThan(initial.velocityVarianceM2PerS2);
+  });
+
+  it("combines inertial and target-track uncertainty without exposing world truth", () => {
+    const initial = createMissileNavigationState([0, 0, 0], [300, 0, 0], 3, 1, 2);
+    const navigation = stepMissileNavigation(initial, model, {
+      deltaTimeSeconds: 0.1,
+      measuredInertialAccelerationWorldMps2: [0, 0, 0]
+    }, createScopedRandom(2, "ins-guidance"));
+    const guidanceEstimate = composeGuidanceStateEstimate(navigation.solution, {
+      positionWorldM: [1000, 5000, 100],
+      velocityWorldMps: [50, 250, 0],
+      measurementAgeSeconds: 0.1,
+      positionStandardDeviationM: 8,
+      velocityStandardDeviationMps: 2
+    }, 2.1);
+    expect(guidanceEstimate.estimateTimeSeconds).toBe(2.1);
+    expect(guidanceEstimate.measurementAgeSeconds).toBe(0.1);
+    expect(guidanceEstimate.positionStandardDeviationM).toBeGreaterThan(8);
+    expect(guidanceEstimate.velocityStandardDeviationMps).toBeGreaterThan(2);
   });
 
   it("rejects unavailable, stale and implausible updates rather than resetting navigation", () => {
