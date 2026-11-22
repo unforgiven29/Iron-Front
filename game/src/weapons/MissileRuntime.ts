@@ -132,16 +132,25 @@ export function stepMissileRuntime(
   const flight = flightStep.state;
   const distanceTravelledM = previous.distanceTravelledM +
     distance(flight.positionWorldM, previous.flight.positionWorldM);
-  const fuzeArmed = flight.elapsedFlightSeconds >= model.fuze.armingDelaySeconds &&
-    distanceTravelledM >= model.fuze.armingDistanceM;
-  const fuzeTriggered = fuzeArmed && input.fuzeEvent !== undefined &&
-    Number.isFinite(input.fuzeEvent.eventTimeSeconds) &&
-    Number.isFinite(input.fuzeEvent.missDistanceM) &&
-    Number.isFinite(input.fuzeEvent.confidence) &&
-    input.fuzeEvent.eventTimeSeconds <= flight.elapsedFlightSeconds + 1e-9 &&
-    input.fuzeEvent.eventTimeSeconds >= previous.flight.elapsedFlightSeconds - 1e-9 &&
-    input.fuzeEvent.confidence >= model.fuze.minimumEventConfidence &&
-    (input.fuzeEvent.kind === "impact" || input.fuzeEvent.missDistanceM <= model.fuze.proximityRadiusM);
+  const event = input.fuzeEvent;
+  const eventWithinStep = event !== undefined &&
+    Number.isFinite(event.eventTimeSeconds) &&
+    Number.isFinite(event.missDistanceM) &&
+    Number.isFinite(event.confidence) &&
+    event.missDistanceM >= 0 && event.confidence >= 0 && event.confidence <= 1 &&
+    event.eventTimeSeconds <= flight.elapsedFlightSeconds + 1e-9 &&
+    event.eventTimeSeconds >= previous.flight.elapsedFlightSeconds - 1e-9;
+  const eventFraction = eventWithinStep
+    ? Math.max(0, Math.min(1,
+      (event.eventTimeSeconds - previous.flight.elapsedFlightSeconds) / input.deltaTimeSeconds))
+    : 0;
+  const distanceTravelledAtEventM = previous.distanceTravelledM +
+    distance(flight.positionWorldM, previous.flight.positionWorldM) * eventFraction;
+  const fuzeArmedAtEvent = eventWithinStep && event!.eventTimeSeconds >= model.fuze.armingDelaySeconds &&
+    distanceTravelledAtEventM >= model.fuze.armingDistanceM;
+  const fuzeTriggered = fuzeArmedAtEvent &&
+    event!.confidence >= model.fuze.minimumEventConfidence &&
+    (event!.kind === "impact" || event!.missDistanceM <= model.fuze.proximityRadiusM);
 
   const selfDestructed = !fuzeTriggered && flight.elapsedFlightSeconds >= model.fuze.maximumFlightTimeSeconds;
   const motorActive = flightStep.diagnostics.activeMotorStageIndices.length > 0 &&
