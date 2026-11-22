@@ -43,8 +43,9 @@ describe("pulse-by-pulse complex radar simulation", () => {
     const strongestDopplerBin = row.indexOf(Math.max(...row));
     const measuredRadialVelocity = result.frame.radialVelocityStartMps +
       strongestDopplerBin * result.frame.radialVelocityResolutionMps;
-    expect(result.frame.rangeStartM + targetRangeBin * result.frame.rangeResolutionM)
-      .toBeCloseTo(3000, -1);
+    expect(result.frame.rangeStartM + targetRangeBin * (result.frame.rangeBinSpacingM ?? result.frame.rangeResolutionM))
+      .toBeCloseTo(2997.92458, 3);
+    expect(result.frame.rangeResolutionM).toBeCloseTo(599.584916, 3);
     expect(measuredRadialVelocity).toBeGreaterThan(0);
     expect(measuredRadialVelocity).toBeCloseTo(1, 0);
   });
