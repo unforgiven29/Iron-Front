@@ -292,7 +292,7 @@ export function computePhysicalRadarEcho(
   const elevationOffAxis = request.elevationDeg - request.beamElevationDeg;
   const gainDb = evaluateAntennaGainDb(request.antenna, azimuthOffAxis, elevationOffAxis);
   const meanRcsM2 = evaluateAspectRcsM2(request.targetRcsByAspect, request.targetAspectDeg);
-  const sampledRcsM2 = request.swerlingModel
+  const sampledRcsM2 = request.swerlingModel && request.swerlingModel !== "swerling-0"
     ? sampleSwerlingRcsM2(meanRcsM2, request.swerlingModel, requireRandom(request.random))
     : meanRcsM2;
   const link = computeMonostaticEchoPower({
