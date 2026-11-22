@@ -52,16 +52,11 @@ const candidate = {
   thermalDecayRatePerSecond: 0
 } as const;
 
-const baseRequest: Omit<RadarMissileSeekerRequest, "random"> = {
-  mode: "active",
+const baseRequest = {
+  mode: "active" as const,
   waveform,
   receiver,
   candidate,
-  activeTransmitter: {
-    peakPowerW: 1000,
-    systemLossLinear: 2,
-    oneWayPathTransmission: 0.9
-  },
   timeSeconds: 2
 };
 
@@ -69,6 +64,11 @@ describe("active and semi-active radar missile seeker front end", () => {
   it("detects an active radar return and provides only noisy measurements", () => {
     const result = measureRadarMissileSeeker({
       ...baseRequest,
+      activeTransmitter: {
+        peakPowerW: 1000,
+        systemLossLinear: 2,
+        oneWayPathTransmission: 0.9
+      },
       random: createScopedRandom(12, "active-seeker")
     });
     expect(result.detection).toBe(true);
@@ -103,7 +103,6 @@ describe("active and semi-active radar missile seeker front end", () => {
     const illuminated = measureRadarMissileSeeker({
       ...baseRequest,
       mode: "semi-active",
-      activeTransmitter: undefined,
       targetToSeekerRangeM: 5000,
       semiActiveIllumination: {
         available: true,
