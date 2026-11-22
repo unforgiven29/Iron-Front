@@ -1,6 +1,6 @@
 # Shared Radar Physics
 
-**Status:** Initial shared RF kernels are implemented in `game/src/physics/radar/RadarPhysics.ts`: antenna-pattern envelope, aspect-table RCS interpolation, Swerling 0/1/3 fluctuation, monostatic radar equation, Doppler, round-trip delay and spectral jammer coupling. The `physics/radar/` tree remains the requirements owner; terrain LOS, refraction, weather/multipath, distributed clutter and full electromagnetic scattering are not yet implemented.
+**Status:** Initial shared RF kernels are implemented in `game/src/physics/radar/RadarPhysics.ts`: antenna-pattern envelope, aspect-table RCS interpolation, Swerling 0/1/3 fluctuation, monostatic radar equation, Doppler, round-trip delay, spectral jammer coupling and an environment-coupled echo boundary. `game/src/physics/radar/RadarPropagation.ts` adds sampled terrain/effective-Earth-radius LOS, first-Fresnel screening, knife-edge loss and coefficient-driven one-way gas/rain/cloud/fog/foliage attenuation. The `physics/radar/` tree remains the requirements owner. Terrain tile sampling, measured refractivity/ducting, multipath, urban/vegetation interaction, distributed clutter and full-wave scattering are not yet implemented.
 
 ## Purpose
 `sensors/Radar/` represents radar equipment and its processing chain. `physics/radar/` represents reusable models of geometry, propagation, target scattering and environmental clutter. This prevents every radar/aircraft from implementing incompatible environment models.
