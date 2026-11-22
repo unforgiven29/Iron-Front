@@ -33,7 +33,8 @@ export interface RadarEquipmentConfiguration {
   /** Optional sample-level pulse-Doppler path; omitted for the faster reduced-order frame model. */
   readonly pulseDomain?: Omit<PulseDopplerWaveform,
     "centerFrequencyHz" | "pulseWidthSeconds" | "pulseRepetitionIntervalSeconds" |
-    "coherentPulseCount" | "rangeBinCount"> & {
+    "coherentPulseCount" | "rangeBinCount" | "receiverNoisePowerPerComplexSampleW" |
+    "interferencePowerPerComplexSampleW"> & {
       readonly coherentPulseCount: number;
       readonly rangeBinCount: number;
     };
