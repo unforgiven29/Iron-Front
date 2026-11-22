@@ -96,13 +96,6 @@ export interface Missile6DofStepResult {
   readonly diagnostics: Missile6DofDiagnostics;
 }
 
-interface QuaternionComponents {
-  readonly x: number;
-  readonly y: number;
-  readonly z: number;
-  readonly w: number;
-}
-
 interface ForceMomentSolution {
   readonly forceBodyN: Vector3;
   readonly aerodynamicForceBodyN: Vector3;
@@ -369,6 +362,35 @@ function validateModel(model: Missile6DofModel): void {
   if (model.zeroLiftDragMachTable.length < 2) {
     throw new RangeError("6-DoF missile model requires at least two aerodynamic Mach samples.");
   }
+  let previousStageEnd = -Infinity;
+  for (const stage of model.motorStages) {
+    if (![stage.startTimeSeconds, stage.endTimeSeconds, stage.thrustN,
+      stage.massFlowKgPerSecond].every(Number.isFinite) ||
+      stage.startTimeSeconds < 0 || stage.endTimeSeconds <= stage.startTimeSeconds ||
+      stage.startTimeSeconds < previousStageEnd || stage.thrustN < 0 ||
+      stage.massFlowKgPerSecond < 0) {
+      throw new RangeError("6-DoF motor stages must be ordered and physically non-negative.");
+    }
+    if (stage.thrustCurve) {
+      if (stage.thrustCurve.length < 2 ||
+        stage.thrustCurve[0]!.timeSinceStageStartSeconds !== 0 ||
+        Math.abs(stage.thrustCurve[stage.thrustCurve.length - 1]!.timeSinceStageStartSeconds -
+          (stage.endTimeSeconds - stage.startTimeSeconds)) > 1e-9) {
+        throw new RangeError("Motor thrust curve must span the complete motor stage.");
+      }
+      let previousCurveTime = -Infinity;
+      for (const point of stage.thrustCurve) {
+        if (![point.timeSinceStageStartSeconds, point.thrustN,
+          point.massFlowKgPerSecond].every(Number.isFinite) ||
+          point.timeSinceStageStartSeconds <= previousCurveTime ||
+          point.thrustN < 0 || point.massFlowKgPerSecond < 0) {
+          throw new RangeError("Motor thrust curve values must be ordered and non-negative.");
+        }
+        previousCurveTime = point.timeSinceStageStartSeconds;
+      }
+    }
+    previousStageEnd = stage.endTimeSeconds;
+  }
   let previousMach = -Infinity;
   for (const sample of model.zeroLiftDragMachTable) {
     const values = Object.values(sample);
@@ -559,8 +581,6 @@ export function stepMissile6Dof(
   };
   const midpoint = solveDynamics(midpointState, model, environment, finDeflections,
     motor.thrustN, propellantAfterStep);
-  const accelerationMagnitude = magnitude(midpoint.accelerationWorldMps2);
-  const _unusedAccelerationMagnitude = accelerationMagnitude;
   const velocityWorldMps = add(
     previous.velocityWorldMps,
     scale(midpoint.accelerationWorldMps2, dt)
