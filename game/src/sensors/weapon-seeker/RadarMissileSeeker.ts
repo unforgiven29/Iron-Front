@@ -163,7 +163,7 @@ function computeSemiActiveReceivedPower(
     !Number.isFinite(illumination.illuminatorTransmitGainDb) ||
     !Number.isFinite(illumination.illuminatorToTargetRangeM) ||
     illumination.illuminatorToTargetRangeM <= 0 ||
-    !Number.isFinite(rangeToSeeker) || rangeToSeeker <= 0 ||
+    rangeToSeeker === undefined || !Number.isFinite(rangeToSeeker) || rangeToSeeker <= 0 ||
     !Number.isFinite(illumination.illuminatorPathTransmission) ||
     illumination.illuminatorPathTransmission < 0 ||
     illumination.illuminatorPathTransmission > 1 ||
