@@ -51,3 +51,6 @@ Claude's annotated technical research index is [docs/reference-library/README.md
 Claude entry point: `CLAUDE.md`. The [Claude project-state page](docs/claude/PROJECT_STATE.md) identifies the actual implementation boundary; the [Claude task router](docs/claude/README.md) selects focused system guides; the [implementation workflow](docs/claude/implementation-workflow.md) defines the coding/test/report process. Setup and commands: `CONTRIBUTING.md`. Node.js 22.13+ and npm are required. Clean install uses `npm ci`. Main validation is `npm run check`; browser smoke tests use `npm run test:e2e`.
 
 Static GitHub Pages supports local client-side simulation and explicit save export/import. Persistent authoritative cooperative campaigns require an external backend. Documentation/folders are not implementation evidence.
+
+
+See [Radar and missile runtime implementation status](docs/radar-missile-runtime-implementation.md) for the implemented simulation kernels, validation tests and remaining integration work.
