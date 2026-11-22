@@ -13,7 +13,7 @@ This is the executable TypeScript source for radar equipment and processing. Req
 | `RadarScheduler.ts` | Stable priority scheduling with mechanical slew, electronic settling and finite AESA channel/T/R-module capacity |
 | `AesaArray.ts` | Finite planar array factor with phase error, element weights and individual module health |
 | `RadarSystem.ts` | Composes radar power/thermal state, selected frame-generation path, CFAR and track update |
-| `../esm/RwrRuntime.ts` | Passive radar interception with tunable frequency band, thermal noise/sensitivity, direction-of-arrival estimate, pulse-trait measurement and signature-library classification |
+| `../esm/RwrRuntime.ts` and `../esm/RwrTracking.ts` | Passive radar interception, nose-relative bearing, RF pulse-trait/signature classification and bearing-only new/established/coasting tracks |
 
 Shared RF equations and target/interference boundary: `game/src/physics/radar/RadarPhysics.ts`. Limited terrain/refraction and atmospheric screening models are in `game/src/physics/radar/RadarPropagation.ts`.
 
@@ -29,7 +29,7 @@ The optional sample-level pulse-Doppler path is selected with `RadarEquipmentCon
 - The sample-level processor is a single-channel complex-baseband model. It does not yet model ADC quantization, receiver compression, phase noise, frequency-agile waveform scheduling, full pulse ambiguity resolution, matched-filter bank optimization or calibrated clutter covariance.
 - The reduced-order frame path is useful for performance tests, but it is not an FFT-derived pulse-Doppler implementation.
 - A sampled-profile terrain LOS check, effective-Earth-radius curvature, first-Fresnel clearance, knife-edge screening and coefficient-driven gas/rain/cloud/fog/foliage attenuation are implemented. They are not a full terrain/environment pipeline: no terrain tile sampling, refractivity profile, ducting, multipath, building/vegetation geometry, distributed land/sea/weather clutter or calibrated diffraction field is integrated.
-- A passive RWR/ESM receiver kernel is implemented in `game/src/sensors/esm/RwrRuntime.ts`; it estimates nose-relative bearing, in-band power/SNR, pulse count and signature-library matches. There is no RWR emitter tracker/alert prioritization, cockpit display, ESM geolocation, angle-difference network, emitter library for real sets or full radar-to-RWR simulation composition yet.
+- A passive RWR/ESM receiver and bearing-only tracker are implemented in `game/src/sensors/esm/`; they estimate nose-relative bearing, in-band power/SNR, pulse traits, signature-library matches, bearing rate and coast state. There is no RWR alert prioritization, cockpit display, ESM geolocation, angle-difference network, validated emitter library or full radar-to-RWR scenario composition yet.
 - The beam scheduler and AESA array model exist as independent kernels but are not yet coupled to RadarSystem's live scan controller or aircraft hardware state.
 - Mechanical and PESA beam scheduling are currently single-beam abstractions; AESA concurrency is bounded by configured channels and healthy module counts, not unlimited.
 - No aircraft-specific radar installation, F-16/MiG equipment profile, cockpit display, startup/BIT sequence, electrical bus or cooling-loop adapter is integrated.
