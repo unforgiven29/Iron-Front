@@ -15,6 +15,8 @@ export interface ThermalEmitterState {
   readonly projectedAreaM2: number;
   readonly emissivity: number;
   readonly temperatureRateKPerSecond: number;
+  readonly azimuthOffBoresightDeg: number;
+  readonly elevationOffBoresightDeg: number;
 }
 
 export interface ThermalSpectralBand {
@@ -93,7 +95,6 @@ export interface ChaffCloudState {
 
 export interface ChaffCloudStepInput {
   readonly deltaTimeSeconds: number;
-  readonly windWorldMps: Vector3;
 }
 
 export interface ChaffCloudRadarReturn {
@@ -122,6 +123,9 @@ function scale(a: Vector3, value: number): Vector3 {
 }
 function magnitude(a: Vector3): number {
   return Math.hypot(a[0], a[1], a[2]);
+}
+function dot(a: Vector3, b: Vector3): number {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 function db10(value: number): number {
   return 10 * Math.log10(Math.max(value, Number.MIN_VALUE));
@@ -280,6 +284,12 @@ export function observeInfraredEmitters(
     const path = paths[emitterIndex]!;
     validateFiniteVector(emitter.positionWorldM, "Thermal emitter position");
     validateFiniteVector(emitter.velocityWorldMps, "Thermal emitter velocity");
+    if (!emitter.measurementId ||
+      !Number.isFinite(emitter.temperatureRateKPerSecond) ||
+      !Number.isFinite(emitter.azimuthOffBoresightDeg) ||
+      !Number.isFinite(emitter.elevationOffBoresightDeg)) {
+      throw new RangeError("Thermal emitter measurement metadata is invalid.");
+    }
     validatePositive(emitter.temperatureK, "Emitter temperature");
     validatePositive(emitter.projectedAreaM2, "Emitter projected area");
     validateFraction(emitter.emissivity, "Emitter emissivity");
@@ -291,8 +301,6 @@ export function observeInfraredEmitters(
     }
     const powers: number[] = [];
     const snrs: number[] = [];
-    const bandRadiances: number[] = [];
-    const bandBackground: number[] = [];
     for (let bandIndex = 0; bandIndex < optics.spectralBands.length; bandIndex += 1) {
       const band = optics.spectralBands[bandIndex]!;
       const transmission = path.atmosphericTransmissionByBand[bandIndex]!;
@@ -316,13 +324,15 @@ export function observeInfraredEmitters(
       const snr = signalPower / optics.detectorNoisePowerW;
       powers.push(signalPower);
       snrs.push(snr);
-      bandRadiances.push(radiance);
-      bandBackground.push(background);
       weakestBandSnrDb = Math.min(weakestBandSnrDb, db10(snr));
     }
 
     const totalPowerW = powers.reduce((sum, value) => sum + value, 0);
-    const angularSizeRad = 2 * Math.atan(Math.sqrt(emitter.projectedAreaM2 / Math.PI) / path.rangeM);
+    if (totalPowerW < optics.minimumSignalPowerW) continue;
+    const physicalAngularSizeRad = 2 * Math.atan(
+      Math.sqrt(emitter.projectedAreaM2 / Math.PI) / path.rangeM
+    );
+    const angularSizeRad = Math.hypot(physicalAngularSizeRad, optics.angularResolutionRad);
     const featureSignalToNoiseDb = db10(totalPowerW / optics.detectorNoisePowerW);
     const strongest = powers[0]! + powers[1]!;
     const spectralRatio = strongest > 0
@@ -330,10 +340,10 @@ export function observeInfraredEmitters(
       : 0;
     observations.push({
       measurementId: emitter.measurementId,
-      azimuthOffBoresightDeg: 0,
-      elevationOffBoresightDeg: 0,
-      azimuthFromBodyDeg: 0,
-      elevationFromBodyDeg: 0,
+      azimuthOffBoresightDeg: emitter.azimuthOffBoresightDeg,
+      elevationOffBoresightDeg: emitter.elevationOffBoresightDeg,
+      azimuthFromBodyDeg: emitter.azimuthOffBoresightDeg,
+      elevationFromBodyDeg: emitter.elevationOffBoresightDeg,
       rangeM: path.rangeM,
       features: {
         signalToNoiseDb: featureSignalToNoiseDb,
@@ -344,9 +354,6 @@ export function observeInfraredEmitters(
       }
     });
     bandSignalPowerW.push(powers);
-    void snrs;
-    void bandRadiances;
-    void bandBackground;
   }
   return {
     observations,
@@ -395,7 +402,6 @@ export function stepChaffCloud(
   validateFiniteVector(previous.positionWorldM, "Chaff cloud position");
   validateFiniteVector(previous.velocityWorldMps, "Chaff cloud velocity");
   validateFiniteVector(environment.windWorldMps, "Wind");
-  validateFiniteVector(input.windWorldMps, "Input wind");
   if (!Number.isFinite(input.deltaTimeSeconds) || input.deltaTimeSeconds <= 0 ||
     !Number.isFinite(environment.gravityMps2) || environment.gravityMps2 < 0 ||
     !Number.isFinite(previous.ageSeconds) || previous.ageSeconds < 0 ||
@@ -406,7 +412,7 @@ export function stepChaffCloud(
   const dt = input.deltaTimeSeconds;
   const wind = input.windWorldMps;
   const coupling = 1 - Math.exp(-dt / model.windCouplingTimeConstantSeconds);
-  const windAcceleration = scale(subtract(wind, previous.velocityWorldMps), coupling / dt);
+  const windAcceleration = scale(subtract(environment.windWorldMps, previous.velocityWorldMps), coupling / dt);
   const acceleration: Vector3 = [
     windAcceleration[0],
     windAcceleration[1],
@@ -452,10 +458,9 @@ export function evaluateChaffCloudRadarReturn(
     (model.resonanceFractionalBandwidth ** 2));
   const particleRcsM2 = model.peakSingleParticleRcsM2 * resonance *
     model.orientationEfficiency;
-  const decay = Math.exp(-state.ageSeconds / model.cloudLifetimeSeconds);
   const effectiveParticleCount = Math.max(0, Math.min(
     state.particleCount,
-    model.initialParticleCount * decay
+    model.initialParticleCount
   ));
   const totalRcsM2 = particleRcsM2 * effectiveParticleCount;
   const rangeRateMps = -dot(state.velocityWorldMps, losUnit);
