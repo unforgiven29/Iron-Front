@@ -1,7 +1,4 @@
-import {
-  worldEnuToBodyFrd,
-  type Vector3
-} from "../../core/coordinates/CoordinateFrames.js";
+import type { Quaternion, Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import {
   sampleMissile6DofAerodynamics,
   type Missile6DofEnvironment,
@@ -55,17 +52,14 @@ export function computeMissile6DofFinCommands(
   }
 
   const relativeAirVelocityWorld = subtract(state.velocityWorldMps, environment.windWorldMps);
-  const relativeAirVelocityBody = worldEnuToBodyFrd({
-    frame: "world.enu",
-    value: relativeAirVelocityWorld
-  }, state.bodyToWorld).value;
+  const relativeAirVelocityBody = rotateWorldToBody(relativeAirVelocityWorld, state.bodyToWorld);
   const airspeed = magnitude(relativeAirVelocityBody);
   const mach = airspeed / environment.speedOfSoundMps;
   const dynamicPressurePa = 0.5 * environment.airDensityKgPerM3 * airspeed ** 2;
-  const desiredBodyAcceleration = worldEnuToBodyFrd({
-    frame: "world.enu",
-    value: desiredAccelerationWorldMps2
-  }, state.bodyToWorld).value;
+  const desiredBodyAcceleration = rotateWorldToBody(
+    desiredAccelerationWorldMps2,
+    state.bodyToWorld
+  );
 
   if (dynamicPressurePa <= controller.lowDynamicPressureCutoffPa ||
     state.massKg <= 0 || model.actuatorAuthorityFraction * controlAuthorityFraction <= 0) {
@@ -156,4 +150,32 @@ function magnitude(vector: Vector3): number {
 }
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+function rotateWorldToBody(vector: Vector3, bodyToWorld: Quaternion): Vector3 {
+  const length = Math.hypot(
+    bodyToWorld[0], bodyToWorld[1], bodyToWorld[2], bodyToWorld[3]
+  );
+  if (!Number.isFinite(length) || length < 1e-12) {
+    throw new RangeError("Missile body attitude quaternion is invalid.");
+  }
+  const qx = -bodyToWorld[0] / length;
+  const qy = -bodyToWorld[1] / length;
+  const qz = -bodyToWorld[2] / length;
+  const qw = bodyToWorld[3] / length;
+  const uv: Vector3 = [
+    qy * vector[2] - qz * vector[1],
+    qz * vector[0] - qx * vector[2],
+    qx * vector[1] - qy * vector[0]
+  ];
+  const uuv: Vector3 = [
+    qy * uv[2] - qz * uv[1],
+    qz * uv[0] - qx * uv[2],
+    qx * uv[1] - qy * uv[0]
+  ];
+  return [
+    vector[0] + 2 * (qw * uv[0] + uuv[0]),
+    vector[1] + 2 * (qw * uv[1] + uuv[1]),
+    vector[2] + 2 * (qw * uv[2] + uuv[2])
+  ];
 }
