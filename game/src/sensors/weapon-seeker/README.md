@@ -7,6 +7,7 @@ The executable seeker-related kernels are kept separate from product-specific mi
 - `SeekerDiscrimination.ts`: scores observed signal, spectral, angular, thermal-decay, kinematic and track-continuity cues against a configurable seeker feature envelope. Outputs uncalibrated relative weights, not real probability of target identity.
 - `SeekerRuntime.ts`: gimbal travel and rate, acquisition dwell, track/coast memory, power/cooling/health, and external illumination/command-link dependency state.
 - `CountermeasurePhysics.ts`: band-integrated Planck radiance, lumped thermal flare cooling/chemical heat input, IR seeker power/features, chaff advection/dispersal/particle depletion and wavelength-dependent cloud RCS.
+- `RadarMissileSeeker.ts`: active and semi-active radar seeker link budgets, illuminator dependency, receiver noise/SNR, pulse-compression/coherent processing, range/Doppler ambiguity gates and noisy range/range-rate/angle measurements. No detection returns null measurements rather than leaking the target's true state.
 
 ## Data boundaries
 
@@ -18,6 +19,6 @@ The seeker sees observations, not hidden entity labels. Target and decoy candida
 - IR propagation is coefficient-driven per band; the model is not a full atmosphere/radiative-transfer solver.
 - The chaff model uses a configurable resonance envelope and incoherent particle-RCS sum. It is not a full electromagnetic scattering solver and does not currently resolve individual dipoles, orientation distributions, polarization or turbulent particle trajectories.
 - Seeker discrimination profile scores are uncalibrated. No AIM-9/ASRAAM/IRIS-T/R-73 or radar-seeker variant is validated by the generic kernels alone.
-- The current radar seeker front end is not complete. Active/semi-active radar seeker receiver processing, monopulse angle tracking, range gates, velocity gates, memory, ECCM and fuze/warhead interaction remain future work.
+- The active/semi-active radar seeker front end is an initial link-budget and measurement kernel. It is not a full RF pulse/IQ seeker simulation, monopulse angle tracker, range-Doppler processor, coherent/DRFM ECCM model, seeker-specific track filter or fuze/warhead interaction. Its probability-of-false-alarm threshold is an idealized single-cell exponential-noise threshold, not a calibrated product seeker detector.
 
-Tests: `game/tests/unit/SeekerRuntime.test.ts` and `game/tests/unit/CountermeasurePhysics.test.ts`.
+Tests: `game/tests/unit/SeekerRuntime.test.ts`, `game/tests/unit/CountermeasurePhysics.test.ts` and `game/tests/unit/RadarMissileSeeker.test.ts`.
