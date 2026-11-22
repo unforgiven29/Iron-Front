@@ -305,9 +305,10 @@ export function simulatePulseDopplerCpi(
     }
     fftRadix2(real, imaginary);
     for (let fftBin = 0; fftBin < pulseCount; fftBin += 1) {
-      const shiftedBin = (fftBin + pulseCount / 2) % pulseCount;
+      // Convert FFT frequency order into increasing positive-receding range-rate bins.
+      const velocityBin = (pulseCount / 2 - fftBin + pulseCount) % pulseCount;
       const power = (real[fftBin]! ** 2 + imaginary[fftBin]! ** 2) / (pulseCount * pulseCount);
-      dopplerPower[rangeBin * pulseCount + shiftedBin] = power;
+      dopplerPower[rangeBin * pulseCount + velocityBin] = power;
     }
   }
 
@@ -324,7 +325,7 @@ export function simulatePulseDopplerCpi(
     dopplerBins: pulseCount,
     powerWatts: dopplerPower,
     rangeStartM: waveform.rangeStartM,
-    rangeResolutionM,
+    rangeResolutionM: rangeSampleSpacingM,
     radialVelocityStartMps: -unambiguousRadialVelocityMps,
     radialVelocityResolutionMps,
     beamAzimuthDeg: scene.beamAzimuthDeg,
