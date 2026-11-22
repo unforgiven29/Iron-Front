@@ -1,6 +1,8 @@
 # Radar Source Structure
 
-**Status: documentation and empty placeholders only. No radar algorithms or gameplay code have been implemented here.**
+**Status:** This root directory remains the equipment/requirements scaffold. Initial executable algorithms are under `game/src/sensors/radar/` and shared RF physics under `game/src/physics/radar/`. No complete platform-installed radar, cockpit integration, terrain/world query or aircraft power/cooling integration is complete.
+
+Read the [runtime entry point](../../game/src/sensors/radar/README.md) and [radar requirements](../../docs/radar/README.md).
 
 Read [the subsystem reference](../../docs/radar/README.md), [Claude's implementation brief](../../docs/radar/CLAUDE_IMPLEMENTATION_GUIDE.md), and [shared radar physics](../../physics/radar/README.md).
 
