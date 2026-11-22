@@ -1,10 +1,20 @@
 import type { Vector3 } from "../guidance/GuidanceLaws.js";
 
+export interface MissileMotorCurveSample {
+  /** Time from the start of this motor stage. */
+  readonly timeSinceStageStartSeconds: number;
+  readonly thrustN: number;
+  readonly massFlowKgPerSecond: number;
+}
+
 export interface MissileMotorStage {
   readonly startTimeSeconds: number;
   readonly endTimeSeconds: number;
+  /** Constant fallback thrust/flow, or nominal metadata when a curve is supplied. */
   readonly thrustN: number;
   readonly massFlowKgPerSecond: number;
+  /** Optional measured/derived time history, linearly interpolated between knots. */
+  readonly thrustCurve?: readonly MissileMotorCurveSample[];
 }
 
 export interface MachDragSample {
@@ -206,6 +216,24 @@ function validateModel(model: MissileAerodynamicModel): void {
       !Number.isFinite(stage.massFlowKgPerSecond) || stage.massFlowKgPerSecond < 0) {
       throw new RangeError("Motor stages must be ordered, non-overlapping and physically non-negative.");
     }
+    if (stage.thrustCurve) {
+      if (stage.thrustCurve.length < 2 ||
+        stage.thrustCurve[0]!.timeSinceStageStartSeconds !== 0 ||
+        Math.abs(stage.thrustCurve[stage.thrustCurve.length - 1]!.timeSinceStageStartSeconds -
+          (stage.endTimeSeconds - stage.startTimeSeconds)) > 1e-9) {
+        throw new RangeError("Motor thrust curves must start at zero and end at the stage duration.");
+      }
+      let previousCurveTime = -Infinity;
+      for (const point of stage.thrustCurve) {
+        if (!Number.isFinite(point.timeSinceStageStartSeconds) ||
+          point.timeSinceStageStartSeconds <= previousCurveTime ||
+          !Number.isFinite(point.thrustN) || point.thrustN < 0 ||
+          !Number.isFinite(point.massFlowKgPerSecond) || point.massFlowKgPerSecond < 0) {
+          throw new RangeError("Motor thrust curve knots must be ordered with finite non-negative values.");
+        }
+        previousCurveTime = point.timeSinceStageStartSeconds;
+      }
+    }
     previousEnd = stage.endTimeSeconds;
   }
 }
@@ -305,20 +333,112 @@ function evaluateMotorOutput(
     const activeEnd = Math.min(stepEnd, stage.endTimeSeconds);
     if (activeEnd <= activeStart || remainingPropellant <= 0 || stage.thrustN <= 0) continue;
     activeStageIndices.push(index);
-    const duration = activeEnd - activeStart;
-    const burnDuration = stage.massFlowKgPerSecond > 0
-      ? Math.min(duration, remainingPropellant / stage.massFlowKgPerSecond)
-      : duration;
-    impulseNs += stage.thrustN * burnDuration;
-    const stageConsumption = burnDuration * stage.massFlowKgPerSecond;
-    consumedKg += stageConsumption;
-    remainingPropellant = Math.max(0, remainingPropellant - stageConsumption);
+    const stageStartOffset = activeStart - stage.startTimeSeconds;
+    const stageEndOffset = activeEnd - stage.startTimeSeconds;
+    const stageOutput = integrateMotorStage(
+      stage,
+      stageStartOffset,
+      stageEndOffset,
+      remainingPropellant
+    );
+    impulseNs += stageOutput.impulseNs;
+    consumedKg += stageOutput.propellantConsumedKg;
+    remainingPropellant = Math.max(0, remainingPropellant - stageOutput.propellantConsumedKg);
   }
   return {
     averageThrustN: impulseNs / deltaTimeSeconds,
     propellantConsumedKg: consumedKg,
     activeStageIndices
   };
+}
+
+function interpolateMotorCurve(
+  curve: readonly MissileMotorCurveSample[],
+  timeSinceStageStartSeconds: number
+): { readonly thrustN: number; readonly massFlowKgPerSecond: number } {
+  if (timeSinceStageStartSeconds <= curve[0]!.timeSinceStageStartSeconds) {
+    return curve[0]!;
+  }
+  const last = curve[curve.length - 1]!;
+  if (timeSinceStageStartSeconds >= last.timeSinceStageStartSeconds) return last;
+  for (let index = 1; index < curve.length; index += 1) {
+    const upper = curve[index]!;
+    const lower = curve[index - 1]!;
+    if (timeSinceStageStartSeconds <= upper.timeSinceStageStartSeconds) {
+      const fraction = (timeSinceStageStartSeconds - lower.timeSinceStageStartSeconds) /
+        (upper.timeSinceStageStartSeconds - lower.timeSinceStageStartSeconds);
+      return {
+        thrustN: lower.thrustN + (upper.thrustN - lower.thrustN) * fraction,
+        massFlowKgPerSecond: lower.massFlowKgPerSecond +
+          (upper.massFlowKgPerSecond - lower.massFlowKgPerSecond) * fraction
+      };
+    }
+  }
+  return last;
+}
+
+function integrateMotorStage(
+  stage: MissileMotorStage,
+  startOffsetSeconds: number,
+  endOffsetSeconds: number,
+  availablePropellantKg: number
+): { readonly impulseNs: number; readonly propellantConsumedKg: number } {
+  if (!stage.thrustCurve) {
+    const duration = endOffsetSeconds - startOffsetSeconds;
+    const burnDuration = stage.massFlowKgPerSecond > 0
+      ? Math.min(duration, availablePropellantKg / stage.massFlowKgPerSecond)
+      : duration;
+    return {
+      impulseNs: stage.thrustN * burnDuration,
+      propellantConsumedKg: burnDuration * stage.massFlowKgPerSecond
+    };
+  }
+
+  const boundaries = [
+    startOffsetSeconds,
+    ...stage.thrustCurve
+      .map((point) => point.timeSinceStageStartSeconds)
+      .filter((time) => time > startOffsetSeconds && time < endOffsetSeconds),
+    endOffsetSeconds
+  ];
+  let remaining = availablePropellantKg;
+  let impulseNs = 0;
+  let propellantConsumedKg = 0;
+  for (let index = 1; index < boundaries.length && remaining > 0; index += 1) {
+    const segmentStart = boundaries[index - 1]!;
+    const segmentEnd = boundaries[index]!;
+    const segmentDuration = segmentEnd - segmentStart;
+    const start = interpolateMotorCurve(stage.thrustCurve, segmentStart);
+    const end = interpolateMotorCurve(stage.thrustCurve, segmentEnd);
+    const massFlowSlope = (end.massFlowKgPerSecond - start.massFlowKgPerSecond) /
+      segmentDuration;
+    const fullSegmentConsumption = 0.5 *
+      (start.massFlowKgPerSecond + end.massFlowKgPerSecond) * segmentDuration;
+    let burnDuration = segmentDuration;
+    if (fullSegmentConsumption > remaining) {
+      let lower = 0;
+      let upper = segmentDuration;
+      for (let iteration = 0; iteration < 32; iteration += 1) {
+        const midpoint = (lower + upper) / 2;
+        const consumedAtMidpoint = start.massFlowKgPerSecond * midpoint +
+          0.5 * massFlowSlope * midpoint * midpoint;
+        if (consumedAtMidpoint < remaining) lower = midpoint;
+        else upper = midpoint;
+      }
+      burnDuration = (lower + upper) / 2;
+    }
+    const burnEnd = interpolateMotorCurve(stage.thrustCurve, segmentStart + burnDuration);
+    const thrustImpulse = 0.5 * (start.thrustN + burnEnd.thrustN) * burnDuration;
+    const stageConsumption = Math.min(
+      remaining,
+      start.massFlowKgPerSecond * burnDuration +
+        0.5 * massFlowSlope * burnDuration * burnDuration
+    );
+    impulseNs += thrustImpulse;
+    propellantConsumedKg += stageConsumption;
+    remaining -= stageConsumption;
+  }
+  return { impulseNs, propellantConsumedKg };
 }
 
 function calculateAcceleration(
