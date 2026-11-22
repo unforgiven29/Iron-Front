@@ -1,6 +1,7 @@
 import {
   BOLTZMANN_CONSTANT_J_PER_K,
   SPEED_OF_LIGHT_MPS,
+  evaluateAntennaGainDb,
   type AntennaPatternProfile
 } from "../../physics/radar/RadarPhysics.js";
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
@@ -248,13 +249,18 @@ export function synthesizeRangeDopplerFrame(
   const rangeStartM = 0;
   const radialVelocityStartMps = -derived.unambiguousRadialVelocityMps;
   const powerBuffer = new Array<number>(equipment.rangeBinCount * equipment.dopplerBinCount);
+  if (!Number.isFinite(equipment.receiver.systemTemperatureK) || equipment.receiver.systemTemperatureK <= 0 ||
+    !Number.isFinite(equipment.receiver.noiseFigureDb) || equipment.receiver.noiseFigureDb < 0 ||
+    !Number.isFinite(equipment.receiver.clutterPowerPerCellW) || equipment.receiver.clutterPowerPerCellW < 0) {
+    throw new RangeError("Radar receiver configuration is invalid.");
+  }
   const thermalNoiseW = BOLTZMANN_CONSTANT_J_PER_K *
     equipment.receiver.systemTemperatureK * equipment.waveform.receiverBandwidthHz *
     10 ** (equipment.receiver.noiseFigureDb / 10);
-  const clutterW = equipment.receiver.clutterPowerPerCellW +
-    (scene.additionalClutterPowerWPerCell ?? 0);
-  if (![thermalNoiseW, clutterW, scene.interferencePowerW].every(Number.isFinite) ||
-    thermalNoiseW < 0 || clutterW < 0) {
+  const additionalClutterW = scene.additionalClutterPowerWPerCell ?? 0;
+  const clutterW = equipment.receiver.clutterPowerPerCellW + additionalClutterW;
+  if (![thermalNoiseW, clutterW, scene.interferencePowerW, additionalClutterW].every(Number.isFinite) ||
+    thermalNoiseW < 0 || clutterW < 0 || additionalClutterW < 0) {
     throw new RangeError("Radar noise and clutter powers must be finite and non-negative.");
   }
   const meanNoisePerCellW = thermalNoiseW + clutterW + scene.interferencePowerW;
@@ -271,12 +277,9 @@ export function synthesizeRangeDopplerFrame(
     }
     const azimuthError = echo.azimuthDeg - scene.beamAzimuthDeg;
     const elevationError = echo.elevationDeg - scene.beamElevationDeg;
-    const antennaGainDb = 10 ** (
-      (equipment.antenna.peakGainDb === 0
-        ? 0
-        : 0) / 10
-    );
-    void antennaGainDb;
+    const transmitReceivePatternGainDb =
+      evaluateAntennaGainDb(equipment.antenna, azimuthError, elevationError) -
+      equipment.antenna.peakGainDb;
     const rangeBin = Math.round((echo.rangeM - rangeStartM) / derived.rangeResolutionM);
     let foldedVelocity = echo.rangeRateMps;
     const ambiguityVelocity = 2 * derived.unambiguousRadialVelocityMps;
@@ -289,8 +292,7 @@ export function synthesizeRangeDopplerFrame(
     );
     if (rangeBin < 0 || rangeBin >= equipment.rangeBinCount ||
       dopplerBin < 0 || dopplerBin >= equipment.dopplerBinCount) continue;
-    const patternRelativeGainDb = antennaRelativeGainDb(equipment.antenna, azimuthError, elevationError);
-    const antennaPowerFactor = 10 ** (2 * patternRelativeGainDb / 10);
+    const antennaPowerFactor = 10 ** (2 * transmitReceivePatternGainDb / 10);
     const signalPowerW = echo.receivedPowerW * antennaPowerFactor *
       transmitterPowerFraction * pulses;
     const primaryIndex = rangeBin * equipment.dopplerBinCount + dopplerBin;
@@ -329,19 +331,3 @@ export function synthesizeRangeDopplerFrame(
   };
 }
 
-function antennaRelativeGainDb(
-  profile: AntennaPatternProfile,
-  azimuthOffAxisDeg: number,
-  elevationOffAxisDeg: number
-): number {
-  const az = Math.abs(azimuthOffAxisDeg);
-  const el = Math.abs(elevationOffAxisDeg);
-  if (az > 90 || el > 90) return profile.backlobeLevelDb;
-  const normalized = Math.hypot(
-    az / (profile.horizontalHalfPowerBeamwidthDeg / 2),
-    el / (profile.verticalHalfPowerBeamwidthDeg / 2)
-  );
-  const main = -12 * normalized * normalized;
-  const side = profile.firstSidelobeLevelDb - 18 * (normalized - 1.5) ** 2;
-  return Math.max(main, side, profile.sidelobeFloorDb);
-}
