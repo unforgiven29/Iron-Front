@@ -96,7 +96,6 @@ export function updateRadarTracks(
     };
   });
 
-  const assignedTracks = new Set<string>();
   const usedMeasurements = new Set<string>();
   const nextTracks: RadarTrack[] = [];
   const associatedMeasurementIds: string[] = [];
@@ -178,7 +177,6 @@ export function updateRadarTracks(
       missedUpdates: 0,
       lastRangeRateMps: measurement.radialVelocityMps
     });
-    assignedTracks.add(item.track.id);
     usedMeasurements.add(measurement.measurementId);
     associatedMeasurementIds.push(measurement.measurementId);
   }
