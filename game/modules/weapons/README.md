@@ -7,7 +7,8 @@ This directory defines weapon products and their installed component profiles. I
 ## Current executable kernel
 
 - `game/src/weapons/MissileRuntime.ts`: post-launch phase, guidance-law selection, externally supplied seeker state, fuze arming/event gate and maximum-flight-time self-destruct.
-- `game/src/physics/ballistics/MissileDynamics.ts`: deterministic translational 3-DoF dynamics, staged motor profile, propellant mass flow, Mach-dependent drag and control lag/jerk/G limits.
+- `game/src/physics/ballistics/MissileDynamics.ts`: deterministic translational 3-DoF dynamics, staged constant or time-varying motor thrust/flow profile, propellant mass flow, Mach-dependent drag, dynamic-pressure-limited normal force, induced drag and control lag/jerk/G limits.
+- `game/src/weapons/MissileNavigation.ts`: inertial drift/uncertainty growth, seeded accelerometer noise/bias, gated GNSS/datalink correction and uncertain target-track composition for guidance.
 - `game/src/physics/guidance/GuidanceLaws.ts`: PN, APN and pure-pursuit calculations from uncertain state estimates.
 - `game/src/sensors/weapon-seeker/SeekerRuntime.ts` and `SeekerDiscrimination.ts`: gimbal, dwell, track memory/coast, feature-envelope discrimination and resource dependencies.
 
