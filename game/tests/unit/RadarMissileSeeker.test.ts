@@ -46,10 +46,6 @@ const candidate = {
   azimuthOffBoresightDeg: 2,
   elevationOffBoresightDeg: 1,
   pathTransmission: 0.9,
-  angularRateDegPerSecond: 1.5,
-  apparentAngularSizeDeg: 0.2,
-  thermalSpectralRatio: 0.4,
-  thermalDecayRatePerSecond: 0
 } as const;
 
 const baseRequest = {
