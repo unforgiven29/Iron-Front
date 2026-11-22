@@ -3,6 +3,7 @@ import { createScopedRandom } from "../../src/core/random/SeededRandom.js";
 import {
   computeMonostaticEchoPower,
   computeMonostaticDopplerHz,
+  computeEnvironmentCoupledRadarEcho,
   computePhysicalRadarEcho,
   computeRadarInterference,
   evaluateAntennaGainDb,
@@ -89,6 +90,67 @@ describe("shared radar RF physics", () => {
     expect(echo.roundTripTimeSeconds).toBeGreaterThan(0);
     expect("entityId" in echo).toBe(false);
     expect(computeMonostaticDopplerHz(-100, echo.wavelengthM)).toBeGreaterThan(0);
+  });
+
+  it("blocks terrain-masked echoes and applies atmospheric loss to both legs", () => {
+    const physical = {
+      transmitPowerW: 1000,
+      frequencyHz: 10e9,
+      antenna,
+      targetRcsByAspect: [{ aspectDeg: 0, rcsM2: 2 }],
+      targetAspectDeg: 0,
+      rangeM: 10_000,
+      rangeRateMps: 0,
+      azimuthDeg: 0,
+      elevationDeg: 0,
+      beamAzimuthDeg: 0,
+      beamElevationDeg: 0
+    };
+    const clear = computeEnvironmentCoupledRadarEcho({
+      physical,
+      terrain: {
+        rangeM: 10_000,
+        radarAntennaHeightM: 100,
+        targetAntennaHeightM: 100,
+        wavelengthM: 0.03,
+        effectiveEarthRadiusFactor: 4 / 3,
+        terrainProfile: [],
+        requiredFirstFresnelClearanceFraction: 0.6
+      },
+      atmosphere: {
+        rangeM: 10_000,
+        oxygenWaterVapourAttenuationDbPerKm: 0.1,
+        rainSpecificAttenuationDbPerKm: 0,
+        cloudFogAttenuationDbPerKm: 0,
+        foliageAttenuationDbPerKm: 0,
+        additionalOneWayLossDb: 0
+      }
+    });
+    const unattenuated = computePhysicalRadarEcho(physical);
+    expect(clear.echo).not.toBeNull();
+    expect(clear.echo!.receivedPowerW / unattenuated.receivedPowerW).toBeCloseTo(10 ** (-0.2), 8);
+    const blocked = computeEnvironmentCoupledRadarEcho({
+      physical,
+      terrain: {
+        rangeM: 10_000,
+        radarAntennaHeightM: 50,
+        targetAntennaHeightM: 50,
+        wavelengthM: 0.03,
+        effectiveEarthRadiusFactor: 4 / 3,
+        terrainProfile: [{ distanceFromRadarM: 5000, terrainElevationM: 100 }],
+        requiredFirstFresnelClearanceFraction: 0.6
+      },
+      atmosphere: {
+        rangeM: 10_000,
+        oxygenWaterVapourAttenuationDbPerKm: 0,
+        rainSpecificAttenuationDbPerKm: 0,
+        cloudFogAttenuationDbPerKm: 0,
+        foliageAttenuationDbPerKm: 0,
+        additionalOneWayLossDb: 0
+      }
+    });
+    expect(blocked.blocked).toBe(true);
+    expect(blocked.echo).toBeNull();
   });
 
   it("integrates only in-band jammer energy and weights receive direction", () => {
