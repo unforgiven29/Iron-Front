@@ -78,3 +78,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 A useful guide defines: purpose; owner and non-owners; state/configuration separation; public inputs/outputs; dependencies; tick/update domain; resource use; normal/degraded/failed/recovery behavior; data/provenance; test matrix; performance concerns; first implementation slice; status and known gaps.
 
 Do not create a runtime module just because a folder exists. Do not repeat global Claude rules in every README. A child folder can be a data category or private implementation detail rather than an independently loadable module.
+
+## Radar and missile runtime kernels
+
+Read `docs/radar-missile-runtime-implementation.md` and `docs/claude/PROJECT_STATE.md` before extending these modules. Preserve the stated subsystem boundaries, source/evidence labels and stage gates.
