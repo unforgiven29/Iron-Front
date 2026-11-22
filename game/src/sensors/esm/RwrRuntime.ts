@@ -66,6 +66,7 @@ export interface RwrEmitterObservation {
   readonly acquiredAtSeconds: number;
   readonly bearingDeg: number;
   readonly bearingStandardDeviationDeg: number;
+  readonly bearingArchitecture: RwrBearingArchitecture;
   readonly receivedPowerDbm: number;
   readonly snrDb: number;
   readonly frequencyHz: number;
@@ -213,8 +214,6 @@ export function interceptRadarEmissions(
 
   const observations: RwrEmitterObservation[] = [];
   let rejectedEmissionCount = 0;
-  const noisePowerW = BOLTZMANN_CONSTANT_J_PER_K * receiver.noiseTemperatureK *
-    receiver.instantaneousBandwidthHz * 10 ** (receiver.noiseFigureDb / 10);
   const receiverLower = receiver.minimumFrequencyHz;
   const receiverUpper = receiver.maximumFrequencyHz;
 
@@ -317,6 +316,7 @@ export function interceptRadarEmissions(
       acquiredAtSeconds,
       bearingDeg: wrapDegrees(azimuthFromReceiverDeg + bearingNoise),
       bearingStandardDeviationDeg: bearingAccuracy,
+      bearingArchitecture: receiver.bearingArchitecture,
       receivedPowerDbm,
       snrDb,
       frequencyHz: measuredFrequencyHz,
