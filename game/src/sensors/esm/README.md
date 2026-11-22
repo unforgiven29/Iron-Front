@@ -1,22 +1,34 @@
-# Passive ESM / RWR runtime
+# Passive ESM and radar-warning receiver
 
-This directory contains the first executable passive radar-warning receiver slice.
+**Status: folder scaffold and README only for this task. This task added no ESM/RWR implementation code.**
 
-## Modules
+This directory is reserved for future passive RF interception, emitter measurement, threat-library and warning-receiver systems. It is distinct from active radar: an ESM/RWR receiver listens to emissions and does not transmit an interrogation signal.
 
-- `RwrRuntime.ts`: models whether an emitted radar signal reaches a receiver. It applies transmitter beam pattern, free-space spreading, path transmission, receiver tuning/instantaneous bandwidth, spectral overlap, thermal noise, noise figure, sensitivity and SNR threshold. It estimates pulse count, noisy nose-relative bearing, frequency/pulse-width/PRF measurements and matches the result against a configurable emitter signature library.
-- `RwrTracking.ts`: associates reports by predicted bearing and RF frequency, estimates bearing rate, maintains signature confidence, and supports new/established/coasting track states.
+## Planned responsibilities
+
+- Receiver tuning, instantaneous bandwidth, channelization, sensitivity, noise figure and dynamic range.
+- Pulse/continuous-wave emission intercept and pulse descriptor measurements.
+- Frequency, bandwidth, pulse width, PRI/PRF, modulation, scan characteristics and signal strength estimates.
+- Bearing measurement architectures (amplitude, phase/interferometer, correlative and time-difference where supported by the installation).
+- Bearing-only contact association, emitter track lifecycle and uncertainty.
+- Threat-library matching with confidence and ambiguity, not guaranteed identity.
+- Priority/alert logic, cockpit RWR display, audio warnings and operator controls.
+- Cooperative ESM/DF and network geolocation only when multiple legitimate sensor observations are available.
+- Connections to radar emissions, electronic attack, mission data and aircraft electrical/avionics systems.
 
 ## Information boundary
 
-An observation intentionally contains no emitter entity ID, target truth position or direct range. Passive RWR reports bearing and signal characteristics; range is null. Track IDs are local contact handles, not world entity IDs. Classification confidence is explicitly an unvalidated signature match, not a calibrated posterior probability.
+Passive observations must not contain a hidden emitter entity ID or perfect emitter position. A single receiver normally supplies bearing and signal characteristics, not direct range. Classification should preserve unknown/ambiguous emitters and confidence. Multi-platform triangulation requires separate geometry, time synchronization, measurement error and track association.
 
-## Limits
+## Key failure and environment cases
 
-- Bearing architecture is retained as a receiver property; bearing accuracy remains a configured receiver parameter until an exact interferometer/antenna installation is calibrated.
-- The emission interface accepts a signal snapshot; it does not yet simulate pulse-by-pulse intercept probability, receiver channelization, superheterodyne IF chains, DF baseline geometry, amplitude/phase comparison channels or time-difference-of-arrival across multiple aircraft.
-- The signature library is data-driven but no real radar library is shipped. Every emitter profile must identify exact radar variant, mode, frequency agility, waveform and evidence provenance.
-- The model does not yet fuse RWR contacts with onboard radar, ESM/ELINT, datalink, threat libraries or a cockpit RWR display.
-- It does not model deception/repeater jamming, DRFM false emitters, monopulse angle deception, deceptive range gates or coherent jamming effects in the receiver front-end.
+Out-of-band emissions, low signal-to-noise ratio, antenna nulls, scan-dependent intercept probability, terrain masking, multipath, co-channel emitters, frequency agility, pulse-on-pulse overlap, receiver saturation, blanking, damage, calibration drift, threat-library mismatch and false/deceptive emissions.
 
-Tests: `game/tests/unit/RwrRuntime.test.ts` and `game/tests/unit/RwrTracking.test.ts`.
+## Relationship to other folders
+
+- Radar generation and RF hardware: [radar source area](../radar/README.md).
+- Shared RF propagation and scattering: [shared radar physics](../../../physics/radar/README.md).
+- Platform-specific RWR hardware, antennas and threat libraries belong to exact aircraft equipment profiles.
+- Cockpit presentation belongs to the aircraft/avionics display integration, not the RF receiver itself.
+
+This README describes planned architecture only. It is not evidence of a working RWR, ESM tracker or aircraft warning display.
