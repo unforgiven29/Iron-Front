@@ -1,9 +1,14 @@
 import type { SeededRandom } from "../../core/random/SeededRandom.js";
+import { BOLTZMANN_CONSTANT_J_PER_K } from "../../physics/radar/RadarPhysics.js";
 import type { RadarHardwareState, RadarHardwareThermalModel, RadarEquipmentConfiguration, RadarRangeDopplerScene, RadarResourceSnapshot } from "./RadarRuntime.js";
 import {
   advanceRadarHardware,
   synthesizeRangeDopplerFrame
 } from "./RadarRuntime.js";
+import {
+  simulatePulseDopplerCpi,
+  type PulseDopplerWaveform
+} from "./PulseDopplerSimulation.js";
 import {
   detectCaCfar,
   type CaCfarConfiguration,
@@ -76,9 +81,53 @@ export function stepRadarSystem(input: RadarSystemStepInput): RadarSystemStepRes
     input.resources,
     input.deltaTimeSeconds
   );
-  const frame = hardware.emissionAvailable
-    ? synthesizeRangeDopplerFrame(input.equipment, input.scene, input.random, hardware.transmitPowerFraction)
-    : null;
+  let frame: RadarRangeDopplerFrame | null = null;
+  if (hardware.emissionAvailable) {
+    const pulseDomain = input.equipment.pulseDomain;
+    if (input.equipment.waveform.family === "pulse-doppler" && pulseDomain) {
+      const expectedPulseCount = Math.floor(
+        input.equipment.waveform.pulseRepetitionFrequencyHz *
+        input.equipment.waveform.coherentProcessingIntervalSeconds
+      );
+      if (pulseDomain.coherentPulseCount !== expectedPulseCount) {
+        throw new RangeError("Pulse-domain CPI count must match the equipment PRF and coherent interval.");
+      }
+      const noisePowerPerComplexSampleW =
+        BOLTZMANN_CONSTANT_J_PER_K * input.equipment.receiver.systemTemperatureK *
+        input.equipment.waveform.receiverBandwidthHz *
+        10 ** (input.equipment.receiver.noiseFigureDb / 10);
+      const pulseWaveform: PulseDopplerWaveform = {
+        ...pulseDomain,
+        centerFrequencyHz: input.equipment.waveform.centerFrequencyHz,
+        pulseWidthSeconds: input.equipment.waveform.pulseWidthSeconds,
+        pulseRepetitionIntervalSeconds: 1 / input.equipment.waveform.pulseRepetitionFrequencyHz,
+        receiverNoisePowerPerComplexSampleW: noisePowerPerComplexSampleW,
+        interferencePowerPerComplexSampleW:
+          input.scene.interferencePowerW + input.equipment.receiver.clutterPowerPerCellW +
+          (input.scene.additionalClutterPowerWPerCell ?? 0)
+      };
+      const cpi = simulatePulseDopplerCpi(pulseWaveform, {
+        scatterers: input.scene.returns.map((echo) => ({
+          receivedPowerW: echo.receivedPowerW * hardware.transmitPowerFraction,
+          rangeM: echo.rangeM,
+          rangeRateMps: echo.rangeRateMps,
+          phaseRadians: echo.phaseRadians ?? 0
+        })),
+        interferers: [],
+        acquiredAtSeconds: input.scene.acquiredAtSeconds,
+        beamAzimuthDeg: input.scene.beamAzimuthDeg,
+        beamElevationDeg: input.scene.beamElevationDeg
+      }, input.random);
+      frame = cpi.frame;
+    } else {
+      frame = synthesizeRangeDopplerFrame(
+        input.equipment,
+        input.scene,
+        input.random,
+        hardware.transmitPowerFraction
+      );
+    }
+  }
   const detections = frame ? detectCaCfar(frame, input.cfar) : [];
   const trackUpdate = updateRadarTracks(
     input.previousTracks,
