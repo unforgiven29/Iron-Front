@@ -453,9 +453,14 @@ function solveDynamics(
   const rHat = state.angularRatesBodyRadPerSecond[2] * model.referenceSpanM / (2 * velocityForRate);
   const authority = model.actuatorAuthorityFraction;
 
-  const cn = aero.normalForceSlopePerRad * alpha +
+  const rawCn = aero.normalForceSlopePerRad * alpha +
     aero.pitchControlEffectiveness * finDeflections[1] * authority +
     aero.pitchDampingDerivative * qHat;
+  const qArea = q * model.referenceAreaM2;
+  const maximumNormalCoefficient = qArea > 0
+    ? model.maximumNormalAccelerationG * 9.80665 * state.massKg / qArea
+    : 0;
+  const cn = clamp(rawCn, -maximumNormalCoefficient, maximumNormalCoefficient);
   const cy = aero.sideForceSlopePerRad * beta +
     aero.yawControlEffectiveness * finDeflections[2] * authority +
     aero.yawDampingDerivative * rHat;
@@ -502,7 +507,10 @@ function solveDynamics(
   const gravityWorld: Vector3 = [0, 0, -environment.gravityMps2];
   const accelerationWorldMps2 = add(scale(forceWorld, 1 / state.massKg), gravityWorld);
   const aerodynamicNormalForce = Math.hypot(forceAero[1], forceAero[2]);
-  const normalAccelerationG = aerodynamicNormalForce / state.massKg / 9.80665;
+  const normalAccelerationG = Math.min(
+    model.maximumNormalAccelerationG,
+    aerodynamicNormalForce / state.massKg / 9.80665
+  );
   return {
     forceBodyN,
     aerodynamicForceBodyN: forceAero,
