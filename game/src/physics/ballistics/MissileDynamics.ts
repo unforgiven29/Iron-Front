@@ -331,7 +331,8 @@ function evaluateMotorOutput(
     const stage = stages[index]!;
     const activeStart = Math.max(elapsedSeconds, stage.startTimeSeconds);
     const activeEnd = Math.min(stepEnd, stage.endTimeSeconds);
-    if (activeEnd <= activeStart || remainingPropellant <= 0 || stage.thrustN <= 0) continue;
+    if (activeEnd <= activeStart || remainingPropellant <= 0 ||
+      (!stage.thrustCurve && stage.thrustN <= 0)) continue;
     activeStageIndices.push(index);
     const stageStartOffset = activeStart - stage.startTimeSeconds;
     const stageEndOffset = activeEnd - stage.startTimeSeconds;
