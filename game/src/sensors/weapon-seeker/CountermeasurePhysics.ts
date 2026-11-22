@@ -398,14 +398,13 @@ export function createChaffCloudState(
 export function stepChaffCloud(
   previous: ChaffCloudState,
   model: ChaffCloudModel,
-  environment: { readonly windWorldMps: Vector3; readonly gravityMps2: number },
+  environment: { readonly windWorldMps: Vector3 },
   input: ChaffCloudStepInput
 ): ChaffCloudState {
   validateFiniteVector(previous.positionWorldM, "Chaff cloud position");
   validateFiniteVector(previous.velocityWorldMps, "Chaff cloud velocity");
   validateFiniteVector(environment.windWorldMps, "Wind");
   if (!Number.isFinite(input.deltaTimeSeconds) || input.deltaTimeSeconds <= 0 ||
-    !Number.isFinite(environment.gravityMps2) || environment.gravityMps2 < 0 ||
     !Number.isFinite(previous.ageSeconds) || previous.ageSeconds < 0 ||
     !Number.isFinite(previous.particleCount) || previous.particleCount < 0 ||
     !Number.isFinite(previous.cloudRadiusM) || previous.cloudRadiusM <= 0) {
@@ -414,18 +413,19 @@ export function stepChaffCloud(
   const dt = input.deltaTimeSeconds;
   validateChaffCloudModel(model);
   const coupling = 1 - Math.exp(-dt / model.windCouplingTimeConstantSeconds);
-  const windAcceleration = scale(
-    subtract(environment.windWorldMps, previous.velocityWorldMps),
-    coupling / dt
-  );
-  const acceleration: Vector3 = [
-    windAcceleration[0],
-    windAcceleration[1],
-    windAcceleration[2] - environment.gravityMps2
+  const targetCloudVelocity: Vector3 = [
+    environment.windWorldMps[0],
+    environment.windWorldMps[1],
+    environment.windWorldMps[2] - model.terminalFallSpeedMps
   ];
-  const velocityWorldMps = add(previous.velocityWorldMps, scale(acceleration, dt));
-  const positionWorldM = add(previous.positionWorldM,
-    add(scale(previous.velocityWorldMps, dt), scale(acceleration, 0.5 * dt * dt)));
+  const velocityWorldMps = add(
+    previous.velocityWorldMps,
+    scale(subtract(targetCloudVelocity, previous.velocityWorldMps), coupling)
+  );
+  const positionWorldM = add(
+    previous.positionWorldM,
+    scale(add(previous.velocityWorldMps, velocityWorldMps), 0.5 * dt)
+  );
   const ageSeconds = previous.ageSeconds + dt;
   const survival = Math.exp(-dt / model.cloudLifetimeSeconds);
   return {
@@ -469,7 +469,7 @@ export function evaluateChaffCloudRadarReturn(
     model.initialParticleCount
   ));
   const totalRcsM2 = particleRcsM2 * effectiveParticleCount;
-  const rangeRateMps = -dot(state.velocityWorldMps, losUnit);
+  const rangeRateMps = dot(state.velocityWorldMps, losUnit);
   return {
     totalRcsM2,
     meanParticleRcsM2: particleRcsM2,
