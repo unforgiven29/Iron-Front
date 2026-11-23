@@ -207,6 +207,18 @@ export class SimulationScheduler {
     return this.runTick(this.clock.currentTick);
   }
 
+  /**
+   * Set the tick when restoring a save. One-shot work holds closures that cannot be saved,
+   * so a restore with pending one-shot work is refused rather than silently dropping it.
+   */
+  public restoreTick(tick: number): void {
+    this.assertNotExecuting("restore the tick");
+    if (this.pending.length > 0) {
+      throw new Error(`Cannot restore while ${this.pending.length} one-shot work item(s) are pending; they are not serializable.`);
+    }
+    this.clock.reset(tick);
+  }
+
   private runTick(tick: number): TaskFault[] {
     const faults: TaskFault[] = [];
     const stepSeconds = this.clock.stepSeconds;
