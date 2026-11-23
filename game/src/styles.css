@@ -95,3 +95,25 @@ footer { display: flex; justify-content: space-between; gap: 14px; margin-top: 5
 .cockpit-frame:focus-visible { box-shadow: inset 0 0 0 3px #83b8d2; }
 .cockpit-gl, .cockpit-hud { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .cockpit-hud { pointer-events: none; }
+
+/* Main game screen */
+body.game-mode { overflow: hidden; background: #0e151b; }
+.game-screen { position: fixed; inset: 0; }
+.game-frame { position: absolute; inset: 0; outline: none; background: radial-gradient(circle at 50% 30%, #1c2a36, #0b1117 70%); }
+.game-menu { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(8, 12, 16, 0.55); backdrop-filter: blur(3px); }
+.game-menu[hidden] { display: none; }
+.game-menu-card { width: min(440px, 100%); padding: 28px; border: 1px solid #2c3a45; border-radius: 16px; background: rgba(14, 21, 27, 0.92); display: grid; gap: 12px; }
+.game-title { margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: 0.18em; }
+.game-subtitle { margin: -6px 0 4px; color: #9cf5b0; font-weight: 650; letter-spacing: 0.06em; }
+.game-status:empty { display: none; }
+.game-status { margin: 0; color: #ffd36e; }
+.game-button { border: 1px solid #44535e; border-radius: 10px; padding: 12px 16px; background: transparent; color: #e7edf2; font-weight: 700; cursor: pointer; }
+.game-button.primary { background: #d4e0e7; color: #101920; border-color: #d4e0e7; }
+.game-button:hover:not(:disabled) { filter: brightness(1.08); }
+.game-button:focus-visible { outline: 3px solid #83b8d2; outline-offset: 2px; }
+.game-controls { display: grid; gap: 6px; margin-top: 6px; font-size: 0.85rem; color: #b4c0c8; }
+.game-control-row { display: flex; justify-content: space-between; gap: 12px; }
+.game-control-row kbd { font-family: ui-monospace, Menlo, monospace; color: #e7edf2; }
+.game-note { margin: 4px 0 0; color: #8596a2; font-size: 0.75rem; line-height: 1.5; }
+.game-link { color: #83b8d2; font-size: 0.85rem; }
+.back-link { color: #83b8d2; }
