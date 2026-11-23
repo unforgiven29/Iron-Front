@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { uniformWind } from "../../src/physics/environment/Atmosphere.js";
-import { F16Aircraft, type F16Snapshot } from "../../src/platforms/aircraft/f16c-block50/F16Aircraft.js";
+import { F16Aircraft, F16_SWITCHES, type F16Snapshot } from "../../src/platforms/aircraft/f16c-block50/F16Aircraft.js";
 import { F16_FLCS_LIMITS } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
 import { generateSyntheticTile, TerrainSurface } from "../../src/world/terrain/Terrain.js";
 
@@ -78,5 +78,34 @@ describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS
     const a = jet(260, 200); // Mach ≈ 0.77
     const s = fly(a, 0.1);
     expect(s.outsideAeroEnvelope).toBe(true);
+  });
+
+  it("FLCS switch: DIRECT removes augmentation; with an aft CG the bare airframe departs while NORM holds", () => {
+    const D2 = 180 / Math.PI;
+    const growth = (mode: "NORM" | "DIRECT") => {
+      const a = jet(200);
+      a.controls.request(F16_SWITCHES.testCg, "AFT", "test");
+      fly(a, 20);
+      expect(a.controls.request(F16_SWITCHES.flcsMode, mode, "test").accepted).toBe(true);
+      const a0 = a.snapshot().alphaRad;
+      a.setPilotInputs({ pitch: 0.05, roll: 0, yaw: 0 });
+      fly(a, 0.1);
+      a.setPilotInputs({ pitch: 0, roll: 0, yaw: 0 });
+      let maxDev = 0;
+      fly(a, 3, (s) => { maxDev = Math.max(maxDev, Math.abs(s.alphaRad - a0) * D2); });
+      return { maxDev, mode: a.snapshot().flcsMode };
+    };
+    const norm = growth("NORM"), direct = growth("DIRECT");
+    expect(direct.mode).toBe("DIRECT");
+    expect(norm.maxDev).toBeLessThan(2);
+    expect(direct.maxDev).toBeGreaterThan(20);
+  });
+
+  it("reset returns the FLCS to NORM", () => {
+    const a = jet();
+    a.controls.request(F16_SWITCHES.flcsMode, "DIRECT", "test");
+    a.reset({ positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.5 });
+    expect(a.snapshot().flcsMode).toBe("NORM");
+    expect(a.snapshot().switches[F16_SWITCHES.flcsMode]).toBe("NORM");
   });
 });

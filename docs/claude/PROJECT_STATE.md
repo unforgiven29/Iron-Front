@@ -97,6 +97,8 @@ Build and test narrow, replaceable services in this order:
 
 ### Stage 3 progress (provisional)
 1. **Done, provisional data:** F-16C Block 50 flight-model slice (`game/src/platforms/aircraft/f16c-block50/`). Uses NASA TP-1538/Stevens & Lewis low-speed tables (not Block 50 data), an estimated F110 engine and a project-designed FLCS. Every value is labelled; see `game/modules/planes/F-16/flight-model/README.md`. **This is not a validated Block 50 model**, and Stage 3 exit is not met.
+2. **Done:** control registry (`game/src/core/controls/ControlRegistry.ts`). Switches are data with an owner. Views and keys only request a position, and the owner accepts or rejects it. F-16 test switches: **FLCS NORM/DIRECT** (DIRECT = no augmentation, trim captured on entry) and **CG test** (0.35/0.40/0.45 MAC, using the same unmodified tables). Neither is a real F-16 control. Measured: at the 0.40 CG, DIRECT departs within 3 s while NORM holds.
+3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 
 **Stage 2 exit criteria have passing tests.** Remaining Stage 2 gaps are listed in each owner README. The next work is Stage 3 (F-16C Block 50 vertical slice), which needs sourced aircraft data per the platform dossier. A debug flyer (`game/src/debug/`) exercises these services with a fictional, synthetic-data airframe; it is not an aircraft model.
 

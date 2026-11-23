@@ -42,3 +42,19 @@ test("debug flight view flies with the keyboard and reports no errors", async ({
   await expect(page.getByText("Fictional test airframe", { exact: false })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("F-16 cockpit starts, flies and toggles the FLCS switch without page errors", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Start F-16" }).click();
+  await expect(page.getByRole("button", { name: "Running" })).toBeVisible({ timeout: 20_000 });
+  const frame = page.getByLabel("F-16 cockpit view. Click, then use the keyboard to fly.");
+  await frame.click();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(300);
+  await page.keyboard.up("d");
+  await page.keyboard.press("f");
+  await page.waitForTimeout(300);
+  expect(errors).toEqual([]);
+});
