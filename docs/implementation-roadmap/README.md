@@ -32,6 +32,8 @@ Implement world coordinates/local ENU, rigid-body integration and force/moment c
 
 Exit: analytical rigid-body/force tests, coordinate transforms, timestep sensitivity and deterministic replay pass; missing/invalid geodata cannot silently become flat terrain.
 
+Status: all exit criteria have passing tests (see `docs/claude/PROJECT_STATE.md`). Remaining Stage 2 gaps are listed in each owner README.
+
 ## Stage 3 — F-16C Block 50 vertical slice
 
 Implement an end-to-end F-16C Block 50 using its own geometry, mass/inertia, aerodynamic representation and sourced coefficient data; flight-control laws/actuators; F110-GE-129 installation and engine model; fuel/electrical/hydraulic/pneumatic/cooling topology; high-lift/control devices; landing gear/brakes/tires and cockpit controls/instruments; connected damage/failures.
