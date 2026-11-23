@@ -72,3 +72,43 @@ export function lookup2D(t: Table2D, row: number, column: number): Lookup {
   const top = v00 + (v01 - v00) * c.f, bottom = v10 + (v11 - v10) * c.f;
   return { value: top + (bottom - top) * r.f, clamped: r.clamped || c.clamped };
 }
+
+/**
+ * N-dimensional table, first axis varying fastest:
+ * index = i0 + n0·(i1 + n1·(i2 + …)).
+ */
+export interface TableND {
+  readonly axes: readonly (readonly number[])[];
+  readonly values: Float64Array | readonly number[];
+}
+
+export function validateTableND(t: TableND, name = "table"): void {
+  if (t.axes.length === 0) throw new RangeError(`${name} needs at least one axis.`);
+  t.axes.forEach((a, i) => checkAxis(a, `${name} axis ${i}`));
+  const size = t.axes.reduce((n, a) => n * a.length, 1);
+  if (t.values.length !== size) throw new RangeError(`${name} has ${t.values.length} values; its axes need ${size}.`);
+  for (const v of t.values) if (!Number.isFinite(v)) throw new RangeError(`${name} contains a non-finite value.`);
+}
+
+/** Multilinear interpolation, clamped at each axis edge (reported, never extrapolated). */
+export function lookupND(t: TableND, inputs: readonly number[]): Lookup {
+  if (inputs.length !== t.axes.length) throw new RangeError(`Expected ${t.axes.length} inputs, got ${inputs.length}.`);
+  const loc = t.axes.map((axis, i) => locate(axis, inputs[i] as number));
+  const clamped = loc.some((l) => l.clamped);
+  const strides: number[] = [];
+  let stride = 1;
+  for (const axis of t.axes) { strides.push(stride); stride *= axis.length; }
+  let value = 0;
+  const corners = 1 << t.axes.length;
+  for (let c = 0; c < corners; c++) {
+    let weight = 1, index = 0;
+    for (let d = 0; d < t.axes.length; d++) {
+      const { i, f } = loc[d] as { i: number; f: number };
+      const upper = (c >> d) & 1;
+      weight *= upper ? f : 1 - f;
+      index += (i + upper) * (strides[d] as number);
+    }
+    if (weight !== 0) value += weight * (t.values[index] as number);
+  }
+  return { value, clamped };
+}

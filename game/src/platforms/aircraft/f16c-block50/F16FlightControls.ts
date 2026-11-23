@@ -60,6 +60,8 @@ export const F16_FLCS_GAINS = Object.freeze({
   /** Look-ahead (s) applied to pitch rate in the AoA limiter. */
   alphaLimiterLeadS: 0.35,
   rollProportionalDegPerRadps: 6,
+  /** Integral on roll-rate error, so small aerodynamic asymmetries do not cause a steady roll drift. */
+  rollIntegralDegPerRad: 12,
   yawRateDampingDegPerRadps: 25,
   sideslipDegPerDeg: 1.0,
   alphaLimiterOnsetMarginDeg: 3,
@@ -70,10 +72,12 @@ export const F16_FLCS_GAINS = Object.freeze({
 export class F16FlightControls {
   private pitchIntegral = 0;
   private filteredNzCmd = 1;
+  private rollIntegral = 0;
 
   public reset(): void {
     this.pitchIntegral = 0;
     this.filteredNzCmd = 1;
+    this.rollIntegral = 0;
   }
 
   public step(pilot: PilotInputs, s: FlcsSensors, dt: number): FlcsOutput {
@@ -113,7 +117,11 @@ export class F16FlightControls {
 
     // Roll: roll-rate command. Source convention: negative aileron rolls right.
     const pCmd = clamp(pilot.roll, -1, 1) * lim.maxRollRateDegS.value / DEG;
-    const aileronDeg = clamp(-g.rollProportionalDegPerRadps * (pCmd - p) * schedule, -F16_ACTUATORS.aileronLimitDeg.value, F16_ACTUATORS.aileronLimitDeg.value);
+    const ailLimit = F16_ACTUATORS.aileronLimitDeg.value;
+    const rollError = pCmd - p;
+    const ailUnsat = -(g.rollProportionalDegPerRadps * rollError + g.rollIntegralDegPerRad * this.rollIntegral) * schedule;
+    if (Math.abs(ailUnsat) < ailLimit) this.rollIntegral = clamp(this.rollIntegral + rollError * dt, -0.5, 0.5);
+    const aileronDeg = clamp(ailUnsat, -ailLimit, ailLimit);
 
     // Yaw: pedal command plus yaw damper and sideslip feedback. Negative rudder yaws nose right.
     const rudderDeg = clamp(
