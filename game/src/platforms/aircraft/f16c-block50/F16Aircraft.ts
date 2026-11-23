@@ -14,6 +14,7 @@ import { RigidBody, rotateVector } from "../../../physics/rigidbody/RigidBody.js
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
 import { F16_ACTUATORS, F16_MASS } from "./F16Data.js";
 import { F16FlightControls, type PilotInputs } from "./F16FlightControls.js";
+import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
 import { createF16Actuators, f16Aerodynamics, F16Engine, f16InertiaTensor, type EngineState, type SurfaceDeflections } from "./F16FlightModel.js";
 
 export type F16GroundStatus =
@@ -52,11 +53,17 @@ export interface F16Snapshot {
   /** FLCS law in effect: NORM (fly-by-wire) or DIRECT (test switch: no augmentation). */
   readonly flcsMode: F16FlcsMode;
   readonly cgFractionMac: number;
+  /** Leading-edge flap position, deg (hi-fi model only; 0 with the low-fidelity model). */
+  readonly lefDeg: number;
+  readonly aeroModel: F16AeroModel;
   /** Current switch positions from the control registry. */
   readonly switches: Readonly<Record<string, string>>;
 }
 
 export type F16FlcsMode = "NORM" | "DIRECT";
+
+/** "hifi": NASA TP-1538 high-fidelity tables with LEF (default). "lofi": Stevens & Lewis reduced tables. */
+export type F16AeroModel = "hifi" | "lofi";
 
 /** Switch ids owned by the F-16 package. */
 export const F16_SWITCHES = Object.freeze({ flcsMode: "f16.flcs.mode", testCg: "f16.test.cg" });
@@ -82,6 +89,8 @@ export class F16Aircraft {
   private flcsMode: F16FlcsMode = "NORM";
   private directPitchTrimDeg = 0;
   private cgFractionMac = F16_MASS.cgFractionMac.value;
+  private readonly lef = new LefSchedule();
+  public aeroModel: F16AeroModel = "hifi";
   private body!: RigidBody;
   private readonly actuators = createF16Actuators();
   private engine!: F16Engine;
@@ -133,6 +142,7 @@ export class F16Aircraft {
     this.throttle = start.throttle;
     for (const a of Object.values(this.actuators)) a.reset();
     this.flcs.reset();
+    this.lef.reset();
     this.directPitchTrimDeg = 0;
     if (this.controls.position(F16_SWITCHES.flcsMode) !== "NORM") this.controls.request(F16_SWITCHES.flcsMode, "NORM", "reset");
     this.pilot = { pitch: 0, roll: 0, yaw: 0 };
@@ -193,10 +203,13 @@ export class F16Aircraft {
       rudderDeg: this.actuators.rudder.step(cmd.rudderDeg, dt)
     };
     const engine = this.engine.step(this.throttle, env.atmosphere.densityKgM3 / SEA_LEVEL_DENSITY, dt);
-    const aero = f16Aerodynamics({
+    const aeroInput = {
       alphaRad: alpha, betaRad: beta, trueAirspeedMps: V, dynamicPressurePa: flow.dynamicPressurePa, mach: flow.machNumber,
       ratesRadps: st.angularVelocityBodyRadps, surfaces, cgFractionMac: this.cgFractionMac
-    });
+    };
+    const aero = this.aeroModel === "hifi"
+      ? f16HifiAerodynamics({ ...aeroInput, lefDeg: this.lef.step(alpha, flow.dynamicPressurePa, env.atmosphere.pressurePa, dt) })
+      : f16Aerodynamics(aeroInput);
     // Thrust is modelled along the body x axis through the CG (engine offset/cant not sourced).
     const loads = this.body.step(dt, {
       forces: [
@@ -254,6 +267,8 @@ export class F16Aircraft {
       faults: [...this.faults],
       flcsMode: this.flcsMode,
       cgFractionMac: this.cgFractionMac,
+      lefDeg: this.aeroModel === "hifi" ? this.lef.positionDeg : 0,
+      aeroModel: this.aeroModel,
       switches: this.controls.snapshot()
     });
   }
