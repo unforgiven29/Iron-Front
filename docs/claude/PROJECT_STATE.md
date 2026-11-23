@@ -86,7 +86,11 @@ Build and test narrow, replaceable services in this order:
 4. ~~Resource offer/demand/allocation contracts with observable denial and degraded behavior.~~ **Done** (`game/src/core/resources/ResourceArbiter.ts`; see `game/core/resources/README.md`).
 5. ~~Configuration resolution, diagnostics and save/replay contracts as their dependencies become stable.~~ **Done** (`game/src/core/configuration/`, `game/src/core/diagnostics/`, `game/src/core/persistence/`).
 
-**Stage 1 exit criteria are met by tests:** missing/incompatible/cyclic dependencies are rejected (`ModuleResolver.test.ts`); two test modules compose through one interface (`ModuleComposition.test.ts`); replay reproduces state (`SaveReplay.test.ts`); resource failures report causes (`ResourceArbiter.test.ts`). Stage 1 is complete once these pass in CI on `main`. The next work is Stage 2 (physics and world foundations). A live runtime monitor (`game/src/debug/`) shows these services running in the browser; it is a debug view with a fictional demo module, not a simulator feature.
+**Stage 1 exit criteria are met by tests:** missing/incompatible/cyclic dependencies are rejected (`ModuleResolver.test.ts`); two test modules compose through one interface (`ModuleComposition.test.ts`); replay reproduces state (`SaveReplay.test.ts`); resource failures report causes (`ResourceArbiter.test.ts`). Stage 1 is complete once these pass in CI on `main`. The next work is Stage 2 (physics and world foundations).
+
+### Stage 2 progress
+1. **Done:** rigid-body 6-DoF state, force/moment contract and RK4 integrator (`game/src/physics/rigidbody/RigidBody.ts`; see `physics/rigidbody/README.md`).
+2. Next: atmosphere sampling and local air velocity; then terrain surface data with explicit missing-data failure, collision/query contracts and a spatial index; then a fixed-render-rate replay comparison across these services. A live runtime monitor (`game/src/debug/`) shows these services running in the browser; it is a debug view with a fictional demo module, not a simulator feature.
 
 Keep each step a small vertical slice with contract tests. Do not create a monolithic `SimulationManager` or implement all planned services in one pass.
 
