@@ -6,6 +6,7 @@
  * Aero data provenance: see AeroData.ts (provisional, early-F-16 low-speed tables).
  */
 import { lookup1D, lookup2D } from "../../../physics/aerodynamics/Tables.js";
+import { calibrate, MixedFlowTurbofan, type Ambient, type TurbofanDesign, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { CM, CN_BETA, CL_BETA, CX, CZ0, DAMPING, DCL_DA, DCL_DR, DCN_DA, DCN_DR, F16_AERO_PROVENANCE } from "./AeroData.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS } from "./F16Data.js";
 
@@ -117,25 +118,45 @@ export function createF16Actuators() {
 }
 
 export interface EngineState {
-  /** 0..1 fraction of max afterburning thrust currently produced (before density lapse). */
+  /** Physical spool speed, fraction of design. */
   readonly power: number;
   readonly thrustN: number;
   readonly fuelFlowKgS: number;
   readonly fuelKg: number;
   readonly afterburner: boolean;
   readonly flameout: boolean;
+  readonly turbineInletTemperatureK: number;
+  readonly nozzleTemperatureK: number;
+  readonly airflowKgS: number;
 }
 
-/** Estimated F110-GE-129 model: see F16_ENGINE for which values are published vs estimated. */
+const F110_DESIGN_BASE: TurbofanDesign = {
+  airflowKgS: F16_ENGINE.airflowKgS.value,
+  bypassRatio: F16_ENGINE.bypassRatio.value,
+  overallPressureRatio: F16_ENGINE.overallPressureRatio.value,
+  fanPressureRatio: F16_ENGINE.fanPressureRatio.value,
+  fanEfficiency: 0.86, compressorEfficiency: 0.86, turbineEfficiency: 0.89, burnerEfficiency: 0.99, afterburnerEfficiency: 0.9, nozzleVelocityCoefficient: 0.98,
+  turbineInletTemperatureK: 1600, afterburnerMaxTemperatureK: 2000,
+  idleCorrectedSpeed: F16_ENGINE.idleCorrectedSpeed.value,
+  spoolUpTimeConstantS: F16_ENGINE.spoolUpTimeConstantS.value,
+  spoolDownTimeConstantS: F16_ENGINE.spoolDownTimeConstantS.value,
+  afterburnerLightDelayS: F16_ENGINE.afterburnerLightDelayS.value,
+  afterburnerRatePerS: 2
+};
+
+/** F110 cycle with design temperatures DERIVED from the published SLS dry/AB ratings. */
+export const F110_DESIGN: TurbofanDesign = { ...F110_DESIGN_BASE, ...calibrate(F110_DESIGN_BASE, F16_ENGINE.militaryThrustN.value, F16_ENGINE.maxAfterburnerThrustN.value) };
+
+/** F-16 engine installation: shared gas-path turbofan plus the fuel inventory it draws from. */
 export class F16Engine {
-  private power: number;
+  private readonly core: MixedFlowTurbofan;
   private fuel: number;
   private last: EngineState;
 
   public constructor(initialThrottle = 0.5, fuelKg = F16_ENGINE.internalFuelKg.value) {
-    this.power = this.commandedPower(initialThrottle);
+    this.core = new MixedFlowTurbofan(F110_DESIGN, F16_ENGINE.afterburnerDetentThrottle.value, initialThrottle);
     this.fuel = fuelKg;
-    this.last = { power: this.power, thrustN: 0, fuelFlowKgS: 0, fuelKg: fuelKg, afterburner: false, flameout: false };
+    this.last = this.wrap(this.core.state);
   }
 
   public get state(): EngineState {
@@ -146,35 +167,18 @@ export class F16Engine {
     return this.fuel;
   }
 
-  public setState(power: number, fuelKg: number): void {
-    this.power = power;
-    this.fuel = fuelKg;
-  }
-
-  /** Throttle 0..1 → target fraction of max AB thrust (static, sea level). */
-  public commandedPower(throttle: number): number {
-    const e = F16_ENGINE;
-    const t = Math.max(0, Math.min(1, throttle));
-    const detent = e.afterburnerDetentThrottle.value;
-    const idle = e.idleThrustFraction.value, mil = e.militaryThrustFraction.value;
-    return t <= detent ? idle + (mil - idle) * (t / detent) : mil + (1 - mil) * ((t - detent) / (1 - detent));
-  }
-
-  public step(throttle: number, densityRatio: number, dt: number): EngineState {
-    const e = F16_ENGINE;
-    if (this.fuel <= 0) {
-      this.power = 0;
-      this.last = { power: 0, thrustN: 0, fuelFlowKgS: 0, fuelKg: 0, afterburner: false, flameout: true };
-      return this.last;
-    }
-    const target = this.commandedPower(throttle);
-    this.power += (target - this.power) * (1 - Math.exp(-dt / e.spoolTimeConstantS.value));
-    const thrust = e.maxAfterburnerThrustN.value * this.power * Math.max(0, densityRatio) ** e.densityLapseExponent.value;
-    const afterburner = this.power > e.militaryThrustFraction.value + 1e-6;
-    const flow = thrust * (afterburner ? e.tsfcAfterburnerPerS.value : e.tsfcDryPerS.value);
-    this.fuel = Math.max(0, this.fuel - flow * dt);
-    this.last = { power: this.power, thrustN: thrust, fuelFlowKgS: flow, fuelKg: this.fuel, afterburner, flameout: false };
+  public step(throttle: number, ambient: Ambient, dt: number): EngineState {
+    const s = this.core.step(throttle, ambient, this.fuel > 0, dt);
+    this.fuel = Math.max(0, this.fuel - s.fuelFlowKgS * dt);
+    this.last = this.wrap(s);
     return this.last;
+  }
+
+  private wrap(s: TurbofanState): EngineState {
+    return {
+      power: s.spoolSpeed, thrustN: s.netThrustN, fuelFlowKgS: s.fuelFlowKgS, fuelKg: this.fuel, afterburner: s.afterburnerLit, flameout: s.flameout,
+      turbineInletTemperatureK: s.turbineInletTemperatureK, nozzleTemperatureK: s.nozzleTemperatureK, airflowKgS: s.airflowKgS
+    };
   }
 }
 

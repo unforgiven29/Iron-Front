@@ -202,7 +202,7 @@ export class F16Aircraft {
       aileronDeg: this.actuators.aileron.step(cmd.aileronDeg, dt),
       rudderDeg: this.actuators.rudder.step(cmd.rudderDeg, dt)
     };
-    const engine = this.engine.step(this.throttle, env.atmosphere.densityKgM3 / SEA_LEVEL_DENSITY, dt);
+    const engine = this.engine.step(this.throttle, { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber }, dt);
     const aeroInput = {
       alphaRad: alpha, betaRad: beta, trueAirspeedMps: V, dynamicPressurePa: flow.dynamicPressurePa, mach: flow.machNumber,
       ratesRadps: st.angularVelocityBodyRadps, surfaces, cgFractionMac: this.cgFractionMac
