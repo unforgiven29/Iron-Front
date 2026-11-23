@@ -17,7 +17,7 @@ The executable TypeScript is concentrated in `game/src/`. The current source tre
 | Area | Current evidence | What that evidence does not mean |
 |---|---|---|
 | Application | `game/src/main.ts` and the Vite shell | Not a playable simulator or 3D renderer |
-| Time | `game/src/core/time/SimulationClock.ts` | Not a complete simulation scheduler or deterministic event loop |
+| Time and scheduling | `game/src/core/time/SimulationClock.ts`, `game/src/core/simulation/SimulationScheduler.ts` | Fixed-step clock plus deterministic phase/priority/multi-rate scheduler with one-shot work, fault isolation and pause. Not a message dispatcher/event journal, time-scale policy or save/restore of scheduled work |
 | Coordinates | `game/src/core/coordinates/CoordinateFrames.ts` | Not a complete world/spatial engine |
 | Randomness | `game/src/core/random/SeededRandom.ts` | Not complete scenario/entity/subsystem stream orchestration |
 | Message shapes | `game/src/core/contracts/Messages.ts` | Not a validated message bus, dispatcher or event journal |
@@ -81,7 +81,7 @@ The successful CI run above executed `npm run check` and `npm run test:e2e`. Kee
 Build and test narrow, replaceable services in this order:
 
 1. ~~Manifest validation and a capability/version resolver.~~ **Done** (see `game/core/module-registry/README.md`): two test modules compose through one interface; missing, incompatible, ambiguous and cyclic dependencies are rejected with diagnostics.
-2. A deterministic simulation dispatcher/scheduler. Define update phases, fixed-tick order, event ordering and multi-rate scheduling. Rendering frame rate must not control simulation time.
+2. ~~A deterministic simulation dispatcher/scheduler.~~ **Done** (`game/src/core/simulation/SimulationScheduler.ts`; see `game/core/simulation/README.md`). Original requirement: Define update phases, fixed-tick order, event ordering and multi-rate scheduling. Rendering frame rate must not control simulation time.
 3. Entity identity and lifecycle, then typed command/event/observation/snapshot transport.
 4. Resource offer/demand/allocation contracts with observable denial and degraded behavior.
 5. Configuration resolution, diagnostics and save/replay contracts as their dependencies become stable.
