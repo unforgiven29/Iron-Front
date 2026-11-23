@@ -81,3 +81,11 @@ footer { display: flex; justify-content: space-between; gap: 14px; margin-top: 5
   .monitor-stats { grid-template-columns: repeat(2, 1fr); }
   .shell { width: calc(100% - 32px); }
 }
+
+/* Debug flight view */
+.flight { margin-top: 14px; }
+.flight-frame { position: relative; margin-top: 16px; border-radius: 10px; overflow: hidden; border: 1px solid #27333d; }
+.flight-canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: #0e151b; outline: none; cursor: crosshair; }
+.flight-canvas:focus-visible { box-shadow: inset 0 0 0 3px #83b8d2; }
+.flight-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 10px 16px; border-radius: 999px; background: rgba(10, 14, 18, 0.75); color: #e7edf2; font-weight: 650; pointer-events: none; }
+.flight-help { margin-top: 10px; }
