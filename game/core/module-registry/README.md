@@ -1,6 +1,12 @@
 # Module registry and capability dependency resolver
 
-**Owner:** game/core/module-registry. **Status:** design only; no runtime loader/registry is implemented.
+**Owner:** game/core/module-registry. **Status:** Stage 1 step 1 implemented: manifest validation, capability/version resolution, dependency graph, and synchronous composition from an explicit factory catalog. Not implemented yet: manifest discovery/loading from disk or network, async initialization, runtime lifecycle states beyond construct/dispose, and configuration loading.
+
+## Implementation
+- `game/src/core/modules/SemanticVersion.ts`: version parsing, precedence and ranges (`x.y.z`, `^`, `~`, `>=`/`>`/`<=`/`<`, space-separated AND, `*`). An unparseable range is an error, never "any". Prereleases match only ranges that name the same release's prerelease.
+- `game/src/core/modules/ModuleResolver.ts`: `resolveModules({ manifests, hostApiVersion, providerSelections })`. A pure function: input order never changes the result. It returns modules in provider-first order, the selected/rejected provider with a reason for every binding, and coded diagnostics (`MANIFEST_INVALID`, `DUPLICATE_MODULE`, `HOST_API_INCOMPATIBLE`, `INVALID_VERSION_RANGE`, `SELF_DEPENDENCY`, `MISSING_PROVIDER`, `INCOMPATIBLE_PROVIDER`, `AMBIGUOUS_PROVIDER`, `INVALID_SELECTION`, `PROVIDER_UNAVAILABLE`, `DEPENDENCY_CYCLE`, warning `OPTIONAL_DEPENDENCY_DEGRADED`). Rejection propagates to dependants: required dependants are rejected, optional dependants run degraded.
+- `game/src/core/modules/ModuleComposer.ts`: `composeModules(resolution, catalog)`. It constructs in dependency order. Each module sees only the capabilities its manifest binds (`require`/`optional`), and supplied capabilities must match `provides`. A factory failure disposes already-built modules in reverse order.
+- Tests: `game/tests/unit/SemanticVersion.test.ts`, `game/tests/unit/ModuleResolver.test.ts`, `game/tests/integration/ModuleComposition.test.ts`.
 
 ## Responsibility
 Discover manifests, validate identity/schema/version, index capabilities, resolve compatible providers, build the dependency graph and coordinate lifecycle. The registry manages composition metadata, not domain behavior.
