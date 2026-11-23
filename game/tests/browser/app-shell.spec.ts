@@ -28,3 +28,17 @@ test("runtime monitor runs the live simulation and accepts commands", async ({ p
   await page.getByRole("button", { name: "Spawn turbine" }).click();
   await expect(monitor.getByText("demo-monitor/turbine/t2 · active")).toBeVisible();
 });
+
+test("debug flight view flies with the keyboard and reports no errors", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  const canvas = page.getByLabel("Flight view. Click, then use the keyboard to fly.");
+  await canvas.click();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("d");
+  await page.getByRole("button", { name: "Reset (R)" }).click();
+  await expect(page.getByText("Fictional test airframe", { exact: false })).toBeVisible();
+  expect(errors).toEqual([]);
+});

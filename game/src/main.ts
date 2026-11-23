@@ -1,4 +1,5 @@
 import { SimulationClock } from "./core/time/SimulationClock.js";
+import { mountFlightView } from "./debug/FlightView.js";
 import { mountRuntimeMonitor } from "./debug/RuntimeMonitor.js";
 import "./styles.css";
 
@@ -26,6 +27,7 @@ main.innerHTML = [
   '<article class="panel"><p class="panel-label">MODULE RESOLVER</p><p class="metric metric-text">Implemented</p><p class="panel-note">Validation, dependency resolution, composition</p></article>',
   '</section>',
   '<section class="panel self-check"><div><p class="panel-label">CORE SELF-CHECK</p><p class="self-check-text" id="check-result">Ready. Run a 1/60-second frame through the 120 Hz clock.</p></div><button id="run-check" type="button">Run clock check</button></section>',
+  '<div id="flight-slot"></div>',
   '<div id="monitor-slot"></div>',
   '<footer><span>IRON-FRONT · STAGE 1</span><span>No placeholder capability is reported as implemented.</span></footer>'
 ].join("");
@@ -35,6 +37,10 @@ root.append(main);
 const monitorSlot = document.querySelector<HTMLElement>("#monitor-slot");
 if (!monitorSlot) throw new Error("Application shell is missing the runtime monitor slot.");
 mountRuntimeMonitor(monitorSlot);
+
+const flightSlot = document.querySelector<HTMLElement>("#flight-slot");
+if (!flightSlot) throw new Error("Application shell is missing the flight view slot.");
+mountFlightView(flightSlot);
 
 const tickValue = document.querySelector<HTMLElement>("#tick-value");
 const checkResult = document.querySelector<HTMLElement>("#check-result");
