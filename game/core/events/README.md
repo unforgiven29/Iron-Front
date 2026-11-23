@@ -1,6 +1,13 @@
 # Commands, events, observations and snapshots
 
-**Owner:** game/core/events. **Status:** TypeScript/schema contracts exist; runtime queues, dispatch, journal and delivery semantics are not complete.
+**Owner:** game/core/events. **Status:** in-process transport implemented in `game/src/core/events/MessageBus.ts` (tests: `game/tests/unit/MessageBus.test.ts`, `game/tests/integration/RuntimeLoop.test.ts`). Not yet implemented: event journal/replay serialization, command expiry/cancel policy, bounded retention of seen message ids, and cross-process/network transport.
+
+## Implemented contract
+- A message is accepted only if it passes the envelope JSON Schema, matches a registered `(contractId, contractVersion, kind)` and passes the contract's payload validator. It must also carry a unique `messageId` and be stamped with the bus's current tick. An observation must not claim acquisition after its publication tick.
+- `publish` only queues. `deliver()` drains in publish order. Anything published during delivery waits for the next `deliver()`, and `deliver()` is not re-entrant.
+- A command goes only to the single handler registered for `(contract, targetModuleId)`. That handler returns accept or reject-with-reason. Each command yields a `CommandOutcome` (with `correlationId`), including when no handler exists.
+- Events, observations and snapshots go to subscribers of that contract id in subscriber-id order. Consumers see only contracts they subscribed to. Snapshot payloads are deep-frozen.
+- A consumer or handler that throws is reported as a `ConsumerFault`, and other consumers still receive the message.
 
 ## Message meanings
 - Command: validated request with issuer, target, issue tick, payload, preconditions and expiry/cancel policy. Owner may accept, reject, limit or defer.

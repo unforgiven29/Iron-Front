@@ -20,7 +20,7 @@ The executable TypeScript is concentrated in `game/src/`. The current source tre
 | Time and scheduling | `game/src/core/time/SimulationClock.ts`, `game/src/core/simulation/SimulationScheduler.ts` | Fixed-step clock plus deterministic phase/priority/multi-rate scheduler with one-shot work, fault isolation and pause. Not a message dispatcher/event journal, time-scale policy or save/restore of scheduled work |
 | Coordinates | `game/src/core/coordinates/CoordinateFrames.ts` | Not a complete world/spatial engine |
 | Randomness | `game/src/core/random/SeededRandom.ts` | Not complete scenario/entity/subsystem stream orchestration |
-| Message shapes | `game/src/core/contracts/Messages.ts` | Not a validated message bus, dispatcher or event journal |
+| Messages and entities | `game/src/core/contracts/Messages.ts`, `game/src/core/events/MessageBus.ts`, `game/src/core/entities/EntityRegistry.ts` | Validated, deterministic in-process message bus and entity identity/lifecycle registry. Not an event journal, replay, save/load or network transport |
 | Module types and resolution | `game/src/core/modules/` (ModuleTypes, SemanticVersion, ModuleResolver, ModuleComposer) | Validates manifests, resolves capabilities/versions/dependencies (missing, incompatible, ambiguous, cyclic rejected with diagnostics) and composes modules from an explicit factory catalog. Not a manifest discovery/loader, async lifecycle host or configuration loader |
 | Rendering boundary | `game/src/rendering/RendererPort.ts` | Not a selected or implemented rendering engine |
 | Tests | Foundation unit tests and browser smoke test for the shell | Not aircraft, radar, missile or campaign acceptance coverage |
@@ -32,7 +32,7 @@ The README files under `physics/`, `sensors/`, `game/modules/`, `game/systems/` 
 Do not describe or build on these as though they already exist:
 
 - Module manifest discovery/loading, async module lifecycle states and configuration-driven runtime composition (validation, resolution and synchronous composition exist).
-- Deterministic event dispatcher/journal, multi-rate scheduler, entity store, resource allocator, diagnostics service, persistence, replay and complete spatial services.
+- Event journal/replay, entity component composition and save/load, resource allocator, diagnostics service, persistence, replay and complete spatial services.
 - Six-degree-of-freedom aircraft flight model, aerodynamic surface integration, propulsion simulation, flight controls/actuators, ground handling or aircraft-specific system networks.
 - Complete environment/atmosphere and terrain/collision runtime, RF propagation, radar waveform/receiver/processing/detection/tracking chain, RWR/ESM and passive emitter tracking, IRST/EO, sensor fusion or aircraft datalink runtime. Radar/ESM README files describe intended ownership only.
 - Aircraft installations, accurate clickable cockpits, startup procedures, operational aircraft, complete missile variant data, validated 6-DoF coefficient tables, full pulse-IQ radar missile seeker, calibrated monopulse seeker/CM susceptibility, fuze/warhead effects, ground units, infantry, naval units, AI, logistics or campaign simulation.
@@ -82,7 +82,7 @@ Build and test narrow, replaceable services in this order:
 
 1. ~~Manifest validation and a capability/version resolver.~~ **Done** (see `game/core/module-registry/README.md`): two test modules compose through one interface; missing, incompatible, ambiguous and cyclic dependencies are rejected with diagnostics.
 2. ~~A deterministic simulation dispatcher/scheduler.~~ **Done** (`game/src/core/simulation/SimulationScheduler.ts`; see `game/core/simulation/README.md`). Original requirement: Define update phases, fixed-tick order, event ordering and multi-rate scheduling. Rendering frame rate must not control simulation time.
-3. Entity identity and lifecycle, then typed command/event/observation/snapshot transport.
+3. ~~Entity identity and lifecycle, then typed command/event/observation/snapshot transport.~~ **Done** (`game/src/core/entities/EntityRegistry.ts`, `game/src/core/events/MessageBus.ts`; see the owner READMEs).
 4. Resource offer/demand/allocation contracts with observable denial and degraded behavior.
 5. Configuration resolution, diagnostics and save/replay contracts as their dependencies become stable.
 
