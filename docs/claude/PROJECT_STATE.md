@@ -91,7 +91,8 @@ Build and test narrow, replaceable services in this order:
 ### Stage 2 progress
 1. **Done:** rigid-body 6-DoF state, force/moment contract and RK4 integrator (`game/src/physics/rigidbody/RigidBody.ts`; see `physics/rigidbody/README.md`).
 2. **Done:** standard atmosphere, gravity, wind-field contract and local airflow (`game/src/physics/environment/Atmosphere.ts`; see `physics/environment/README.md`).
-3. Next: terrain surface data with explicit missing-data failure, collision/query contracts and a spatial index; then a fixed-render-rate replay comparison across these services. A live runtime monitor (`game/src/debug/`) shows these services running in the browser; it is a debug view with a fictional demo module, not a simulator feature.
+3. **Done:** terrain heightfield tiles, validated surface queries with explicit no-data/outside-coverage, and a seeded synthetic generator (`game/src/world/terrain/Terrain.ts`; see `game/world/terrain/README.md`).
+4. Next: collision/query contracts and a spatial index; then a fixed-render-rate replay comparison across these services. A live runtime monitor (`game/src/debug/`) shows these services running in the browser; it is a debug view with a fictional demo module, not a simulator feature.
 
 Keep each step a small vertical slice with contract tests. Do not create a monolithic `SimulationManager` or implement all planned services in one pass.
 
