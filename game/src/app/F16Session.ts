@@ -1,6 +1,6 @@
 /**
- * Page section that launches the F-16C Block 50 cockpit on demand.
- * Three.js and the view are loaded lazily, so the rest of the page stays light.
+ * One F-16C Block 50 flying session: aircraft, terrain, Three.js cockpit view, keyboard input and
+ * the frame loop. Three.js is loaded lazily by the caller (see GameScreen).
  */
 import { createTestTerrain } from "../debug/DebugFlyer.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
@@ -13,50 +13,20 @@ const DEG = 180 / Math.PI;
 const KT = 1.943844;
 const FT = 3.28084;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
+export function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag);
   if (className) n.className = className;
   if (text !== undefined) n.textContent = text;
   return n;
 }
 
-export function mountF16Cockpit(parent: HTMLElement): void {
-  const section = el("section", "panel flight");
-  section.setAttribute("aria-label", "F-16C Block 50 cockpit");
-  const head = el("div", "monitor-head");
-  const titles = el("div");
-  titles.append(
-    el("p", "panel-label", "F-16C BLOCK 50 · PROVISIONAL FLIGHT MODEL"),
-    el("p", "panel-note", "NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific), estimated F110 engine, project-designed fly-by-wire. Untextured cockpit; Three.js renderer is provisional (ADR-0002).")
-  );
-  const start = el("button", "ghost", "Start F-16");
-  start.type = "button";
-  head.append(titles, start);
-  const frame = el("div", "cockpit-frame");
-  frame.tabIndex = 0;
-  frame.setAttribute("aria-label", "F-16 cockpit view. Click, then use the keyboard to fly.");
-  const hint = el("p", "flight-hint", "Press Start F-16");
-  frame.append(hint);
-  const help = el("p", "panel-note flight-help",
-    "Keys: W/S pitch · A/D roll · Q/E yaw · Shift/Ctrl throttle · F fly-by-wire NORM/DIRECT · C CG test setting · R reset. Click the yellow (FLCS) and blue (CG) console switches. FLCS DIRECT and CG are simulation test switches, not real F-16 controls.");
-  section.append(head, frame, help);
-  parent.append(section);
-
-  start.addEventListener("click", async () => {
-    start.disabled = true;
-    hint.textContent = "Loading…";
-    try {
-      const { ThreeCockpitView } = await import("../rendering/three/ThreeCockpitView.js");
-      hint.hidden = true;
-      run(ThreeCockpitView, frame, start);
-    } catch (e) {
-      hint.textContent = `Could not start the 3D cockpit: ${e instanceof Error ? e.message : String(e)}`;
-      start.disabled = false;
-    }
-  });
+export interface F16SessionHandle {
+  readonly paused: boolean;
+  setPaused(paused: boolean): void;
+  restart(): void;
 }
 
-function run(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, start: HTMLButtonElement): void {
+export function startF16Session(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement): F16SessionHandle {
   const terrain = createTestTerrain();
   const startState = () => {
     const s = terrain.sample(0, -12000);
@@ -75,16 +45,19 @@ function run(View: typeof import("../rendering/three/ThreeCockpitView.js").Three
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
   };
   const view = new View(frame, F16_COCKPIT_LAYOUT, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source);
-  start.textContent = "Running";
+  let paused = false;
+  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0 }; };
 
   const held = new Set<string>();
   let stick = { pitch: 0, roll: 0, yaw: 0 };
   let throttle = jet.snapshot().throttle;
+  void throttle;
   frame.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
     if (e.repeat) return;
-    if (k === "r") { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0 }; return; }
+    if (paused) return;
+    if (k === "r") { restart(); return; }
     if (k === "f") { jet.controls.cycle(F16_SWITCHES.flcsMode, "keyboard"); return; }
     if (k === "c") { jet.controls.cycle(F16_SWITCHES.testCg, "keyboard"); return; }
     held.add(k);
@@ -109,12 +82,17 @@ function run(View: typeof import("../rendering/three/ThreeCockpitView.js").Three
     if (has("control")) throttle = Math.max(0, throttle - 0.4 * dt);
     jet.setPilotInputs(stick);
     jet.setThrottle(throttle);
-    jet.advanceFrame(dt);
+    if (!paused) jet.advanceFrame(dt);
     view.render();
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
   frame.focus();
+  return {
+    get paused() { return paused; },
+    setPaused(p: boolean) { paused = p; held.clear(); if (!p) { last = null; frame.focus(); } },
+    restart
+  };
 }
 
 function hud(s: F16Snapshot): HudData {
