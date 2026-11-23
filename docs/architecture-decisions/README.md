@@ -11,3 +11,4 @@ ADRs are append-only. Supersede an accepted decision with a new ADR rather than 
 ## Current decisions
 
 - ADR-0001: Module composition, shared-engine ownership and dependency direction.
+- ADR-0002: Provisional renderer: Three.js (pending the Stage 4 comparison).
