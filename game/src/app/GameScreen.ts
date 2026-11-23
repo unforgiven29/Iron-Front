@@ -26,7 +26,7 @@ export function mountGameScreen(root: HTMLElement): void {
   const controls = el("div", "game-controls");
   for (const [k, v] of [
     ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw"], ["Shift / Ctrl", "Throttle"],
-    ["F", "Fly-by-wire NORM / DIRECT (test)"], ["C", "CG test setting"], ["R", "Reset"], ["Esc / P", "Pause"]
+    ["F", "Fly-by-wire NORM / DIRECT (test)"], ["C", "CG test setting"], ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
   ] as const) {
     const row = el("div", "game-control-row");
     row.append(el("kbd", undefined, k), el("span", undefined, v));

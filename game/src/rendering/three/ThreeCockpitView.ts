@@ -56,6 +56,12 @@ export class ThreeCockpitView {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly world = new THREE.Group();
   private readonly cockpit = new THREE.Group();
+  /** Aircraft-fixed frame at the design eye point; the cockpit and the head (camera) ride in it. */
+  private readonly rig = new THREE.Group();
+  private lookYaw = 0;
+  private lookPitch = 0;
+  private fov: number;
+  private dragging = false;
   private readonly animated: { part: CockpitPart; mesh: THREE.Mesh; base: THREE.Quaternion; basePos: THREE.Vector3 }[] = [];
   private readonly screens = new Map<string, { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }>();
   private readonly hudCanvas: HTMLCanvasElement;
@@ -85,14 +91,32 @@ export class ThreeCockpitView {
     this.scene.add(sun);
 
     this.camera = new THREE.PerspectiveCamera(layout.fieldOfViewDeg, 16 / 9, 0.05, 60000);
-    this.scene.add(this.camera, this.world);
-    this.camera.add(this.cockpit);
+    this.fov = layout.fieldOfViewDeg;
+    this.scene.add(this.rig, this.world);
+    this.rig.add(this.cockpit, this.camera);
     const cockpitLight = new THREE.PointLight("#ffffff", 0.6, 3);
-    this.camera.add(cockpitLight);
+    this.rig.add(cockpitLight);
 
     this.world.add(buildTerrainMesh(terrain, terrainBounds));
     this.buildCockpit();
     this.renderer.domElement.addEventListener("click", (e) => this.onClick(e));
+    // Head look: hold the right mouse button and drag; wheel zooms.
+    const el = this.renderer.domElement;
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+    el.addEventListener("pointerdown", (e) => { if (e.button === 2) { this.dragging = true; el.setPointerCapture(e.pointerId); } });
+    el.addEventListener("pointerup", (e) => { if (e.button === 2) { this.dragging = false; el.releasePointerCapture(e.pointerId); } });
+    el.addEventListener("pointermove", (e) => {
+      if (!this.dragging) return;
+      const k = (this.fov / 60) * 0.004;
+      this.lookYaw = Math.max(-2.8, Math.min(2.8, this.lookYaw - e.movementX * k));
+      this.lookPitch = Math.max(-0.7, Math.min(1.5, this.lookPitch - e.movementY * k));
+    });
+    el.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      this.fov = Math.max(25, Math.min(95, this.fov + Math.sign(e.deltaY) * 4));
+      this.camera.fov = this.fov;
+      this.camera.updateProjectionMatrix();
+    }, { passive: false });
   }
 
   /** Render one frame from the current snapshot. */
@@ -104,7 +128,9 @@ export class ThreeCockpitView {
     const right = enuToThree(rotateVector(q, [0, 1, 0]));
     const up = enuToThree(rotateVector(q, [0, 0, -1]));
     const back = enuToThree(rotateVector(q, [-1, 0, 0]));
-    this.camera.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, back));
+    this.rig.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, back));
+    this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch, this.lookYaw, 0, "YXZ"));
+    this.rig.updateMatrixWorld(true);
     const eyeWorld = rotateVector(q, this.layout.eyeFromCgM as Vector3);
     const eye = enuToThree([s.positionEnuM[0] + eyeWorld[0], s.positionEnuM[1] + eyeWorld[1], s.positionEnuM[2] + eyeWorld[2]]);
     this.world.position.copy(eye).multiplyScalar(-1);
@@ -113,6 +139,25 @@ export class ThreeCockpitView {
     if (this.frame++ % 6 === 0) this.drawScreens();
     this.renderer.render(this.scene, this.camera);
     this.drawHud(s);
+  }
+
+  /** Head look angles (rad): yaw left positive, pitch up positive. */
+  public get look(): { readonly yaw: number; readonly pitch: number; readonly fovDeg: number } {
+    return { yaw: this.lookYaw, pitch: this.lookPitch, fovDeg: this.fov };
+  }
+
+  public setLook(yaw: number, pitch: number): void {
+    this.lookYaw = Math.max(-2.8, Math.min(2.8, yaw));
+    this.lookPitch = Math.max(-0.7, Math.min(1.5, pitch));
+  }
+
+  /** Re-centre the view and restore the default field of view. */
+  public resetLook(): void {
+    this.lookYaw = 0;
+    this.lookPitch = 0;
+    this.fov = this.layout.fieldOfViewDeg;
+    this.camera.fov = this.fov;
+    this.camera.updateProjectionMatrix();
   }
 
   public dispose(): void {
@@ -248,6 +293,15 @@ export class ThreeCockpitView {
     g.font = `600 ${Math.round(u * 2.2)}px ui-monospace, Menlo, monospace`;
     g.textBaseline = "middle";
 
+    d.warnings.forEach((wn, i) => {
+      g.textAlign = "center";
+      g.font = `700 ${Math.round(u * 2.6)}px ui-monospace, Menlo, monospace`;
+      g.fillStyle = wn.level === "warning" ? "#ff8a7a" : "#ffd36e";
+      g.fillText(wn.text, w / 2, (5 + i * 3.4) * u);
+    });
+    g.font = `600 ${Math.round(u * 2.2)}px ui-monospace, Menlo, monospace`;
+    g.fillStyle = color;
+
     // Symbology is clipped to the HUD's field of view around boresight.
     const bore = this.project(rotateVector(s.bodyToWorld, [1, 0, 0]));
     if (!bore) return;
@@ -313,12 +367,6 @@ export class ThreeCockpitView {
     g.fillText(`α ${d.alphaDeg.toFixed(1)}`, cx - 20 * u, cy + 14 * u);
     g.restore();
 
-    d.warnings.forEach((wn, i) => {
-      g.textAlign = "center";
-      g.font = `700 ${Math.round(u * 2.6)}px ui-monospace, Menlo, monospace`;
-      g.fillStyle = wn.level === "warning" ? "#ff8a7a" : "#ffd36e";
-      g.fillText(wn.text, w / 2, (5 + i * 3.4) * u);
-    });
   }
 }
 

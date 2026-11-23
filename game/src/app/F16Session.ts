@@ -60,6 +60,7 @@ export function startF16Session(View: typeof import("../rendering/three/ThreeCoc
     if (k === "r") { restart(); return; }
     if (k === "f") { jet.controls.cycle(F16_SWITCHES.flcsMode, "keyboard"); return; }
     if (k === "c") { jet.controls.cycle(F16_SWITCHES.testCg, "keyboard"); return; }
+    if (k === "v") { view.resetLook(); return; }
     held.add(k);
   });
   frame.addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
