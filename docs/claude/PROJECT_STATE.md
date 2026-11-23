@@ -32,7 +32,7 @@ The README files under `physics/`, `sensors/`, `game/modules/`, `game/systems/` 
 Do not describe or build on these as though they already exist:
 
 - Module manifest discovery/loading, async module lifecycle states and configuration-driven runtime composition (validation, resolution and synchronous composition exist).
-- Event journal/replay, entity component composition and save/load, resource allocator, diagnostics service, persistence, replay and complete spatial services.
+- Event journal/replay, entity component composition and save/load, resource quality matching and reservations, resource allocator, diagnostics service, persistence, replay and complete spatial services.
 - Six-degree-of-freedom aircraft flight model, aerodynamic surface integration, propulsion simulation, flight controls/actuators, ground handling or aircraft-specific system networks.
 - Complete environment/atmosphere and terrain/collision runtime, RF propagation, radar waveform/receiver/processing/detection/tracking chain, RWR/ESM and passive emitter tracking, IRST/EO, sensor fusion or aircraft datalink runtime. Radar/ESM README files describe intended ownership only.
 - Aircraft installations, accurate clickable cockpits, startup procedures, operational aircraft, complete missile variant data, validated 6-DoF coefficient tables, full pulse-IQ radar missile seeker, calibrated monopulse seeker/CM susceptibility, fuze/warhead effects, ground units, infantry, naval units, AI, logistics or campaign simulation.
@@ -83,7 +83,7 @@ Build and test narrow, replaceable services in this order:
 1. ~~Manifest validation and a capability/version resolver.~~ **Done** (see `game/core/module-registry/README.md`): two test modules compose through one interface; missing, incompatible, ambiguous and cyclic dependencies are rejected with diagnostics.
 2. ~~A deterministic simulation dispatcher/scheduler.~~ **Done** (`game/src/core/simulation/SimulationScheduler.ts`; see `game/core/simulation/README.md`). Original requirement: Define update phases, fixed-tick order, event ordering and multi-rate scheduling. Rendering frame rate must not control simulation time.
 3. ~~Entity identity and lifecycle, then typed command/event/observation/snapshot transport.~~ **Done** (`game/src/core/entities/EntityRegistry.ts`, `game/src/core/events/MessageBus.ts`; see the owner READMEs).
-4. Resource offer/demand/allocation contracts with observable denial and degraded behavior.
+4. ~~Resource offer/demand/allocation contracts with observable denial and degraded behavior.~~ **Done** (`game/src/core/resources/ResourceArbiter.ts`; see `game/core/resources/README.md`).
 5. Configuration resolution, diagnostics and save/replay contracts as their dependencies become stable.
 
 Keep each step a small vertical slice with contract tests. Do not create a monolithic `SimulationManager` or implement all planned services in one pass.
