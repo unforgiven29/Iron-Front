@@ -95,6 +95,9 @@ Build and test narrow, replaceable services in this order:
 4. **Done:** spatial broad-phase index and collision queries (`game/src/core/spatial/SpatialIndex.ts`, `game/src/physics/collision/Collision.ts`).
 5. **Done:** Stage 2 exit scenario (`game/tests/integration/Stage2Physics.test.ts`): rigid body, atmosphere, wind, terrain and collision on the scheduler give identical results at 30/60/144 fps and through save/load, and missing terrain yields `unknown`, never flat ground.
 
+### Stage 3 progress (provisional)
+1. **Done, provisional data:** F-16C Block 50 flight-model slice (`game/src/platforms/aircraft/f16c-block50/`). Uses NASA TP-1538/Stevens & Lewis low-speed tables (not Block 50 data), an estimated F110 engine and a project-designed FLCS. Every value is labelled; see `game/modules/planes/F-16/flight-model/README.md`. **This is not a validated Block 50 model**, and Stage 3 exit is not met.
+
 **Stage 2 exit criteria have passing tests.** Remaining Stage 2 gaps are listed in each owner README. The next work is Stage 3 (F-16C Block 50 vertical slice), which needs sourced aircraft data per the platform dossier. A debug flyer (`game/src/debug/`) exercises these services with a fictional, synthetic-data airframe; it is not an aircraft model.
 
 
