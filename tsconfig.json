@@ -11,11 +11,12 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["game/src/**/*.ts", "game/tests/unit/**/*.ts"],
+  "include": ["game/src/**/*.ts", "game/tests/unit/**/*.ts", "game/tests/integration/**/*.ts"],
   "exclude": ["node_modules", "dist", "game/tests/browser"]
 }

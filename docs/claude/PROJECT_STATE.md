@@ -21,7 +21,7 @@ The executable TypeScript is concentrated in `game/src/`. The current source tre
 | Coordinates | `game/src/core/coordinates/CoordinateFrames.ts` | Not a complete world/spatial engine |
 | Randomness | `game/src/core/random/SeededRandom.ts` | Not complete scenario/entity/subsystem stream orchestration |
 | Message shapes | `game/src/core/contracts/Messages.ts` | Not a validated message bus, dispatcher or event journal |
-| Module types | `game/src/core/modules/ModuleTypes.ts` | Not a manifest loader, registry, dependency resolver or lifecycle host |
+| Module types and resolution | `game/src/core/modules/` (ModuleTypes, SemanticVersion, ModuleResolver, ModuleComposer) | Validates manifests, resolves capabilities/versions/dependencies (missing, incompatible, ambiguous, cyclic rejected with diagnostics) and composes modules from an explicit factory catalog. Not a manifest discovery/loader, async lifecycle host or configuration loader |
 | Rendering boundary | `game/src/rendering/RendererPort.ts` | Not a selected or implemented rendering engine |
 | Tests | Foundation unit tests and browser smoke test for the shell | Not aircraft, radar, missile or campaign acceptance coverage |
 
@@ -31,7 +31,7 @@ The README files under `physics/`, `sensors/`, `game/modules/`, `game/systems/` 
 
 Do not describe or build on these as though they already exist:
 
-- Module manifest validation/loading, capability resolution, dependency graph, module lifecycle and runtime composition.
+- Module manifest discovery/loading, async module lifecycle states and configuration-driven runtime composition (validation, resolution and synchronous composition exist).
 - Deterministic event dispatcher/journal, multi-rate scheduler, entity store, resource allocator, diagnostics service, persistence, replay and complete spatial services.
 - Six-degree-of-freedom aircraft flight model, aerodynamic surface integration, propulsion simulation, flight controls/actuators, ground handling or aircraft-specific system networks.
 - Complete environment/atmosphere and terrain/collision runtime, RF propagation, radar waveform/receiver/processing/detection/tracking chain, RWR/ESM and passive emitter tracking, IRST/EO, sensor fusion or aircraft datalink runtime. Radar/ESM README files describe intended ownership only.
@@ -80,7 +80,7 @@ The successful CI run above executed `npm run check` and `npm run test:e2e`. Kee
 
 Build and test narrow, replaceable services in this order:
 
-1. Manifest validation and a capability/version resolver. Prove it with two small test modules, including missing, incompatible and cyclic dependencies.
+1. ~~Manifest validation and a capability/version resolver.~~ **Done** (see `game/core/module-registry/README.md`): two test modules compose through one interface; missing, incompatible, ambiguous and cyclic dependencies are rejected with diagnostics.
 2. A deterministic simulation dispatcher/scheduler. Define update phases, fixed-tick order, event ordering and multi-rate scheduling. Rendering frame rate must not control simulation time.
 3. Entity identity and lifecycle, then typed command/event/observation/snapshot transport.
 4. Resource offer/demand/allocation contracts with observable denial and degraded behavior.
