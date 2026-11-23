@@ -31,7 +31,7 @@ Find the canonical owner and search for existing implementations first. State th
 
 ## Current implementation gate
 
-The executable foundation is small: application shell, fixed-step clock, coordinate helpers, seeded random generator, message/module type contracts and renderer port. The full runtime loader/scheduler, flight model, aircraft, radar, weapon and campaign systems are not implemented. Stage 0.5 foundation hardening is complete and CI-verified on `main` (see `docs/claude/PROJECT_STATE.md`). The next work is Stage 1 core runtime. Do not begin aircraft or sensor implementation until Stage 1 exit criteria pass.
+The executable foundation is the Stage 1 core runtime: module manifest resolution/composition, deterministic phase scheduler, entity registry, typed message bus, resource arbitration, layered configuration, diagnostics log and save/replay, plus a debug runtime monitor page. The flight model, aircraft, radar, weapon and campaign systems are not implemented. Stage 1 exit criteria have passing tests (see `docs/claude/PROJECT_STATE.md`). The next work is Stage 2 physics and world foundations. Do not begin aircraft or sensor implementation until Stage 2 exit criteria pass.
 
 ## Repository workflow
 

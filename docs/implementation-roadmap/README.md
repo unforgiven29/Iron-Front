@@ -24,6 +24,8 @@ Implement a validated module manifest loader/registry and capability resolver; v
 
 Exit: missing/incompatible/cyclic dependencies rejected; two test modules compose through one interface; replay reproduces state; resource failures report causes.
 
+Status: all four exit criteria have passing tests (see `docs/claude/PROJECT_STATE.md`). Remaining Stage 1 gaps are listed in each core owner README.
+
 ## Stage 2 — Physics and world foundations
 
 Implement world coordinates/local ENU, rigid-body integration and force/moment contracts, collision/query contracts, atmosphere sampling/local air velocity, terrain surface data and spatial index. Lay the world data contract so both deterministic generated theatres and region-streamed, licensed geospatial Earth tiles can use the same interfaces.

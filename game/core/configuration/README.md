@@ -1,6 +1,12 @@
 # Core configuration and schema validation
 
-**Owner:** game/core/configuration. **Status:** repository JSON validation tooling exists; runtime configuration discovery/resolution remains future work.
+**Owner:** game/core/configuration. **Status:** layered resolution implemented in `game/src/core/configuration/ConfigurationResolver.ts` (tests: `game/tests/unit/ConfigurationResolver.test.ts`). Not yet implemented: discovering configuration files from manifests, presentation-preference layer, a reconfiguration boundary during a running scenario, and data migrations.
+
+## Implemented contract
+- Precedence is global < family < variant < installation < scenario, whatever order the layers are supplied in. A duplicate or unknown layer is rejected, never guessed.
+- Objects merge key by key. Arrays and scalars replace wholesale. Every resolved leaf records the `layer:source` it came from.
+- Validation is the JSON Schema plus semantic checks. Errors give the path, the message and the layer that supplied the bad value. Values are never coerced.
+- The resolved configuration is deep-frozen.
 
 ## Responsibility
 Find configuration references, select versioned schemas, validate data and produce immutable resolved configuration before runtime construction. Report the origin of every resolved value.
