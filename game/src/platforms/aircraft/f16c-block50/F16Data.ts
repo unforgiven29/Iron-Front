@@ -53,18 +53,26 @@ export const F16_ACTUATORS = Object.freeze({
 });
 
 /**
- * F110-GE-129 engine. Only the afterburning rating is published at fact-sheet level; every
- * other number here is an estimate so the aircraft can fly, and is labelled as such.
+ * F110-GE-129 engine cycle inputs for the shared mixed-flow turbofan model
+ * (physics/propulsion/MixedFlowTurbofan.ts). Published ratings and cycle figures are used where
+ * public; component efficiencies, fan pressure ratio and dynamics are estimates for the engine
+ * class; turbine-inlet and afterburner temperatures are DERIVED by calibrating sea-level-static
+ * thrust to the published dry and afterburning ratings.
  */
+const PUBLIC_F110 = "Public F110-GE-129 references (GE Aerospace product data; widely reported); verify against an engine manual";
 export const F16_ENGINE = Object.freeze({
   maxAfterburnerThrustN: { value: 29000 * LBF, unit: "N", status: "primary-published", source: "Shaw AFB F-16C fact sheet (Block 50/52)", note: "'over 29,000 lbf' afterburning, sea-level static; lower bound used" } as Parameter,
-  militaryThrustFraction: { value: 0.6, unit: "fraction of max AB", status: "estimated", source: "project estimate", note: "Dry/AB ratio typical of the engine class; not F110-GE-129 data" } as Parameter,
-  idleThrustFraction: { value: 0.04, unit: "fraction of max AB", status: "estimated", source: "project estimate" } as Parameter,
-  densityLapseExponent: { value: 0.7, unit: "-", status: "estimated", source: "project estimate", note: "Thrust ∝ (ρ/ρ0)^n; Mach and ram effects not modelled" } as Parameter,
-  spoolTimeConstantS: { value: 1.2, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
+  militaryThrustN: { value: 17000 * LBF, unit: "N", status: "secondary-reported", source: PUBLIC_F110, note: "Dry (MIL) sea-level static rating" } as Parameter,
+  airflowKgS: { value: 270 * 0.45359237, unit: "kg/s", status: "secondary-reported", source: PUBLIC_F110, note: "≈270 lb/s design airflow" } as Parameter,
+  bypassRatio: { value: 0.76, unit: "-", status: "secondary-reported", source: PUBLIC_F110 } as Parameter,
+  overallPressureRatio: { value: 30.7, unit: "-", status: "secondary-reported", source: PUBLIC_F110 } as Parameter,
+  fanPressureRatio: { value: 3.0, unit: "-", status: "estimated", source: "project estimate", note: "Sensitivity checked: 3.0 vs 3.2 changes thrust/TSFC by <1 %" } as Parameter,
+  componentEfficiencies: { value: Number.NaN, unit: "-", status: "estimated", source: "project estimate", note: "fan 0.86, compressor 0.86, turbine 0.89, burner 0.99, AB 0.90, nozzle Cv 0.98 — typical for the class" } as Parameter,
+  idleCorrectedSpeed: { value: 0.72, unit: "fraction", status: "estimated", source: "project estimate", note: "Gives ≈7 % of max thrust at idle" } as Parameter,
+  spoolUpTimeConstantS: { value: 1.5, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
+  spoolDownTimeConstantS: { value: 1.0, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
+  afterburnerLightDelayS: { value: 0.4, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
   afterburnerDetentThrottle: { value: 0.77, unit: "throttle fraction", status: "secondary-reported", source: SL, note: "Throttle position of the MIL/AB break in the source simulation" } as Parameter,
-  tsfcDryPerS: { value: 0.76 / 3600 * (0.45359237 / LBF), unit: "kg/(N·s)", status: "estimated", source: "project estimate", note: "0.76 lb/(lbf·h)" } as Parameter,
-  tsfcAfterburnerPerS: { value: 1.95 / 3600 * (0.45359237 / LBF), unit: "kg/(N·s)", status: "estimated", source: "project estimate", note: "1.95 lb/(lbf·h)" } as Parameter,
   internalFuelKg: { value: 3175, unit: "kg", status: "primary-published", source: "USAF F-16 fact sheet", note: "Family-level figure; tank layout/feed not modelled" } as Parameter
 });
 

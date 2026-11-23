@@ -123,13 +123,14 @@ function mfd(screen: string, s: F16Snapshot): MfdPage {
       title: "ENG",
       lines: [
         `THR  ${(s.throttle * 100).toFixed(0).padStart(3)} %`,
-        `PWR  ${(s.engine.power * 100).toFixed(0).padStart(3)} %`,
+        `RPM  ${(s.engine.power * 100).toFixed(0).padStart(3)} %`,
+        `TIT  ${s.engine.turbineInletTemperatureK.toFixed(0)} K`,
         `THRUST ${(s.engine.thrustN / 1000).toFixed(1)} kN`,
         `       ${((s.engine.thrustN / max) * 100).toFixed(0)}% of max`,
         `A/B  ${s.engine.afterburner ? "ON" : "OFF"}`,
         `FF   ${(s.engine.fuelFlowKgS * 3600).toFixed(0)} kg/h`,
         `FUEL ${s.engine.fuelKg.toFixed(0)} kg`,
-        "ENGINE MODEL: ESTIMATED"
+        "F110 CYCLE: CALIBRATED"
       ]
     };
   }
