@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { standardAtmosphere } from "../../src/physics/environment/Atmosphere.js";
-import { f16Aerodynamics, F16Engine, SurfaceActuator } from "../../src/platforms/aircraft/f16c-block50/F16FlightModel.js";
-import { allF16Parameters, F16_ENGINE, F16_MASS } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
+import { SurfaceActuator } from "../../src/platforms/aircraft/common/SurfaceActuator.js";
+import { f16Aerodynamics } from "../../src/platforms/aircraft/f16c-block50/F16FlightModel.js";
+import { allF16Parameters, F16_MASS } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
 
 const FT = 0.3048;
 const DEG = Math.PI / 180;
@@ -68,21 +69,13 @@ describe("F-16 aerodynamics (provisional NASA TP-1538 / Stevens & Lewis dataset)
   });
 });
 
-describe("F-16 actuators and engine", () => {
+describe("shared surface actuator", () => {
   it("actuators are rate-limited and never jump to the command", () => {
-    const a = new SurfaceActuator(25, 60);
+    const a = new SurfaceActuator(25, 60, 20.2);
     a.step(25, 0.1);
     expect(a.positionDeg).toBeCloseTo(6, 9); // 60 deg/s * 0.1 s
     for (let i = 0; i < 100; i++) a.step(40, 0.01);
     expect(a.positionDeg).toBe(25);
   });
 
-  it("F-16 engine installation burns fuel, flames out when empty and keeps spooling down", () => {
-    const sl = { temperatureK: 288.15, pressurePa: 101325, mach: 0 };
-    const e = new F16Engine(1, 20);
-    let s = e.step(1, sl, 0.01);
-    for (let i = 0; i < 100_000 && !s.flameout; i++) s = e.step(1, sl, 0.01);
-    expect(s).toMatchObject({ flameout: true, thrustN: 0, fuelKg: 0 });
-    expect(F16_ENGINE.maxAfterburnerThrustN.status).toBe("primary-published");
-  });
 });

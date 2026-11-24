@@ -31,6 +31,7 @@ A subsystem guide may refine but may not contradict global ownership/conventions
 | Installed inlet / distortion / exhaust coupling | physics/flight-model/propulsion-integration/README.md | exact engine/inlet installation, atmosphere and engine-family model |
 | Aircraft landing gear / tire / brakes / ground handling | physics/ground-handling/README.md | exact aircraft gear installation, collision, rigidbody, hydraulic/electrical and damage owners |
 | Aircraft control surfaces / high-lift devices | physics/flight-model/control-surfaces/README.md and high-lift-devices/README.md | exact aircraft controls-and-actuators and systems dossiers |
+| Add an aircraft package to the game (code) | docs/claude/adding-an-aircraft.md | game/src/platforms/aircraft/common/AircraftDefinition.ts and the F-16 package as an example |
 | New full-fidelity aircraft / platform research | docs/platform-reference-program/README.md and the exact aircraft dossier | exact platform source register, flight-model/system/sensor/store guides |
 
 | Implement or research F-16C Block 50 / MiG-29 product 9.13 | exact dossier in docs/platform-reference-program/aircraft/ plus matching game/modules/planes/<platform>/README.md | source register, exact engine/sensor/store fit, acceptance tests; preserve all variant caveats |

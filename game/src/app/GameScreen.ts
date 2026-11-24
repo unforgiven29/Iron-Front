@@ -2,10 +2,15 @@
  * Main game screen (route "/"): full-viewport F-16C Block 50 with a start/pause menu.
  * Developer tools live on a separate route (#debug).
  */
-import { el, startF16Session, type F16SessionHandle } from "./F16Session.js";
+import { loadAircraftCatalog } from "./AircraftCatalog.js";
+import { el, startAircraftSession, type AircraftSessionHandle } from "./AircraftSession.js";
 
 export function mountGameScreen(root: HTMLElement): void {
   document.body.classList.add("game-mode");
+  const catalog = loadAircraftCatalog();
+  const aircraftId = catalog.ids[0];
+  if (!aircraftId) throw new Error(`No aircraft could be loaded: ${catalog.problems.join("; ")}`);
+  const definition = catalog.definition(aircraftId);
   const screen = el("main", "game-screen");
   const frame = el("div", "game-frame");
   frame.tabIndex = 0;
@@ -16,7 +21,7 @@ export function mountGameScreen(root: HTMLElement): void {
   menu.setAttribute("aria-label", "Game menu");
   const card = el("div", "game-menu-card");
   const title = el("h1", "game-title", "IRON-FRONT");
-  const subtitle = el("p", "game-subtitle", "F-16C Block 50");
+  const subtitle = el("p", "game-subtitle", definition.displayName);
   const status = el("p", "game-status", "");
   const fly = el("button", "game-button primary", "Fly");
   fly.type = "button";
@@ -32,8 +37,7 @@ export function mountGameScreen(root: HTMLElement): void {
     row.append(el("kbd", undefined, k), el("span", undefined, v));
     controls.append(row);
   }
-  const note = el("p", "game-note",
-    "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6), estimated engine, project-designed fly-by-wire.");
+  const note = el("p", "game-note", definition.dataNote);
   const debug = el("a", "game-link", "Developer tools →");
   debug.href = "#debug";
   card.append(title, subtitle, status, fly, restart, controls, note, debug);
@@ -41,7 +45,7 @@ export function mountGameScreen(root: HTMLElement): void {
   screen.append(frame, menu);
   root.append(screen);
 
-  let session: F16SessionHandle | null = null;
+  let session: AircraftSessionHandle | null = null;
   const showMenu = (paused: boolean) => {
     menu.hidden = false;
     fly.textContent = paused ? "Resume" : "Fly";
@@ -61,7 +65,7 @@ export function mountGameScreen(root: HTMLElement): void {
     status.textContent = "Loading…";
     try {
       const { ThreeCockpitView } = await import("../rendering/three/ThreeCockpitView.js");
-      session = startF16Session(ThreeCockpitView, frame);
+      session = startAircraftSession(ThreeCockpitView, frame, definition);
       status.textContent = "";
       hideMenu();
     } catch (e) {
