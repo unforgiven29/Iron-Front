@@ -97,6 +97,7 @@ export class FixedWingAircraft {
   private readonly surfaceLimits: ReadonlyMap<string, number>;
   private readonly gear: LandingGear | undefined;
   private gearHandleDown = true;
+  private readonly fuelCutoff = new Set<string>();
   private gearCrash: string | undefined;
   private surfaceRates: Record<string, number> = {};
   private engines: { id: string; control: Fadec; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
@@ -124,6 +125,7 @@ export class FixedWingAircraft {
     this.surfaceLimits = new Map(definition.surfaces.map((s) => [s.id, Math.max(Math.abs(s.limitDeg), Math.abs(s.minDeg ?? s.limitDeg))]));
     const context = {
       setGearHandle: (down: boolean) => { this.gearHandleDown = down; },
+      setEngineFuelCutoff: (engineId: string, cutoff: boolean) => { if (cutoff) this.fuelCutoff.add(engineId); else this.fuelCutoff.delete(engineId); },
       setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
       setCgFractionMac: (v: number) => { this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
@@ -162,6 +164,7 @@ export class FixedWingAircraft {
     this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
     this.gear?.reset(this.gearHandleDown);
     this.gearCrash = undefined;
+    this.fuelCutoff.clear();
     this.surfaceRates = {};
     this.systems.fcs.reset();
     this.systems.devices?.reset();
@@ -269,7 +272,7 @@ export class FixedWingAircraft {
     const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
     for (const e of this.engines) {
-      const fuel = this.fuelKg > 0;
+      const fuel = this.fuelKg > 0 && !this.fuelCutoff.has(e.id);
       const cmd = e.control.step(this.throttle, { ambient, spoolSpeed: e.core.state.spoolSpeed, fuelAvailable: fuel }, dt);
       const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand, throat: cmd.throat }, ambient, fuel, dt);
       totalFlow += s.fuelFlowKgS;

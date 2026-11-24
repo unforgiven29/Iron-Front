@@ -21,6 +21,11 @@ different shape from the F-16's NASA tables, and its controls are mechanical wit
 augmentation rather than fly-by-wire. Each package implements the same small interfaces in its
 own way.
 
+## Worked examples
+
+- `f16c-block50/`: NASA wind-tunnel tables, GE engine-deck gas generator, TP-1538 fly-by-wire, A/B hydraulics with EPU.
+- `mig29/`: analytic estimated aero, generic-map twin engines, mechanical controls with SAU, two hydraulic systems on different engines. It imports nothing from the F-16 package — use it as the template for an aircraft without published tables.
+
 ## Steps
 
 1. Create `game/src/platforms/aircraft/<your-aircraft>/` (the F-16 is in `f16c-block50/`).

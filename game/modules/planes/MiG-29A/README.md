@@ -1,5 +1,7 @@
 # MiG-29 product 9.13 — aircraft integration package
 
+**Implementation status:** a provisional package exists at `game/src/platforms/aircraft/mig29/` (bounded approximation: family-level geometry and RD-33 ratings, textbook-method aerodynamics, estimated SAU control laws, estimated hydraulics and gear). It proves the shared runtime is modular; it is not a validated product 9.13 model. See docs/claude/PROJECT_STATE.md item 17.
+
 **Internal identity:** single-seat product 9.13. Folder/display label MiG-29A must not cause 9.12, 9.13S, 9.13B, 9.13SE or later modernization data to be merged. **Status:** research/architecture only; no functional aircraft.
 
 ## Baseline discipline

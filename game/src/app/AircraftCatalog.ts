@@ -7,13 +7,15 @@ import { composeModules, type ModuleFactory } from "../core/modules/ModuleCompos
 import { resolveModules } from "../core/modules/ModuleResolver.js";
 import type { AircraftDefinition } from "../platforms/aircraft/common/AircraftDefinition.js";
 import { createF16Definition, F16_MANIFEST } from "../platforms/aircraft/f16c-block50/F16Definition.js";
+import { createMiG29Definition, MIG29_MANIFEST } from "../platforms/aircraft/mig29/MiG29Definition.js";
 
 export const AIRCRAFT_CAPABILITY = "platform.aircraft.definition";
 export const HOST_API_VERSION = "0.1.0";
 
 /** Registered aircraft packages: manifest + factory. */
 const PACKAGES: readonly { manifest: typeof F16_MANIFEST; create: () => AircraftDefinition }[] = [
-  { manifest: F16_MANIFEST, create: () => createF16Definition() }
+  { manifest: F16_MANIFEST, create: () => createF16Definition() },
+  { manifest: MIG29_MANIFEST, create: () => createMiG29Definition() }
 ];
 
 export interface AircraftCatalog {
