@@ -216,9 +216,11 @@ export class FixedWingAircraft {
     this.surfaceRates = {};
     this.systems.fcs.reset();
     this.systems.devices?.reset();
-    // Switches return to their defaults (owner logic decides what that means).
+    // Switches return to their defaults (owner logic decides what that means), except a declared
+    // gear handle, which matches the start state's gear (re-asserting the handle already applied).
     for (const sw of this.systems.switches) {
-      if (this.controls.position(sw.definition.id) !== sw.definition.defaultPosition) this.controls.request(sw.definition.id, sw.definition.defaultPosition, "reset");
+      const target = sw.gearHandle ? (this.gearHandleDown ? sw.gearHandle.down : sw.gearHandle.up) : sw.definition.defaultPosition;
+      if (this.controls.position(sw.definition.id) !== target) this.controls.request(sw.definition.id, target, "reset");
     }
     this.pilot = { pitch: 0, roll: 0, yaw: 0 };
     this.nz = 1;

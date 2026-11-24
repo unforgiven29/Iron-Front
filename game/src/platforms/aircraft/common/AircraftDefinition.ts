@@ -174,6 +174,11 @@ export interface SwitchBinding {
   readonly onChange: (to: string, context: AircraftControlContext) => { readonly accepted: true } | { readonly accepted: false; readonly reason: string };
   /** Optional keyboard key that cycles this switch. */
   readonly key?: string;
+  /**
+   * Declares this switch as the landing-gear handle: its UP/DOWN positions. The runtime sets it to
+   * match `StartState.gearDown` on reset (the owner sees the same handle state it already has).
+   */
+  readonly gearHandle?: { readonly up: string; readonly down: string };
 }
 
 /** Fresh per-aircraft instances of the stateful parts (a package may be flown more than once). */

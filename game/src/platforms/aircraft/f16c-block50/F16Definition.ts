@@ -234,6 +234,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         },
         {
           key: "g",
+          gearHandle: { up: "UP", down: "DN" },
           definition: { id: F16_SWITCHES.gearHandle, ownerId: "f16.landing-gear", label: "LDG GR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "F-16 landing-gear handle; cannot retract with weight on wheels (squat interlock in the gear model)" },
           onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; }
         },
