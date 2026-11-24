@@ -3,7 +3,7 @@
  * deck values: N1/N2, EGT), the forward/aft fuel systems with reservoirs and wing tanks, main /
  * standby / EPU generators with PMG, TRs and batteries, and hydraulic systems A/B with the EPU.
  */
-import { box, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
+import { accumulator, box, checkValve, COLORS, engineCutaway, engineHealthPanel, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 
 type Snap = AircraftSnapshot;
@@ -139,43 +139,85 @@ function electricsPage(s: Snap): string {
     ${text(12, 690, "T.O. GR1F-16CJ-1 Section I. Loads, battery capacity and converter ratings estimated; FLCS branches lumped.", { size: 9, color: COLORS.dim })}`);
 }
 
+/** Fig 1-33 style live schematic: supply (blue), pressure (red), return (green); valves driven by the network. */
 function hydraulicsPage(s: Snap): string {
   const h = s.hydraulics;
   if (!h) return svg(600, 200, text(20, 40, "No hydraulic model"));
-  const P = (pa: number) => pa / 6894.757;
-  const circ = (id: string) => h.circuits.find((c) => c.id === id);
-  const br = (id: string) => h.branches?.find((b) => b.id === id);
+  const PSI = 6894.757, Q = 1e-7;
+  const RED = "#ff4d7a", REDF = "#ffb3c6", GRN = "#7ee787", GRNF = "#d2ffd9", BLU = "#29b6f6", BLUF = "#b3e5fc";
+  const red = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: RED, fluid: REDF });
+  const grn = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: GRN, fluid: GRNF });
+  const blu = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: BLU, fluid: BLUF });
   const flow = (id: string) => h.consumers?.find((c) => c.id === id)?.flowM3s ?? 0;
+  const br = (id: string) => h.branches?.find((b) => b.id === id);
   const gpm = (m3s: number) => m3s / 6.309e-5;
-  const epu = h.emergencyUnit, engPump = (s.indications["rpmPercent"] ?? 0) > 12;
-  const col = (psiV: number) => (psiV < 1000 ? COLORS.warn : psiV < 2500 ? COLORS.caution : COLORS.ok);
-  const system = (x: number, id: "A" | "B") => {
-    const c = circ(id);
+  const epu = h.emergencyUnit;
+  const userBox = (x: number, y: number, name: string, value: string, active: boolean) =>
+    `<rect x="${x}" y="${y - 14}" width="92" height="28" rx="3" fill="${active ? "#3a1f2a" : "#1c1d1f"}" stroke="${active ? RED : "#555"}"/>${text(x + 4, y - 2, name, { size: 9, weight: 600 })}${text(x + 4, y + 10, value, { size: 9, color: COLORS.dim })}`;
+
+  const system = (x0: number, id: "A" | "B") => {
+    const c = h.circuits.find((k) => k.id === id);
     if (!c) return "";
-    const p = P(c.pressurePa), flcs = br(`${id}.flcs`);
-    const users = id === "A"
-      ? [["LEF · RUD · H-TAILS · FLPRN", "via FLCS acc"], ["SPEEDBRAKES", `${num(Math.abs(s.surfaces["speedbrake"] ?? 0))}°`], ["FFP", `${num(gpm(flow("ffp")), 1)} gpm`]]
-      : [["LEF · RUD · H-TAILS · FLPRN", "via FLCS acc"], ["LG (isolation valve)", br("B.lg")?.open ? `OPEN ${num(gpm(flow("gear")), 1)} gpm` : "closed"], ["NWS", `${num(gpm(flow("nws")), 1)} gpm`], ["GUN · AR SYSTEM", `${num(gpm(flow("gun") + flow("airRefuel")), 1)} gpm`], ["BRAKES · JFS (accumulators)", `${num(gpm(flow("brakes") + flow("jfs")), 2)} gpm`], ["DRAG CHUTE (accumulator)", `${num(P(br("B.dragchute")?.pressurePa ?? 0))} psi`]];
+    const p = c.pressurePa / PSI, pumping = c.pumpFlowM3s > Q, M = x0 + 150, U = x0 + 188, R = x0 + 288;
+    const flcs = br(`${id}.flcs`)!;
+    const flcsOn = flcs.chargeFlowM3s > Q;
+    const accFrac = (pa: number, pre = 1000) => Math.max(0, Math.min(1, 1 - pre / Math.max(pre, pa / PSI)) * 1.5);
+    const users: { y: number; name: string; value: string; on: boolean; extra?: string }[] = [];
+    // FLCS branch: check valve + accumulator.
+    users.push({ y: 150, name: "FLCS SURFACES", value: `${num(flcs.pressurePa / PSI)} psi`, on: flcsOn,
+      extra: `${checkValve(M + 16, 150, "right", flcsOn)}${accumulator(M + 26, 112, 12, 30, accFrac(flcs.pressurePa), RED)}${red([[M + 32, 142], [M + 32, 150]], flcsOn)}${text(M + 42, 122, "FLCS ACC", { size: 8, color: COLORS.dim })}` });
+    if (id === "A") {
+      const sbOn = c.demandFlowM3s - flow("ffp") > Q;
+      users.push({ y: 230, name: "SPEEDBRAKES", value: `${num(Math.abs(s.surfaces["speedbrake"] ?? 0))}°`, on: sbOn });
+      users.push({ y: 290, name: "FFP", value: `${num(gpm(flow("ffp")), 1)} gpm`, on: flow("ffp") > Q });
+    } else {
+      const lg = br("B.lg")!, brakes = br("B.brakes")!, chute = br("B.dragchute")!;
+      users.push({ y: 215, name: "LG SYSTEM", value: lg.open ? `${num(gpm(flow("gear")), 1)} gpm` : "isolated", on: flow("gear") > Q || lg.chargeFlowM3s > Q,
+        extra: `${valve(M + 18, 215, lg.open, false)}${text(M + 6, 236, "LG ISO", { size: 8, color: COLORS.dim })}` });
+      users.push({ y: 265, name: "NWS", value: `${num(gpm(flow("nws")), 1)} gpm`, on: flow("nws") > Q });
+      users.push({ y: 310, name: "GUN · AR", value: `${num(gpm(flow("gun") + flow("airRefuel")), 1)} gpm`, on: flow("gun") + flow("airRefuel") > Q });
+      const bOn = brakes.chargeFlowM3s > Q;
+      users.push({ y: 380, name: "BRAKES · JFS", value: `${num(brakes.pressurePa / PSI)} psi`, on: flow("brakes") + flow("jfs") > Q || bOn,
+        extra: `${checkValve(M + 12, 380, "right", bOn)}${accumulator(M + 20, 340, 10, 28, accFrac(brakes.pressurePa), RED)}${accumulator(M + 22 + 10, 340, 10, 28, accFrac(brakes.pressurePa), RED)}${text(M + 2, 334, "BRAKE/JFS ACC", { size: 8, color: COLORS.dim })}` });
+      const cOn = chute.chargeFlowM3s > Q;
+      users.push({ y: 445, name: "DRAG CHUTE", value: `${num(chute.pressurePa / PSI)} psi`, on: flow("dragChute") > Q || cOn,
+        extra: `${checkValve(M + 12, 445, "right", cOn)}${accumulator(M + 18, 410, 22, 12, accFrac(chute.pressurePa), RED)}` });
+    }
+    const lastY = Math.max(...users.map((u) => u.y));
+    const anyUser = users.some((u) => u.on);
+    const relief = c.reliefFlowM3s > Q, ret = c.returnFlowM3s > Q;
+    const cool = c.coolerValveFraction ?? 0;
     return `
-      <rect x="${x}" y="8" width="286" height="760" rx="6" fill="${COLORS.panel}" stroke="#44474c"/>
-      ${text(x + 10, 30, `SYSTEM ${id}`, { size: 15, weight: 700, color: "#d9b3ff" })}${text(x + 276, 30, `${num(p)} psi`, { size: 15, weight: 700, anchor: "end", color: col(p) })}
-      ${hbar(x + 10, 52, 266, "HYD PRESS (0–4000 psi)", p / 4000, `${num(p)}`, col(p))}
-      ${pump(x + 30, 100, engPump && c.pumpFlowM3s >= 0)}${text(x + 46, 96, "ENGINE-DRIVEN PUMP (ADG)", { size: 10 })}${text(x + 46, 110, `${num(gpm(c.pumpFlowM3s), 1)} gpm delivered`, { size: 10, color: COLORS.dim })}
-      ${id === "A" ? `${pump(x + 30, 136, epu?.state === "running")}${text(x + 46, 132, `EPU PUMP · ${epu ? epu.state.toUpperCase() : "—"}`, { size: 10, color: epu && epu.state !== "off" ? COLORS.caution : COLORS.text })}${text(x + 46, 146, epu && epu.state !== "off" ? `${num(epu.remainingS)} s hydrazine` : "auto: both < 1000 psi / both gens", { size: 10, color: COLORS.dim })}` : ""}
-      ${hbar(x + 10, 176, 266, "RESERVOIR", c.reservoirFraction ?? 1, c.reservoirM3 !== undefined ? `${num(c.reservoirM3 * 1000, 2)} L` : "—", (c.reservoirFraction ?? 1) < 0.2 ? COLORS.warn : COLORS.ok)}
-      ${hbar(x + 10, 210, 266, "FLUID TEMP", ((c.temperatureK ?? 288) - 233) / 160, `${num((c.temperatureK ?? 288) - 273.15)} °C`, (c.temperatureK ?? 0) > 380 ? COLORS.warn : (c.temperatureK ?? 0) > 360 ? COLORS.caution : COLORS.ok)}
-      ${box(x + 10, 238, 266, 46, "FUEL/OIL HEAT EXCHANGER", [c.coolerBypassed ? "THERMAL BYPASS (cold)" : `cooling ${num((c.coolerHeatW ?? 0) / 1000, 1)} kW`], c.coolerBypassed ? "off" : "on", "#d9b3ff")}
-      ${box(x + 10, 296, 266, 58, "FLCS ACCUMULATOR (check valve)", [`${num(P(flcs?.pressurePa ?? 0))} psi · ${num((flcs?.accumulatorFluidM3 ?? 0) * 1000, 2)} L`, `refill ${num(gpm(flcs?.chargeFlowM3s ?? 0), 1)} gpm`], P(flcs?.pressurePa ?? 0) < 1000 ? "warn" : "on", "#d9b3ff")}
-      ${pipe([[x + 143, 284], [x + 143, 296]], { flow: (flcs?.chargeFlowM3s ?? 0) > 1e-7, color: COLORS.hyd, fluid: "#e9d5ff" })}
-      ${text(x + 10, 376, "USERS", { size: 11, color: COLORS.dim })}
-      ${users.map(([n, v], i) => `<rect x="${x + 10}" y="${384 + i * 34}" width="266" height="28" rx="3" fill="#1c1d1f" stroke="#44474c"/>${text(x + 18, 402 + i * 34, n!, { size: 10 })}${text(x + 268, 402 + i * 34, v!, { size: 10, anchor: "end", color: COLORS.dim })}`).join("")}
-      ${id === "B" ? `${hbar(x + 10, 610, 266, "BRAKE/JFS ACCUMULATORS (2)", s.indications["brakeJfsAccumulatorCharge"] ?? 0, `${num(P(br("B.brakes")?.pressurePa ?? 0))} psi`, (s.indications["brakeJfsAccumulatorCharge"] ?? 0) < 0.3 ? COLORS.caution : COLORS.ok)}
-        ${text(x + 10, 650, `recharge ${num(gpm(br("B.brakes")?.chargeFlowM3s ?? 0), 2)} gpm (40–60 s full)`, { size: 10, color: COLORS.dim })}` : ""}
-      ${text(x + 10, 700, `demand ${num(gpm(c.demandFlowM3s), 1)} gpm`, { size: 11 })}
-      ${text(x + 10, 718, `HYD/OIL PRESS ${p < 1000 ? "ON" : "off"} (< 1000 psi)`, { size: 11, color: p < 1000 ? COLORS.warn : COLORS.dim })}`;
+      <rect x="${x0}" y="6" width="296" height="676" rx="6" fill="${COLORS.panel}" stroke="#44474c"/>
+      ${text(x0 + 10, 28, `SYSTEM ${id}`, { size: 15, weight: 700, color: "#d9b3ff" })}
+      ${text(x0 + 286, 28, `${num(p)} psi`, { size: 15, weight: 700, anchor: "end", color: p < 1000 ? COLORS.warn : p < 2500 ? COLORS.caution : COLORS.ok })}
+      ${text(x0 + 286, 44, `${num(((c.temperatureK ?? 288) - 273.15))} °C fluid`, { size: 10, anchor: "end", color: COLORS.dim })}
+      ${blu([[x0 + 36, 588], [x0 + 36, 92]], pumping)}
+      ${pump(x0 + 36, 80, pumping, 12)}${text(x0 + 10, 56, `ENG PUMP ${num(gpm(c.pumpFlowM3s), 1)} gpm`, { size: 9 })}
+      ${red([[x0 + 48, 80], [x0 + 100, 80]], pumping)}
+      <rect x="${x0 + 100}" y="70" width="30" height="20" fill="#2a2c2f" stroke="${COLORS.line}"/>${text(x0 + 115, 84, "FLTR", { size: 8, anchor: "middle" })}
+      ${red([[x0 + 130, 80], [M, 80], [M, lastY + 40]], pumping || anyUser)}
+      ${id === "A" ? `${blu([[x0 + 36, 200], [x0 + 80, 200], [x0 + 80, 182]], epu?.state === "running")}${pump(x0 + 80, 170, epu?.state === "running", 10)}
+        ${text(x0 + 94, 166, `EPU ${epu ? epu.state.toUpperCase() : ""}`, { size: 9, color: epu && epu.state !== "off" ? COLORS.caution : COLORS.dim })}
+        ${red([[x0 + 80, 158], [x0 + 80, 120], [x0 + 115, 120], [x0 + 115, 90]], epu?.state === "running")}${checkValve(x0 + 115, 106, "up", epu?.state === "running")}` : ""}
+      ${text(x0 + 104, 108, "S T", { size: 8, color: COLORS.dim })}
+      ${users.map((u) => `${red([[M, u.y], [U, u.y]], u.on)}${u.extra ?? ""}${userBox(U, u.y, u.name, u.value, u.on)}${grn([[U + 92, u.y], [R, u.y]], u.on)}`).join("")}
+      ${grn([[R, 120], [R, 560], [x0 + 250, 560]], ret)}
+      <rect x="${x0 + 170}" y="546" width="80" height="28" rx="3" fill="#1c2a20" stroke="${GRN}"/>${text(x0 + 210, 558, "FUEL/OIL HX", { size: 8, anchor: "middle" })}${text(x0 + 210, 569, cool > 0 ? `${num((c.coolerHeatW ?? 0) / 1000, 1)} kW` : "bypassed", { size: 8, anchor: "middle", color: COLORS.dim })}
+      ${grn([[x0 + 260, 560], [x0 + 260, 600], [x0 + 160, 600]], ret && cool < 1)}${valve(x0 + 230, 600, cool < 1, false)}${text(x0 + 200, 616, `THERMAL BYPASS ${num((1 - cool) * 100)} %`, { size: 8, anchor: "middle", color: COLORS.dim })}
+      ${grn([[x0 + 170, 560], [x0 + 140, 560], [x0 + 140, 600]], ret && cool > 0)}
+      ${grn([[x0 + 160, 600], [x0 + 120, 600]], ret)}
+      ${red([[M, lastY + 40], [M, lastY + 70]], relief)}${valve(M, lastY + 56, relief)}${text(M + 10, lastY + 60, relief ? "RELIEF OPEN" : "dump/relief", { size: 8, color: relief ? COLORS.caution : COLORS.dim })}
+      ${grn([[M, lastY + 70], [M, lastY + 90], [x0 + 110, lastY + 90], [x0 + 110, 600]], relief)}
+      <rect x="${x0 + 16}" y="588" width="104" height="56" rx="20" fill="#0d3a4f" stroke="${BLU}"/>
+      <rect x="${x0 + 18}" y="${590 + 52 * (1 - (c.reservoirFraction ?? 1))}" width="100" height="${52 * (c.reservoirFraction ?? 1)}" rx="16" fill="${BLU}" opacity="0.7"/>
+      ${text(x0 + 68, 612, "RESERVOIR", { size: 9, anchor: "middle", weight: 700 })}${text(x0 + 68, 626, `${num((c.reservoirM3 ?? 0) * 1000, 2)} L`, { size: 9, anchor: "middle" })}
+      ${text(x0 + 10, 664, `HYD PRESS ${num(p)} psi · HYD/OIL ${p < 1000 ? "ON" : "off"}`, { size: 10, color: p < 1000 ? COLORS.warn : COLORS.text })}
+      ${text(x0 + 10, 678, `demand ${num(gpm(c.demandFlowM3s), 1)} gpm · return ${num(gpm(c.returnFlowM3s), 1)} gpm`, { size: 9, color: COLORS.dim })}`;
   };
-  return svg(600, 830, `${system(8, "A")}${system(306, "B")}
-    ${["Fig 1-33: pump → filter → users; FLCS accumulators behind check valves;", "return via the fuel/oil heat exchanger (thermal bypass).", "B charges the brake/JFS accumulators through the dump & relief manifold; LG behind the isolation valve.", "Component sizes, flows, reservoir contents and thermal values estimated."].map((l, i) => text(12, 784 + i * 12, l, { size: 9, color: COLORS.dim })).join("")}`);
+  return svg(600, 730, `${system(2, "A")}${system(302, "B")}
+    ${[["#29b6f6", "SUPPLY"], ["#ff4d7a", "PRESSURE"], ["#7ee787", "RETURN"]].map(([c, l], i) => `<rect x="${12 + i * 110}" y="692" width="22" height="8" fill="${c}"/>${text(40 + i * 110, 700, l!, { size: 9 })}`).join("")}
+    ${text(12, 720, "Fig 1-33 layout. Valves act automatically on simulated pressure/temperature; sizes estimated.", { size: 9, color: COLORS.dim })}`);
 }
 
 /** Rolling history for the FLCS strip charts (UI state only). */

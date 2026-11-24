@@ -151,6 +151,12 @@ export interface CircuitState {
   readonly temperatureK?: number;
   readonly coolerHeatW?: number;
   readonly coolerBypassed?: boolean;
+  /** Thermal-bypass valve: fraction of return flow sent through the cooler (0 = full bypass). */
+  readonly coolerValveFraction?: number;
+  /** Flow through the relief (dump and relief) valve, m³/s (> 0 = valve cracked open). */
+  readonly reliefFlowM3s: number;
+  /** Total return flow to the reservoir (users, leakage, relief), m³/s. */
+  readonly returnFlowM3s: number;
 }
 
 export interface BranchState {
@@ -218,6 +224,9 @@ export class HydraulicNetwork {
   private temperature = new Map<string, number>();
   private coolerW = new Map<string, number>();
   private bypassed = new Map<string, boolean>();
+  private coolerFraction = new Map<string, number>();
+  private reliefFlow = new Map<string, number>();
+  private returnFlow = new Map<string, number>();
   private valveOpen = new Map<string, boolean>();
   private faults: HydraulicFault[] = [];
   private eu: { state: "off" | "starting" | "running" | "depleted"; t: number; remaining: number } = { state: "off", t: 0, remaining: 0 };
@@ -308,11 +317,13 @@ export class HydraulicNetwork {
     const h = dt / SUBSTEPS;
     const P = new Map(nodes.map((id) => [id, this.pressure.get(id) ?? 0]));
     const heat = new Map(inst.circuits.map((c) => [c.id, 0]));
+    const lastRelief = new Map<string, number>(), lastReturn = new Map<string, number>();
     const lastPump = new Map<string, number>(), lastCharge = new Map<string, number>(), lastDemand = new Map<string, number>(), lastConsumer = new Map<string, number>();
     const externalLost = new Map(inst.circuits.map((c) => [c.id, 0]));
 
     for (let i = 0; i < SUBSTEPS; i++) {
       const net = new Map(nodes.map((id) => [id, 0]));
+      lastReturn.clear();
       // Pumps.
       for (const c of inst.circuits) {
         const p = P.get(c.id)!;
@@ -363,6 +374,8 @@ export class HydraulicNetwork {
         const external = cs ? leakOf(id, "external-leak") * p : 0;
         const relief = cs && p > cs.reliefPressurePa ? (p - cs.reliefPressurePa) * 1e-6 : 0;
         qOut += internal + external + relief;
+        if (cs) lastRelief.set(id, relief);
+        lastReturn.set(circuit, (lastReturn.get(circuit) ?? 0) + qOut - external);
         externalLost.set(circuit, externalLost.get(circuit)! + external * h);
         heat.set(circuit, heat.get(circuit)! + h * (throttle + (internal + relief) * p));
         net.set(id, net.get(id)! - qOut);
@@ -383,11 +396,13 @@ export class HydraulicNetwork {
       if (!c.thermal) continue;
       let T = this.temperature.get(c.id) ?? ambient;
       const cool = opts.cooling?.(c.id);
-      const bypass = !cool || T < c.thermal.coolerBypassBelowK;
-      const qCool = bypass ? 0 : cool.conductanceWPerK * (T - cool.sinkK);
+      // Thermal bypass valve modulates open over 15 K above its setting (ESTIMATED band).
+      const frac = cool ? Math.max(0, Math.min(1, (T - c.thermal.coolerBypassBelowK) / 15)) : 0;
+      const bypass = frac <= 0;
+      const qCool = cool ? frac * cool.conductanceWPerK * (T - cool.sinkK) : 0;
       const qAmb = c.thermal.ambientConductanceWPerK * (T - ambient);
       T += (heat.get(c.id)! - (qCool + qAmb) * dt) / c.thermal.heatCapacityJPerK;
-      this.temperature.set(c.id, T); this.coolerW.set(c.id, qCool); this.bypassed.set(c.id, bypass);
+      this.temperature.set(c.id, T); this.coolerW.set(c.id, qCool); this.bypassed.set(c.id, bypass); this.coolerFraction.set(c.id, frac);
     }
     for (const id of nodes) {
       this.pressure.set(id, P.get(id)!);
@@ -396,6 +411,7 @@ export class HydraulicNetwork {
       this.chargeFlow.set(id, lastCharge.get(id) ?? 0);
     }
     this.consumerFlow = lastConsumer;
+    for (const c of inst.circuits) { this.reliefFlow.set(c.id, lastRelief.get(c.id) ?? 0); this.returnFlow.set(c.id, lastReturn.get(c.id) ?? 0); }
     return this.snapshot();
   }
 
@@ -429,8 +445,9 @@ export class HydraulicNetwork {
     return {
       circuits: inst.circuits.map((c) => ({
         id: c.id, pressurePa: this.pressurePa(c.id), pumpFlowM3s: this.pumpFlow.get(c.id) ?? 0, demandFlowM3s: this.demand.get(c.id) ?? 0, accumulatorFluidM3: accOn(c.id),
+        reliefFlowM3s: this.reliefFlow.get(c.id) ?? 0, returnFlowM3s: this.returnFlow.get(c.id) ?? 0,
         ...(c.reservoirM3 !== undefined ? { reservoirM3: this.reservoir.get(c.id) ?? 0, reservoirFraction: (this.reservoir.get(c.id) ?? 0) / c.reservoirM3 } : {}),
-        ...(c.thermal ? { temperatureK: this.temperature.get(c.id) ?? 288.15, coolerHeatW: this.coolerW.get(c.id) ?? 0, coolerBypassed: this.bypassed.get(c.id) ?? true } : {})
+        ...(c.thermal ? { temperatureK: this.temperature.get(c.id) ?? 288.15, coolerHeatW: this.coolerW.get(c.id) ?? 0, coolerBypassed: this.bypassed.get(c.id) ?? true, coolerValveFraction: this.coolerFraction.get(c.id) ?? 0 } : {})
       })),
       ...(this.branches.length ? { branches: this.branches.map((b) => ({ id: b.id, circuitId: b.circuitId, pressurePa: this.pressurePa(b.id), open: this.valveOpen.get(b.id) ?? true, chargeFlowM3s: this.chargeFlow.get(b.id) ?? 0, accumulatorFluidM3: accOn(b.id) })) } : {}),
       ...(inst.consumers?.length ? { consumers: inst.consumers.map((c) => ({ id: c.id, nodeId: c.nodeId, flowM3s: this.consumerFlow.get(c.id) ?? 0 })) } : {}),
