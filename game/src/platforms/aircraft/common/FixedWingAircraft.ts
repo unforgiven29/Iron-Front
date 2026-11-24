@@ -280,6 +280,13 @@ export class FixedWingAircraft {
     return g.status === "valid" ? { heightAboveGroundM: p[2] - g.heightM } : {};
   }
 
+  private hydraulicPressures(): Record<string, number> {
+    const h = this.hydraulics!.snapshot(), out: Record<string, number> = {};
+    for (const c of h.circuits) out[c.id] = c.pressurePa;
+    for (const b of h.branches ?? []) out[b.id] = b.pressurePa;
+    return out;
+  }
+
   /** Engine core (gearbox drive) speed as a fraction of its reference, for engine-driven pumps. */
   private engineCoreSpeed(engineId: string): number {
     const e = this.engines.find((x) => x.id === engineId);
@@ -332,7 +339,8 @@ export class FixedWingAircraft {
       nzG: this.nz, nyG: this.ny, weightOnWheels: this.gear?.state.weightOnWheels ?? false, ...(this.gear ? { gearUpLocked: this.gear.state.extension <= 0 } : {}), alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll,
-      ...(this.electrical ? { electricalBuses: Object.fromEntries(this.electrical.snapshot.buses.map((b) => [b.id, { powered: b.powered, shed: b.shed }])) } : {})
+      ...(this.electrical ? { electricalBuses: Object.fromEntries(this.electrical.snapshot.buses.map((b) => [b.id, { powered: b.powered, shed: b.shed }])) } : {}),
+      ...(this.hydraulics ? { hydraulicPressuresPa: this.hydraulicPressures() } : {})
     };
 
     const fcs = this.systems.fcs.step(this.pilot, sensors, this.surfacePositions(), dt);
@@ -418,7 +426,8 @@ export class FixedWingAircraft {
         engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
         groundSpeedMps: Math.hypot(st.velocityEnuMps[0], st.velocityEnuMps[1]),
         ...(this.gear ? { gear: { extension: this.gear.state.extension, handleDown: this.gearHandleDown, weightOnWheels: this.gear.state.weightOnWheels } } : {}),
-        ...(fc ? { fuelComponents: fc } : {})
+        ...(fc ? { fuelComponents: fc } : {}),
+        ...(Object.keys(this.inlets).length ? { inlets: this.inlets } : {})
       }, dt);
       for (const [id, open] of Object.entries(loads.valves ?? {})) this.hydraulics.setValve(id, open);
       const cooling = loads.cooling;

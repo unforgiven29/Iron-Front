@@ -64,6 +64,8 @@ export interface FlightSensors {
   readonly rollRad: number;
   /** Electrical bus states from the package's electrical installation (absent without one). */
   readonly electricalBuses?: Readonly<Record<string, { readonly powered: boolean; readonly shed: boolean }>>;
+  /** Hydraulic circuit and branch pressures, Pa (pressure transmitters; absent without hydraulics). */
+  readonly hydraulicPressuresPa?: Readonly<Record<string, number>>;
 }
 
 export interface FcsOutput {
@@ -241,6 +243,8 @@ export interface HydraulicLoadContext {
   readonly groundSpeedMps: number;
   readonly fuelComponents?: import("../../../systems/fuel/FuelTanks.js").FuelComponents;
   readonly ambientTemperatureK: number;
+  /** Variable-intake states (ramp positions drive their actuators' flow). */
+  readonly inlets?: Readonly<Record<string, import("../../../physics/propulsion/components/Inlet.js").InletState>>;
 }
 
 export interface EngineControlOutput {

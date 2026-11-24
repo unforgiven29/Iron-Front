@@ -90,49 +90,90 @@ function fuelPage(s: Snap): string {
 function electricsPage(s: Snap): string {
   const el = s.electrical;
   if (!el) return svg(600, 200, text(20, 40, "No electrical model"));
-  const src = (id: string) => el.sources.find((x) => x.id === id)!;
-  const bus = (id: string) => el.buses.find((x) => x.id === id)!;
+  const src = (id: string) => el.sources.find((x) => x.id === id);
+  const bus = (id: string) => el.buses.find((x) => x.id === id);
   const g = gbxSpeed(s);
-  const gen = (x: number, id: string, name: string, v: number) => { const o = src(id); return box(x, 70, 170, 74, name, [`${o.tripped ? "TRIPPED" : o.online ? "ONLINE" : "OFF"}`, `${(o.loadW / 1000).toFixed(1)} kW · ${(o.loadW / v).toFixed(0)} A`, `GBX ${num(g.v * 100, 0)} %`], o.tripped ? "warn" : o.online ? "on" : "off"); };
-  const busBox = (x: number, y: number, id: string, name: string, v: number) => { const b = bus(id); return box(x, y, 200, 62, name, [b.powered ? `from ${b.sourceId}` : "UNPOWERED", `${v} V · ${(b.loadW / v).toFixed(1)} A${b.shed ? " · SHED" : ""}`], !b.powered ? "warn" : b.shed ? "shed" : "on", id === "ac" ? "#ff9b9b" : "#9bb0ff"); };
-  const bat = src("battery"), pto = src("pto");
-  const acOnPto = bus("ac").sourceId === "pto", dcOnBat = bus("dc").sourceId === "battery";
-  return svg(600, 560, `
-    ${box(215, 10, 170, 40, "GBX", [`${g.by} engine · ${num(g.v * 100, 1)} %`], g.v > 0.55 ? "on" : "warn")}
-    ${gen(30, "gen.ac", "AC GEN 30 kVA", 115)}${gen(400, "gen.dc", "DC GEN 12 kW", 28.5)}
-    ${pipe([[115, 144], [115, 300]], { flow: src("gen.ac").online, color: COLORS.elec, fluid: "#ffb3b3" })}
-    ${pipe([[485, 144], [485, 300]], { flow: src("gen.dc").online, color: COLORS.dc, fluid: "#b3c4ff" })}
-    ${busBox(15, 300, "ac", "AC BUS 115 V 400 Hz", 115)}${busBox(385, 300, "dc", "DC BUS 28 V", 28)}
-    ${box(230, 200, 140, 62, "PTO DC/AC", [pto.online ? `ON · ${(pto.loadW / 1000).toFixed(1)} kVA` : "standby", "1.5 kVA"], pto.online ? "shed" : "off")}
-    ${pipe([[385, 330], [370, 330], [370, 231]], { flow: acOnPto, color: COLORS.dc, fluid: "#b3c4ff" })}${pipe([[230, 231], [215, 231], [215, 330]], { flow: acOnPto, color: COLORS.elec, fluid: "#ffb3b3" })}
-    ${box(400, 420, 170, 74, "BATTERIES Ag-Zn", [`${num(bat.chargeAh, 1)} Ah`, bat.online ? `DISCHARGING ${(bat.loadW / 27.6).toFixed(0)} A` : "standby (not charged)", "27.6 V nominal"], bat.online ? "shed" : "on", "#8fe28f")}
-    ${pipe([[485, 420], [485, 362]], { flow: dcOnBat, color: COLORS.dc, fluid: "#b3c4ff" })}
-    ${text(20, 400, "Shed on PTO (GAF list):", { size: 10, color: COLORS.dim })}
-    ${["INS heaters · radar & sight", "IRST / LRF / HMS · probe & windshield heat", "AFCS (SAU) · armament · IFF encoder"].map((l, i) => text(20, 418 + 15 * i, l, { size: 10, color: acOnPto ? COLORS.caution : COLORS.dim })).join("")}
-    ${text(20, 490, `SAU ${s.annunciations.includes("SAU OFF (NO POWER)") ? "UNPOWERED" : "powered"}`, { size: 12, color: s.annunciations.includes("SAU OFF (NO POWER)") ? COLORS.warn : COLORS.ok })}`);
+  const AC = "#ff8080", ACF = "#ffc9c9", DC = "#7f9cff", DCF = "#c9d5ff";
+  const ac = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: AC, fluid: ACF });
+  const dc = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: DC, fluid: DCF });
+  const srcBox = (x: number, y: number, w: number, id: string, name: string, extra: string) => { const o = src(id); return box(x, y, w, 58, name, [o?.tripped ? "TRIPPED" : o?.online ? "ON LINE" : o?.available ? "AVAILABLE" : "OFF", extra], o?.tripped ? "warn" : o?.online ? "on" : o?.available ? "shed" : "off"); };
+  const busBox = (x: number, y: number, id: string, name: string) => { const b = bus(id); return b ? box(x, y, 170, 58, name, [b.powered ? `← ${({ "gen.ac": "AC GEN", pto: "PTO", "gen.dc": "DC GEN", battery: "BATTERIES", transformer: "TRANSFORMER", pto36: "PTO 36 V" } as Record<string, string>)[b.sourceId ?? ""] ?? b.sourceId}` : "UNPOWERED", b.shed ? "non-essential SHED" : `${num(b.loadW / 1000, 1)} kW`], !b.powered ? "warn" : b.shed ? "shed" : "on", id === "dc" ? "#9bb0ff" : "#ff9b9b") : ""; };
+  const sw = (id: string, label: string, x: number) => { const on = (s.switches[id] ?? "ON") === "ON"; return `<rect x="${x}" y="606" width="104" height="26" rx="3" fill="${on ? "#1f3a24" : "#3a1f1f"}" stroke="#555"/>${text(x + 52, 623, `${label} ${on ? "ON" : "OFF"}`, { size: 9, anchor: "middle", weight: 700 })}`; };
+  const acGen = src("gen.ac")?.online ?? false, dcGen = src("gen.dc")?.online ?? false, ptoOn = src("pto")?.online ?? false, pto36 = src("pto36")?.online ?? false, tr = src("transformer")?.online ?? false, bat = src("battery")?.online ?? false;
+  return svg(600, 690, `
+    ${box(210, 8, 180, 50, "GEARBOX (GBX)", [`${g.by} engine · ${num(g.v * 100, 1)} %`], g.v > 0.5 ? "on" : "warn")}
+    ${ac([[250, 58], [250, 80], [95, 80], [95, 96]], acGen)}${dc([[350, 58], [350, 80], [505, 80], [505, 96]], dcGen)}
+    ${box(16, 96, 158, 46, "CSD 12,000 rpm", [s.switches["mig29.test.electrical-fault"] === "CSD OVERSPEED" ? "DISCONNECTED" : "constant speed"], s.switches["mig29.test.electrical-fault"] === "CSD OVERSPEED" ? "warn" : "on")}
+    ${srcBox(16, 152, 158, "gen.ac", "AC GEN 30 kVA", "115/200 V 400 Hz")}
+    ${srcBox(426, 96, 158, "gen.dc", "DC GEN 12 kW", "28.5 V · 400 A")}
+    ${ac([[95, 210], [95, 260]], acGen)}${busBox(10, 260, "ac", "AC BUS 115 V")}
+    ${ac([[180, 289], [215, 289]], tr)}${srcBox(215, 260, 150, "transformer", "TRANSFORMER", "→ 36 V 1.5 kVA")}
+    ${ac([[290, 318], [290, 360]], tr || pto36)}${busBox(205, 360, "ac36", "AC BUS 36 V")}
+    ${dc([[505, 154], [505, 260]], dcGen || bat)}${busBox(420, 260, "dc", "DC BUS 28 V")}
+    ${srcBox(426, 380, 158, "battery", "BATTERIES 2×45 Ah", `${num(src("battery")?.chargeAh ?? 0, 1)} Ah · Ag-Zn`)}
+    ${dc([[505, 380], [505, 318]], bat)}
+    ${box(215, 460, 170, 60, "PTO DC/AC CONVERTER", [`115 V ${ptoOn ? "ON" : "off"} · 36 V ${pto36 ? "ON" : "off"}`, "1.5 kVA / 1 kVA"], ptoOn || pto36 ? "shed" : "off")}
+    ${dc([[420, 300], [400, 300], [400, 490], [385, 490]], ptoOn || pto36)}${ac([[215, 480], [95, 480], [95, 318]], ptoOn)}${ac([[300, 460], [300, 418]], pto36)}
+    ${text(16, 556, "Shed on the PTO (GAF): INS heaters · radar & sight · IRST/LRF/HMS · AOA/sideslip heaters", { size: 9, color: COLORS.dim })}
+    ${text(16, 570, "windshield heat · AFCS · armament · IFF encoder. On transformer failure: LRF, rate sensors, ILS.", { size: 9, color: COLORS.dim })}
+    ${text(16, 586, "Batteries are not charged by the generator (Ag-Zn charging voltage above generator voltage).", { size: 9, color: COLORS.dim })}
+    ${sw("mig29.elec.bat-gnd", "BAT-GND", 16)}${sw("mig29.elec.dc-gen", "DC GEN", 128)}${sw("mig29.elec.ac-gen", "AC GEN", 240)}${sw("mig29.elec.pto", "PTO", 352)}
+    ${text(16, 660, "Electrical power panel (RH console). Loads estimated; source data GAF T.O. 1F-MIG29-1.", { size: 9, color: COLORS.dim })}`);
 }
 
+/** Live schematic: GBX pumps → main/boost; pressure limiter isolates the utilities below 13 MPa. */
 function hydraulicsPage(s: Snap): string {
   const h = s.hydraulics;
   if (!h) return svg(600, 200, text(20, 40, "No hydraulic model"));
-  const nom = MIG29_HYDRAULICS.nominalPressurePa.value, g = gbxSpeed(s);
-  const circ = (x: number, id: string, name: string) => {
-    const c = h.circuits.find((k) => k.id === id)!, f = c.pressurePa / nom;
-    const color = f < 0.48 ? COLORS.warn : f < 0.9 ? COLORS.caution : COLORS.ok;
-    return `${box(x, 60, 230, 120, name, [`${(c.pressurePa / 1e6).toFixed(1)} MPa · ${(c.pressurePa / 98066.5).toFixed(0)} kp/cm²`, `pump ${(c.pumpFlowM3s * 60000).toFixed(1)} L/min`, `demand ${(c.demandFlowM3s * 60000).toFixed(1)} L/min`, `accumulator ${(c.accumulatorFluidM3 * 1000).toFixed(2)} L`], f < 0.48 ? "warn" : "on", "#d9b3ff")}
-      ${hbar(x + 10, 200, 210, "PRESSURE (0–24 MPa)", c.pressurePa / 24e6, `${(c.pressurePa / 1e6).toFixed(1)}`, color)}`;
+  const MPa = (pa: number) => pa / 1e6, Q = 1e-7;
+  const RED = "#ff4d7a", REDF = "#ffb3c6", GRN = "#7ee787", GRNF = "#d2ffd9", BLU = "#29b6f6", BLUF = "#b3e5fc";
+  const red = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: RED, fluid: REDF });
+  const grn = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: GRN, fluid: GRNF });
+  const blu = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: BLU, fluid: BLUF });
+  const flow = (id: string) => h.consumers?.find((c) => c.id === id)?.flowM3s ?? 0;
+  const lpm = (m3s: number) => m3s * 60000;
+  const g = gbxSpeed(s), util = h.branches?.find((b) => b.id === "main.util");
+  const surf = (id: string) => Math.abs(s.surfaces[id] ?? 0);
+  const user = (x: number, y: number, name: string, value: string, on: boolean) => `<rect x="${x}" y="${y - 14}" width="104" height="28" rx="3" fill="${on ? "#3a1f2a" : "#1c1d1f"}" stroke="${on ? RED : "#555"}"/>${text(x + 4, y - 2, name, { size: 9, weight: 600 })}${text(x + 4, y + 10, value, { size: 9, color: COLORS.dim })}`;
+  const system = (x0: number, id: "main" | "booster") => {
+    const c = h.circuits.find((k) => k.id === id);
+    if (!c) return "";
+    const p = MPa(c.pressurePa), pumping = c.pumpFlowM3s > Q, M = x0 + 120, U = x0 + 160, R = x0 + 284;
+    const ctrlOn = c.demandFlowM3s > Q;
+    const cpi = Math.max(p, MPa(MIG29_HYDRAULICS.accumulatorPrechargePa.value)); // CPI reads the accumulator gas side
+    const rows: string[] = [];
+    rows.push(`${red([[M, 140], [U, 140]], ctrlOn)}${user(U, 140, id === "main" ? "FLT CTRL 2nd ch" : "FLT CTRL 1st ch", "stab·ail·rud·COC", ctrlOn)}${grn([[U + 104, 140], [R, 140]], ctrlOn)}`);
+    if (id === "main") {
+      rows.push(`${red([[M, 190], [U, 190]], surf("lef") > 0.1)}${user(U, 190, "FLAPS / LEF", `${num(surf("lef"))}°`, false)}${grn([[U + 104, 190], [R, 190]], false)}`);
+      const uOn = (util?.chargeFlowM3s ?? 0) > Q;
+      rows.push(`${red([[M, 240], [M + 20, 240]], uOn)}${valve(M + 28, 240, util?.open ?? true, false)}${text(M - 60, 230, "LIMITER 13 MPa", { size: 8, color: util?.open ? COLORS.dim : COLORS.caution })}${red([[M + 36, 240], [M + 36, 420]], uOn)}`);
+      const utils: [string, string, number][] = [["GEAR", `${num(lpm(flow("gear")), 1)} L/min`, flow("gear")], ["NWS", `${num(lpm(flow("nws")), 1)} L/min`, flow("nws")], ["SPEEDBRAKES", `${num(surf("speedbrake"))}°`, 0], ["INTAKE RAMPS", `${num(lpm(flow("rampLeft") + flow("rampRight")), 1)} L/min`, flow("rampLeft") + flow("rampRight")]];
+      utils.forEach(([n, v, f], i) => { const y = 290 + i * 40; rows.push(`${red([[M + 36, y], [U, y]], f > Q)}${user(U, y, n, v, f > Q)}${grn([[U + 104, y], [R, y]], f > Q)}`); });
+      rows.push(text(M - 6, 460, `utilities ${util?.open ? "on" : "ISOLATED"} · ${num(MPa(util?.pressurePa ?? 0), 1)} MPa`, { size: 9, color: util?.open ? COLORS.dim : COLORS.caution }));
+    } else {
+      // Auto-activation condition (GAF): both systems below 10 MPa (it then needs both engines ≥ 85 %).
+      const emerg = h.circuits.every((k) => k.pressurePa < MIG29_HYDRAULICS.lowPressurePa.value);
+      rows.push(`${pump(x0 + 70, 230, emerg, 10)}${text(x0 + 84, 226, "EMERG PUMP", { size: 9 })}${text(x0 + 84, 238, "fuel-driven · <10 MPa both", { size: 8, color: COLORS.dim })}${red([[x0 + 70, 220], [x0 + 70, 200], [M, 200]], emerg)}`);
+    }
+    return `
+      <rect x="${x0}" y="6" width="292" height="520" rx="6" fill="${COLORS.panel}" stroke="#44474c"/>
+      ${text(x0 + 10, 28, id === "main" ? "MAIN" : "BOOST", { size: 15, weight: 700, color: "#d9b3ff" })}
+      ${text(x0 + 282, 28, `${num(p, 1)} MPa`, { size: 15, weight: 700, anchor: "end", color: p < 10 ? COLORS.warn : p < 19 ? COLORS.caution : COLORS.ok })}
+      ${text(x0 + 282, 44, `CPI ${num(cpi, 1)} · ${num((c.temperatureK ?? 288) - 273.15)} °C`, { size: 9, anchor: "end", color: COLORS.dim })}
+      ${blu([[x0 + 30, 470], [x0 + 30, 92]], pumping)}${pump(x0 + 30, 80, pumping, 12)}${text(x0 + 10, 56, `GBX PUMP ${num(lpm(c.pumpFlowM3s), 0)} L/min`, { size: 9 })}
+      ${red([[x0 + 42, 80], [M, 80], [M, id === "main" ? 240 : 200]], pumping || ctrlOn)}
+      <rect x="${M - 14}" y="94" width="28" height="22" rx="11" fill="#ff4d7a" opacity="0.8" stroke="${COLORS.line}"/>${text(M + 18, 108, "ACC 8 MPa N₂", { size: 8, color: COLORS.dim })}
+      ${rows.join("")}
+      ${grn([[R, 120], [R, 480], [x0 + 110, 480]], ctrlOn || pumping)}
+      <rect x="${x0 + 10}" y="460" width="100" height="44" rx="16" fill="#0d3a4f" stroke="${BLU}"/>
+      <rect x="${x0 + 12}" y="${462 + 40 * (1 - (c.reservoirFraction ?? 1))}" width="96" height="${40 * (c.reservoirFraction ?? 1)}" rx="12" fill="${BLU}" opacity="0.7"/>
+      ${text(x0 + 60, 480, "RESERVOIR", { size: 8, anchor: "middle", weight: 700 })}${text(x0 + 60, 494, "in fuel tank 3", { size: 8, anchor: "middle" })}
+      ${text(x0 + 130, 512, c.reliefFlowM3s > Q ? "RELIEF 24 MPa OPEN" : "relief 24 MPa", { size: 9, color: c.reliefFlowM3s > Q ? COLORS.caution : COLORS.dim })}`;
   };
-  const emerg = h.circuits.find((c) => c.id === "booster")!.pumpFlowM3s > 0 && g.v < 0.3;
-  return svg(600, 520, `
-    ${box(215, 6, 170, 40, "GBX PUMPS", [`${g.by} · ${num(g.v * 100, 0)} %`], g.v > 0.5 ? "on" : "warn")}
-    ${pipe([[135, 250], [135, 300], [300, 300], [300, 330]], { flow: g.v > 0.5, color: COLORS.hyd, fluid: "#e9d5ff" })}${pipe([[465, 250], [465, 300], [300, 300]], { flow: g.v > 0.5, color: COLORS.hyd, fluid: "#e9d5ff" })}
-    ${circ(20, "main", "MAIN SYSTEM")}${circ(350, "booster", "BOOST SYSTEM")}${pump(135, 245, g.v > 0.5)}${pump(465, 245, g.v > 0.5)}
-    ${box(200, 330, 200, 104, "FLIGHT CONTROLS", ["tailerons · ailerons", "rudders · diff. tailerons", "dual chambers", "(full control on either)"], "on", "#d9b3ff")}
-    ${box(20, 330, 160, 104, "MAIN ONLY", ["LEF · flaps", "gear · brakes · NWS", "speedbrakes", "intake ramps"], "on", "#d9b3ff")}
-    ${box(420, 330, 160, 74, "EMERGENCY PUMP", [emerg ? "RUNNING" : "standby", "fuel driven · ≥85 % both", "→ boost system"], emerg ? "shed" : "off", "#d9b3ff")}
-    ${text(20, 470, "Relief 24 MPa · low warning 10 MPa · accumulators 8 MPa N₂ (GAF T.O.)", { size: 10, color: COLORS.dim })}`);
+  return svg(600, 580, `${system(4, "main")}${system(302, "booster")}
+    ${text(12, 544, `GBX driven by the ${g.by} engine (${num(g.v * 100, 1)} %). Warnings below 10 MPa; emergency pump needs both engines ≥ 85 %.`, { size: 9, color: COLORS.dim })}
+    ${text(12, 558, "GAF T.O. 1F-MIG29-1. Flows, volumes and thermal values estimated; brakes are pneumatic (not shown).", { size: 9, color: COLORS.dim })}`);
 }
-
 
 export const MIG29_EFB = {
   title: "MiG-29 EFB",
