@@ -45,10 +45,10 @@ export const MIG29_MASS = Object.freeze({
 
 /** Aerodynamic model constants (component method; see MiG29Aerodynamics.ts). */
 export const MIG29_AERO = Object.freeze({
-  zeroLiftDragSubsonic: P(0.021, "-", "estimated", "Raymer equivalent-skin-friction method, twin-engine fighter class"),
-  zeroLiftDragPeak: P(0.046, "-", "estimated", "Typical fighter wave-drag rise to M≈1.2 (Raymer)"),
+  zeroLiftDragSubsonic: P(0.024, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Fitted jointly with e and the drag-rise peak; Raymer estimate was 0.021"),
+  zeroLiftDragPeak: P(0.055, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer typical value was 0.046"),
   zeroLiftDragM2: P(0.040, "-", "estimated", EST),
-  oswaldEfficiency: P(0.80, "-", "estimated", "Raymer, swept low-aspect-ratio wing"),
+  oswaldEfficiency: P(0.60, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Effective value absorbing trim drag and high-alpha losses; Raymer estimate was 0.80"),
   stallAlphaDeg: P(28, "deg", "estimated", EST, "Attached + vortex lift break; flight-manual AoA limits not used"),
   staticMarginSubsonic: P(0.05, "MAC fraction", "estimated", EST, "Conventionally stable; no relaxed stability"),
   staticMarginSupersonic: P(0.20, "MAC fraction", "estimated", "Aerodynamic-centre shift to ≈half chord supersonic (textbook)"),
