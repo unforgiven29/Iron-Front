@@ -13,12 +13,16 @@ import { mig29Aerodynamics } from "./MiG29Aerodynamics.js";
 import { mig29FuelSystem, mig29TankSpecs } from "./MiG29FuelSystem.js";
 import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
-import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_MASS as M } from "./MiG29Data.js";
+import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_HYDRAULICS as HYD, MIG29_MASS as M } from "./MiG29Data.js";
 import { mig29IntakeSystem } from "./MiG29Intake.js";
 import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
-import { mig29AccessoryDrives, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
+import { mig29AccessoryDrives, mig29HydraulicLoads, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
-export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault" });
+export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault",
+  batGnd: "mig29.elec.bat-gnd", dcGen: "mig29.elec.dc-gen", acGen: "mig29.elec.ac-gen", pto: "mig29.elec.pto" });
+
+/** Electrical test faults (simulation only). CSD OVERSPEED = automatic CSD disconnect at 14,300–14,500 rpm (GAF T.O.). */
+const ELEC_FAULTS = Object.freeze({ NORMAL: [], "AC GEN FAIL": ["gen.ac"], "DC GEN FAIL": ["gen.dc"], "BOTH GEN FAIL": ["gen.ac", "gen.dc"], "CSD OVERSPEED": ["gen.ac"], "TRANSFORMER FAIL": ["transformer"] } as const);
 
 export const MIG29_MANIFEST: ModuleManifest = {
   manifestSchemaVersion: 1,
@@ -107,8 +111,13 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     annunciate: (s) => {
       const out: { text: string; level: "caution" | "warning" }[] = [];
       for (const e of s.engines) if (e.flameout) out.push({ text: `${e.id.toUpperCase()} ENGINE OUT`, level: "warning" });
-      const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < 0.4 * 21e6).map((c) => c.id.toUpperCase());
-      if (low.length) out.push({ text: `HYD ${low.join("+")} LOW`, level: low.length > 1 ? "warning" : "caution" });
+      // GAF T.O.: warning when either hydraulic system is below 100 kp/cm² (10 MPa).
+      const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < HYD.lowPressurePa.value).map((c) => (c.id === "booster" ? "BOOST" : "MAIN"));
+      if (low.length) out.push({ text: `HYD ${low.join("+")} LOW`, level: "warning" });
+      const util = s.hydraulics?.branches?.find((b) => b.id === "main.util");
+      if (util && !util.open) out.push({ text: "HYD LIMITER: FLT CONTROLS ONLY", level: "caution" });
+      if (s.switches[MIG29_SWITCHES.electricalFault] === "CSD OVERSPEED") out.push({ text: "DISCON GEN DRIVE", level: "caution" });
+      if (s.electrical?.buses.find((b) => b.id === "ac")?.sourceId === "pto") out.push({ text: "PTO ON", level: "caution" });
       // Engine captions (GAF T.O.): oil temperature > 195 °C, oil pressure below 1.8 kp/cm² (50–89 % NH) or
       // 2.7 kp/cm² (> 89 %) — the manual's 20 s persistence is not modelled — vibration, AB blow-out, surge.
       for (const e of s.engines) {
@@ -129,15 +138,41 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     },
     createSystems: () => {
       const fcs = mig29ControlSystem();
+      const elec = { fault: "NORMAL", batGnd: true, dcGen: true, acGen: true, pto: true };
+      const applyElec = (ctx: { setElectricalSourcesOff(ids: readonly string[]): void }) => ctx.setElectricalSourcesOff([
+        ...(ELEC_FAULTS[elec.fault as keyof typeof ELEC_FAULTS] ?? []),
+        ...(elec.batGnd ? [] : ["battery"]), ...(elec.dcGen ? [] : ["gen.dc"]), ...(elec.acGen ? [] : ["gen.ac"]), ...(elec.pto ? [] : ["pto", "pto36"])
+      ]);
+      let speedbrakeSwitch = false;
       const switches: SwitchBinding[] = [
         { key: "f", definition: { id: MIG29_SWITCHES.sau, ownerId: "mig29.sau", label: "SAU (TEST)", positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "Simulation test switch for the stability-augmentation dampers" }, onChange: (to) => { fcs.setSau(to as SauMode); return { accepted: true }; } },
-        { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { fcs.setSpeedbrake(to === "EXTEND"); return { accepted: true }; } },
+        { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { speedbrakeSwitch = to === "EXTEND"; return { accepted: true }; } },
         { key: "g", definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
         { key: "h", definition: { id: MIG29_SWITCHES.hydraulicFault, ownerId: "mig29.hydraulics", label: "HYD FAULT (TEST)", positions: ["NORMAL", "MAIN PUMP FAIL", "BOOSTER PUMP FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch" }, onChange: (to, ctx) => { ctx.setHydraulicFaults(to === "NORMAL" ? [] : [{ kind: "pump-failed", pumpId: to.startsWith("MAIN") ? "pump.main" : "pump.booster" }]); return { accepted: true }; } },
-        { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: ["NORMAL", "AC GEN FAIL", "DC GEN FAIL", "BOTH GEN FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch: generator failures" }, onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "AC GEN FAIL" ? ["gen.ac"] : to === "DC GEN FAIL" ? ["gen.dc"] : ["gen.ac", "gen.dc"]); return { accepted: true }; } },
+        { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: Object.keys(ELEC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: generator, CSD and transformer failures" }, onChange: (to, ctx) => { elec.fault = to; applyElec(ctx); return { accepted: true }; } },
+        ...([["batGnd", "BAT-GND SUPPLY"], ["dcGen", "DC GEN"], ["acGen", "AC GEN"], ["pto", "PTO"]] as const).map(([k, label]): SwitchBinding => ({
+          definition: { id: MIG29_SWITCHES[k], ownerId: "mig29.electrical", label, positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "GAF T.O. 1F-MIG29-1 fig 1-22, electrical power panel (RH console)" },
+          onChange: (to, ctx) => { elec[k] = to === "ON"; applyElec(ctx); return { accepted: true }; }
+        })),
         { key: "l", definition: { id: MIG29_SWITCHES.leftEngine, ownerId: "mig29.engines", label: "L ENGINE (TEST)", positions: ["RUN", "CUT"], defaultPosition: "RUN", provenance: "Simulation test switch: shuts off fuel to the left engine" }, onChange: (to, ctx) => { ctx.setEngineFuelCutoff("left", to === "CUT"); return { accepted: true }; } }
       ];
-      return { aero: mig29Aerodynamics(), fcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]) };
+      // Speedbrake logic (GAF T.O.): electrically deactivated (retracted) when main or boost pressure is
+      // below 10 MPa, with the gear extended, or without DC power; blow-back above 540 KIAS (estimated
+      // linear limit over 60 kt). Main-pressure loss leaves the surface where the air pushes it (not modelled: held).
+      const guardedFcs: typeof fcs = { ...fcs,
+        step: (pilot: Parameters<typeof fcs.step>[0], sensors: Parameters<typeof fcs.step>[1], surfaces: Parameters<typeof fcs.step>[2], dt: number) => {
+          const p = sensors.hydraulicPressuresPa ?? {}, low = HYD.lowPressurePa.value;
+          const dcOn = sensors.electricalBuses?.["dc"]?.powered ?? true;
+          const allowed = speedbrakeSwitch && (p["main"] ?? 21e6) >= low && (p["booster"] ?? 21e6) >= low && sensors.gearUpLocked !== false && dcOn;
+          fcs.setSpeedbrake(allowed);
+          const out = fcs.step(pilot, sensors, surfaces, dt);
+          const kias = Math.sqrt((2 * sensors.dynamicPressurePa) / 1.225) / 0.514444;
+          const blow = Math.max(0, Math.min(1, 1 - (kias - HYD.speedbrakeBlowBackKias.value) / 60));
+          const sb = out.commands["speedbrake"];
+          return sb === undefined ? out : { ...out, commands: { ...out.commands, speedbrake: sb * blow } };
+        }
+      };
+      return { aero: mig29Aerodynamics(), fcs: guardedFcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]), hydraulicLoads: mig29HydraulicLoads() };
     }
   };
 }

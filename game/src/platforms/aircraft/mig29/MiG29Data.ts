@@ -168,7 +168,13 @@ export const MIG29_HYDRAULICS = Object.freeze({
   pumpRatedFlowM3s: P(1.6e-3, "m³/s", "estimated", EST, "One pump per system, on separate engines"),
   displacementM3PerDeg: P(1.4e-5, "m³/deg", "estimated", EST),
   hingeLoadFractionAtReference: P(0.5, "-", "estimated", EST),
-  hingeReferenceDynamicPressurePa: P(60_000, "Pa", "estimated", EST)
+  hingeReferenceDynamicPressurePa: P(60_000, "Pa", "estimated", EST),
+  pressureLimiterPa: P(13e6, "Pa", "primary-published", GAF_TO, "Main-system pressure limiter and isolation valve: below 130 kp/cm² it disconnects all systems except the flight controls (one chamber of tailerons, ailerons, rudders, flaps/LEF, AOA limiter)"),
+  pumpMinPressurePa: P(19e6, "Pa", "primary-published", GAF_TO, "Pumps operate between 190 and 220 kp/cm²"),
+  speedbrakeBlowBackKias: P(540, "kt", "primary-published", GAF_TO, "Speedbrake blow-back protects actuators and surfaces above 540 KIAS"),
+  reservoirM3: P(0.008, "m³", "estimated", EST, "Reservoirs inside fuel tank 3, air-pressurised, two-chamber (feed at negative g); contents not given"),
+  heatCapacityJPerK: P(4e4, "J/K", "estimated", EST),
+  fuelCoolingWPerK: P(600, "W/K", "estimated", EST, "Reservoirs in fuel tank 3: 'adequate cooling by heat exchange with fuel'; no thermal bypass")
 });
 
 export const MIG29_ELECTRICAL = Object.freeze({
@@ -177,7 +183,10 @@ export const MIG29_ELECTRICAL = Object.freeze({
   ptoConverterW: P(1_500, "VA", "primary-published", GAF_TO, "DC/AC converter PTO, minimum 1.5 kVA at 115 V"),
   generatorMinDriveFraction: P(0.55, "fraction", "primary-published", GAF_TO, "The engine fault detection unit engages the AC generator when NH exceeds 55 %"),
   batteryVoltage: P(27.6, "V", "primary-published", GAF_TO, "Two silver-zinc batteries, nominal 27.6 V (≥22 V at 200 A); not charged by the generator"),
-  batteryCapacityAh: P(50, "Ah (both)", "estimated", EST, "Capacity not given in Section 1"),
+  batteryCapacityAh: P(90, "Ah (both)", "secondary-reported", "HBL Power Systems aircraft battery listing (silver-zinc 15SCS-45 for MiG-29): 45 Ah each, two batteries", "GAF T.O. gives the type (silver-zinc) and voltage only"),
+  transformerW: P(1_500, "VA", "primary-published", GAF_TO, "Transformer: three-phase 36 VAC, maximum 1.5 kVA"),
+  pto36W: P(1_000, "VA", "primary-published", GAF_TO, "PTO: three-phase 36 VAC at a minimum of 1 kVA"),
+  csdDisconnectRpm: P(14_300, "rpm", "primary-published", GAF_TO, "CSD output shaft 12,000 rpm; automatic disconnect at 14,300–14,500 rpm (465–480 Hz), manual if CSD oil pressure < 1 MPa or oil hot"),
   acEssentialLoadW: P(1_200, "W", "estimated", EST, "Flight-essential AC consumers (must fit the PTO)"),
   acSheddableLoadW: P(14_000, "W", "estimated", EST, "Shed on PTO: INS heaters, radar/sight, IRST/LRF/HMS, probe/windshield heaters, AFCS, armament, IFF encoder (GAF list)"),
   dcEssentialLoadW: P(2_500, "W", "estimated", EST),
