@@ -11,6 +11,9 @@
  *       turbine-inlet temperature, minimum burner pressure (raises idle at altitude)
  *     → acceleration / deceleration schedule (rate limits that protect stall and flameout margin)
  *     → speed demand to the rotor
+ *   nozzle throat → opened to whatever the engine's flow needs ("auto"); if it cannot pass the flow
+ *     (held closed, or at full open) the turbine runs hotter (cycle back-pressure matching) and
+ *     the turbine-temperature limiter slows the engine
  *   afterburner request → light-off permission (core at max, burner pressure, light-off delay)
  *     → zone rate limit → afterburner demand
  *
@@ -22,10 +25,11 @@
  * hydromechanical secondary control: speed cap, slower acceleration, afterburner optionally
  * inhibited). A package maps its cockpit switch onto these.
  *
- * Not modelled: surge/stall itself (only the margin-protecting schedules), nozzle-area control
- * and its effect on fan operating line, fault detection and automatic transfer to backup,
+ * Not modelled: surge/stall itself (only the margin-protecting schedules), the nozzle's effect
+ * on the fan operating line other than the area limiter, idle nozzle opening, fault detection and automatic transfer to backup,
  * relight/airstart, fuel-system pressures.
  */
+import type { ThroatCommand } from "./components/Nozzle.js";
 import { solveCycle, type Ambient, type CycleResult, type TurbofanDesign } from "./MixedFlowTurbofan.js";
 
 export type FadecMode = "primary" | "backup";
@@ -60,6 +64,8 @@ export interface FadecSchedule {
     readonly maxPhysicalSpeed: number;
     readonly accelRatePerS: number;
     readonly afterburnerInhibited: boolean;
+    /** Backup control holds the nozzle throat closed (minimum area). */
+    readonly nozzleClosed: boolean;
   };
 }
 
@@ -70,7 +76,7 @@ export interface FadecSensors {
   readonly fuelAvailable: boolean;
 }
 
-export type FadecLimit = "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope";
+export type FadecLimit = "nozzle-area" | "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope";
 
 export interface FadecOutput {
   readonly mode: FadecMode;
@@ -78,6 +84,8 @@ export interface FadecOutput {
   readonly speedDemand: number;
   /** Afterburner demand, 0..1. */
   readonly afterburnerDemand: number;
+  /** Nozzle throat command. */
+  readonly throat: ThroatCommand;
   /** Steady-state speed the throttle asks for, after limiters but before rate limits. */
   readonly scheduledSpeed: number;
   /** Limiters currently holding the demand below what the throttle asks for. */
@@ -88,9 +96,9 @@ const T_STD = 288.15;
 const thetaOf = (a: Ambient) => (a.temperatureK * (1 + 0.2 * a.mach * a.mach)) / T_STD;
 
 /** Highest physical speed in [lo, hi] for which `ok(cycle)` holds (bisection on the on-board model). */
-function highestSpeed(design: TurbofanDesign, ambient: Ambient, ab: number, lo: number, hi: number, ok: (c: CycleResult) => boolean): number {
+function highestSpeed(design: TurbofanDesign, ambient: Ambient, ab: number, throat: ThroatCommand, lo: number, hi: number, ok: (c: CycleResult) => boolean): number {
   const theta = thetaOf(ambient);
-  const at = (n: number) => solveCycle(design, ambient, n / Math.sqrt(theta), ab);
+  const at = (n: number) => solveCycle(design, ambient, n / Math.sqrt(theta), ab, { throat });
   if (ok(at(hi))) return hi;
   if (!ok(at(lo))) return lo;
   for (let i = 0; i < 30; i++) {
@@ -117,7 +125,7 @@ function lowestSpeed(design: TurbofanDesign, ambient: Ambient, lo: number, hi: n
  * Steady-state scheduling (no rate limits): the speed and afterburner fraction the FADEC settles
  * at for a throttle position. Pure; used by the controller and by steady performance tools.
  */
-export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mode: FadecMode, throttle: number, ambient: Ambient): { speed: number; afterburner: number; limits: FadecLimit[] } {
+export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mode: FadecMode, throttle: number, ambient: Ambient): { speed: number; afterburner: number; throat: ThroatCommand; limits: FadecLimit[] } {
   const limits: FadecLimit[] = [];
   const t = Math.max(0, Math.min(1, throttle));
   const maxPhys = mode === "backup" ? s.backup.maxPhysicalSpeed : s.maxPhysicalSpeed;
@@ -134,18 +142,22 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
   if (abRequest > 0 && mode === "backup" && s.backup.afterburnerInhibited) { abRequest = 0; limits.push("afterburner-inhibited"); }
 
-  // Model-based temperature limiters (evaluated with the afterburner the FADEC will run).
+  const throat: ThroatCommand = mode === "backup" && s.backup.nozzleClosed ? { kind: "position", position: 0 } : { kind: "auto" };
+  // Model-based limiters (evaluated with the afterburner and nozzle setting the FADEC will run).
   const lo = Math.min(speed, s.idleSpeed * 0.8);
+  // A throat too small for the flow is handled by the cycle (back-pressure raises turbine
+  // temperature); the turbine-temperature limiter below then slows the engine. Reported here.
   if (s.maxCompressorExitTemperatureK !== undefined) {
     const lim = s.maxCompressorExitTemperatureK;
-    const n = highestSpeed(design, ambient, abRequest, lo, speed, (c) => c.compressorExitTemperatureK <= lim);
+    const n = highestSpeed(design, ambient, abRequest, throat, lo, speed, (c) => c.compressorExitTemperatureK <= lim);
     if (n < speed - 1e-9) { speed = n; limits.push("compressor-exit-temperature"); }
   }
   if (s.maxTurbineInletTemperatureK !== undefined) {
     const lim = s.maxTurbineInletTemperatureK;
-    const n = highestSpeed(design, ambient, abRequest, lo, speed, (c) => c.turbineInletTemperatureK <= lim);
+    const n = highestSpeed(design, ambient, abRequest, throat, lo, speed, (c) => c.turbineInletTemperatureK <= lim);
     if (n < speed - 1e-9) { speed = n; limits.push("turbine-inlet-temperature"); }
   }
+  if (solveCycle(design, ambient, speed / Math.sqrt(theta), abRequest, { throat }).backPressureLimited) limits.push("nozzle-area");
   // Minimum burner pressure: raise the idle floor at altitude (never above the current maximum).
   if (s.minBurnerPressurePa !== undefined) {
     const min = s.minBurnerPressurePa;
@@ -158,7 +170,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
     const c = solveCycle(design, ambient, speed / Math.sqrt(theta), 0);
     if (c.compressorExitPressurePa < s.afterburnerMinBurnerPressurePa) { afterburner = 0; limits.push("afterburner-envelope"); }
   }
-  return { speed, afterburner, limits };
+  return { speed, afterburner, throat, limits };
 }
 
 /** Stateful FADEC: steady scheduling plus acceleration/deceleration and afterburner sequencing. */
@@ -168,10 +180,12 @@ export class Fadec {
   private ab = 0;
   private abTimer = 0;
   private last: FadecOutput;
+  /** Steady schedule cache: the model-based limiters are only re-solved when inputs move. */
+  private cache: { key: readonly number[]; mode: FadecMode; result: ReturnType<typeof scheduleSteadyState>; age: number } | undefined;
 
   public constructor(private readonly design: TurbofanDesign, private readonly schedule: FadecSchedule, initialThrottle: number, initialAmbient: Ambient) {
     this.demand = scheduleSteadyState(design, schedule, "primary", Math.min(initialThrottle, schedule.afterburnerDetentThrottle), initialAmbient).speed;
-    this.last = { mode: this.mode, speedDemand: this.demand, afterburnerDemand: 0, scheduledSpeed: this.demand, activeLimits: [] };
+    this.last = { mode: this.mode, speedDemand: this.demand, afterburnerDemand: 0, throat: { kind: "auto" }, scheduledSpeed: this.demand, activeLimits: [] };
   }
 
   public get output(): FadecOutput {
@@ -192,16 +206,35 @@ export class Fadec {
     return this.demand;
   }
 
+  /**
+   * Steady scheduling with a cache. Re-solved when throttle moves by 0.002, ambient temperature
+   * by 0.2 K, pressure by 0.2 %, Mach by 0.003, the mode changes, or every 0.2 s. Between solves
+   * the result is held (well inside the control's own rate limits).
+   */
+  private steady(throttle: number, ambient: Ambient, dt: number): ReturnType<typeof scheduleSteadyState> {
+    const key = [throttle, ambient.temperatureK, ambient.pressurePa, ambient.mach];
+    const c = this.cache;
+    if (c && c.mode === this.mode && c.age < 0.2
+      && Math.abs(key[0]! - c.key[0]!) < 0.002 && Math.abs(key[1]! - c.key[1]!) < 0.2
+      && Math.abs(key[2]! - c.key[2]!) < 0.002 * c.key[2]! && Math.abs(key[3]! - c.key[3]!) < 0.003) {
+      c.age += dt;
+      return c.result;
+    }
+    const result = scheduleSteadyState(this.design, this.schedule, this.mode, throttle, ambient);
+    this.cache = { key, mode: this.mode, result, age: 0 };
+    return result;
+  }
+
   public step(throttle: number, sensors: FadecSensors, dt: number): FadecOutput {
     const s = this.schedule;
     if (!sensors.fuelAvailable) {
       this.demand = sensors.spoolSpeed;
       this.ab = 0;
       this.abTimer = 0;
-      this.last = { mode: this.mode, speedDemand: sensors.spoolSpeed, afterburnerDemand: 0, scheduledSpeed: 0, activeLimits: [] };
+      this.last = { mode: this.mode, speedDemand: sensors.spoolSpeed, afterburnerDemand: 0, throat: { kind: "auto" }, scheduledSpeed: 0, activeLimits: [] };
       return this.last;
     }
-    const target = scheduleSteadyState(this.design, s, this.mode, throttle, sensors.ambient);
+    const target = this.steady(throttle, sensors.ambient, dt);
     const limits = [...target.limits];
 
     // Acceleration / deceleration schedules: rate limits on the speed demand.
@@ -218,7 +251,7 @@ export class Fadec {
     const rate = s.afterburnerRatePerS * dt;
     this.ab = abTarget > this.ab ? Math.min(abTarget, this.ab + rate) : Math.max(abTarget, this.ab - rate * 2);
 
-    this.last = { mode: this.mode, speedDemand: this.demand, afterburnerDemand: this.ab, scheduledSpeed: target.speed, activeLimits: limits };
+    this.last = { mode: this.mode, speedDemand: this.demand, afterburnerDemand: this.ab, throat: target.throat, scheduledSpeed: target.speed, activeLimits: limits };
     return this.last;
   }
 }

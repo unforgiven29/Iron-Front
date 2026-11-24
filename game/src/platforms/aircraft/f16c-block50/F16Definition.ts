@@ -177,7 +177,7 @@ function engPage(s: AircraftSnapshot) {
       `TIT  ${e.turbineInletTemperatureK.toFixed(0)} K`,
       `THRUST ${(e.netThrustN / 1000).toFixed(1)} kN`,
       `       ${((e.netThrustN / max) * 100).toFixed(0)}% of max`,
-      `A/B  ${e.afterburnerLit ? "ON" : "OFF"}`,
+      `A/B  ${e.afterburnerLit ? "ON" : "OFF"}  NOZ ${Number.isFinite(e.nozzle.position) ? (e.nozzle.position * 100).toFixed(0).padStart(3) + "%" : " — "}`,
       `CONT ${e.control.mode === "backup" ? "SEC" : "PRI"}  N DMD ${(e.control.speedDemand * 100).toFixed(0)}%`,
       `LIM  ${e.control.activeLimits.filter((l) => l !== "acceleration" && l !== "deceleration").map(limitLabel).join(" ") || "—"}`,
       `FF   ${(e.fuelFlowKgS * 3600).toFixed(0)} kg/h`,
@@ -189,7 +189,7 @@ function engPage(s: AircraftSnapshot) {
 }
 
 function limitLabel(l: string): string {
-  return ({ "max-speed": "NMAX", "corrected-speed": "NCOR", "compressor-exit-temperature": "T3", "turbine-inlet-temperature": "TIT", "min-burner-pressure": "PB MIN", "afterburner-inhibited": "AB INH", "afterburner-envelope": "AB ENV" } as Record<string, string>)[l] ?? l;
+  return ({ "max-speed": "NMAX", "corrected-speed": "NCOR", "compressor-exit-temperature": "T3", "turbine-inlet-temperature": "TIT", "nozzle-area": "NOZ", "min-burner-pressure": "PB MIN", "afterburner-inhibited": "AB INH", "afterburner-envelope": "AB ENV" } as Record<string, string>)[l] ?? l;
 }
 
 function flcsPage(s: AircraftSnapshot) {

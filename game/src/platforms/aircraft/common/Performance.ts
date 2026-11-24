@@ -43,7 +43,7 @@ export function levelFlightPoint(def: AircraftDefinition, options: PerformanceOp
     const ambient = { temperatureK: atm.temperatureK, pressurePa: atm.pressurePa, mach };
     // The engine runs where its FADEC settles for full throttle (all limiters applied).
     const op = scheduleSteadyState(e.design, e.control, "primary", afterburner ? 1 : e.control.afterburnerDetentThrottle, ambient);
-    const c = solveCycle(e.design, ambient, op.speed / Math.sqrt(theta), op.afterburner);
+    const c = solveCycle(e.design, ambient, op.speed / Math.sqrt(theta), op.afterburner, { throat: op.throat });
     return sum + Math.max(0, c.netThrustN) * e.thrustAxisBody[0];
   }, 0);
   const forces = (alpha: number, trim: number) => {
