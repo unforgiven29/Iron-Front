@@ -43,6 +43,24 @@ export interface TurbofanDesign {
   readonly afterburnerLightDelayS: number;
   /** Afterburner fraction rate, 1/s. */
   readonly afterburnerRatePerS: number;
+  /**
+   * Inlet type. "pitot-normal-shock": fixed pitot inlet (e.g. F-16), total-pressure recovery set by
+   * a normal shock above Mach 1 (exact gas dynamics) times `inletSubsonicRecovery`.
+   * "mil-e-5008b": generic efficient supersonic inlet. Default "mil-e-5008b".
+   */
+  readonly inlet?: "pitot-normal-shock" | "mil-e-5008b";
+  /** Subsonic duct total-pressure recovery (default 1). */
+  readonly inletSubsonicRecovery?: number;
+  /** Compressor-exit total temperature limit, K. The control reduces spool speed to respect it. */
+  readonly maxCompressorExitTemperatureK?: number;
+  /** Fraction of net thrust lost to installation (bleed, power extraction, spillage, nozzle). Default 0. */
+  readonly installationLossFraction?: number;
+  /**
+   * Reynolds-number effect: component efficiencies fall by this fraction × (1 − RNI) when the
+   * Reynolds number index RNI = δ2/(θ2^0.5·μ-ratio) drops below 1 (approximated as δ2/θ2^1.25).
+   * Default 0 (off).
+   */
+  readonly reynoldsEfficiencyLoss?: number;
 }
 
 export interface Ambient {
@@ -61,6 +79,9 @@ export interface CycleResult {
   readonly nozzleTemperatureK: number;
   readonly compressorExitPressurePa: number;
   readonly correctedSpeed: number;
+  readonly compressorExitTemperatureK: number;
+  /** True when the compressor-exit temperature limit reduced spool speed. */
+  readonly t3Limited?: boolean;
 }
 
 const CP_COLD = 1004.5, G_COLD = 1.4;
@@ -74,29 +95,58 @@ export function inletRecovery(mach: number): number {
   return mach <= 1 ? 1 : 1 - 0.075 * (mach - 1) ** 1.35;
 }
 
+/** Total-pressure ratio across a normal shock (γ = 1.4), exact. 1 at or below Mach 1. */
+export function normalShockRecovery(mach: number): number {
+  if (mach <= 1) return 1;
+  const g = 1.4, m2 = mach * mach;
+  return ((g + 1) * m2 / ((g - 1) * m2 + 2)) ** (g / (g - 1)) * ((g + 1) / (2 * g * m2 - (g - 1))) ** (1 / (g - 1));
+}
+
+function recovery(d: TurbofanDesign, mach: number): number {
+  const sub = d.inletSubsonicRecovery ?? 1;
+  return d.inlet === "pitot-normal-shock" ? sub * normalShockRecovery(mach) : inletRecovery(mach);
+}
+
 /**
  * Steady cycle at a corrected spool speed and afterburner fraction. Pure function.
  * `tit` and `tab` override the design temperatures (used by calibration).
  */
 export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: number, abFraction: number, tit = d.turbineInletTemperatureK, tab = d.afterburnerMaxTemperatureK): CycleResult {
+  const limit = d.maxCompressorExitTemperatureK;
+  const first = solveCycleRaw(d, amb, correctedSpeed, abFraction, tit, tab);
+  if (limit === undefined || first.compressorExitTemperatureK <= limit) return first;
+  // Engine control holds the compressor-exit temperature limit by reducing corrected speed.
+  let lo = 0.2, hi = Math.min(1.05, correctedSpeed);
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (solveCycleRaw(d, amb, mid, abFraction, tit, tab).compressorExitTemperatureK > limit) hi = mid; else lo = mid;
+  }
+  return { ...solveCycleRaw(d, amb, lo, abFraction, tit, tab), t3Limited: true };
+}
+
+function solveCycleRaw(d: TurbofanDesign, amb: Ambient, correctedSpeed: number, abFraction: number, tit: number, tab: number): CycleResult {
   const M = Math.max(0, amb.mach);
   const T0 = amb.temperatureK, p0 = amb.pressurePa;
   const V0 = M * Math.sqrt(G_COLD * R * T0);
   const Tt0 = T0 * (1 + 0.2 * M * M);
   const pt0 = p0 * (1 + 0.2 * M * M) ** 3.5;
-  const Tt2 = Tt0, pt2 = pt0 * inletRecovery(M);
+  const Tt2 = Tt0, pt2 = pt0 * recovery(d, M);
   const theta = Tt2 / T_STD, delta = pt2 / P_STD;
   const Nc = Math.max(0.2, Math.min(1.05, correctedSpeed));
+  // Reynolds-number index (approximation δ/θ^1.25) and the resulting efficiency loss.
+  const rni = delta / theta ** 1.25;
+  const reLoss = 1 - (d.reynoldsEfficiencyLoss ?? 0) * Math.max(0, 1 - rni);
+  const etaFan = d.fanEfficiency * reLoss, etaComp = d.compressorEfficiency * reLoss, etaTurb = d.turbineEfficiency * reLoss;
 
   // Generic map laws: corrected flow ∝ Nc, pressure rise ∝ Nc² (each relative to design).
   const W2 = d.airflowKgS * Nc * delta / Math.sqrt(theta);
   const fpr = 1 + (d.fanPressureRatio - 1) * Nc * Nc;
   const opr = 1 + (d.overallPressureRatio - 1) * Nc * Nc;
   const k = (G_COLD - 1) / G_COLD;
-  const Tt13 = Tt2 * (1 + (fpr ** k - 1) / d.fanEfficiency);
+  const Tt13 = Tt2 * (1 + (fpr ** k - 1) / etaFan);
   const pt13 = pt2 * fpr;
   const cpr = opr / fpr; // core compressor after the fan
-  const Tt3 = Tt13 * (1 + (cpr ** k - 1) / d.compressorEfficiency);
+  const Tt3 = Tt13 * (1 + (cpr ** k - 1) / etaComp);
   const pt3 = pt13 * cpr;
 
   const wCore = W2 / (1 + d.bypassRatio), wBypass = W2 - wCore;
@@ -110,7 +160,7 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   const work = W2 * CP_COLD * (Tt13 - Tt2) + wCore * CP_COLD * (Tt3 - Tt13);
   const Tt5 = Tt4 - work / (wHot * CP_HOT);
   const kh = (G_HOT - 1) / G_HOT;
-  const Tt5s = Tt4 - (Tt4 - Tt5) / d.turbineEfficiency;
+  const Tt5s = Tt4 - (Tt4 - Tt5) / etaTurb;
   const pt5 = pt4 * Math.max(1e-3, Tt5s / Tt4) ** (1 / kh);
 
   // Mixer: energy balance; mixed pressure by mass-weighted average (approximation).
@@ -130,7 +180,8 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   const g9 = ab > 0 ? 1.3 : 1.35;
   const pr = Math.max(1, pt7 / p0);
   const V9 = d.nozzleVelocityCoefficient * Math.sqrt(2 * cp6 * Tt7 * (1 - pr ** (-(g9 - 1) / g9)));
-  const gross = w9 * V9, ram = W2 * V0;
+  const install = 1 - (d.installationLossFraction ?? 0);
+  const gross = w9 * V9 * install, ram = W2 * V0;
   return {
     netThrustN: gross - ram,
     grossThrustN: gross,
@@ -140,7 +191,8 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
     turbineInletTemperatureK: Tt4,
     nozzleTemperatureK: Tt7,
     compressorExitPressurePa: pt3,
-    correctedSpeed: Nc
+    correctedSpeed: Nc,
+    compressorExitTemperatureK: Tt3
   };
 }
 

@@ -75,10 +75,11 @@ describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS
     expect(run(1 / 30, 150)).toEqual(run(1 / 144, 720));
   });
 
-  it("flags flight outside the low-speed aero dataset", () => {
-    const a = jet(260, 200); // Mach ≈ 0.77
+  it("flags flight in the estimated transonic band", () => {
+    const a = jet(330, 200); // Mach ≈ 0.97: transonic corrections are estimated
     const s = fly(a, 0.1);
     expect(s.outsideAeroEnvelope).toBe(true);
+    expect(s.aeroEnvelopeReasons.join()).toContain("transonic corrections are estimated");
   });
 
   it("FLCS switch: DIRECT removes augmentation; with an aft CG the bare airframe departs while NORM holds", () => {

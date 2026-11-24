@@ -94,7 +94,12 @@ const F110_DESIGN_BASE: TurbofanDesign = {
   spoolUpTimeConstantS: F16_ENGINE.spoolUpTimeConstantS.value,
   spoolDownTimeConstantS: F16_ENGINE.spoolDownTimeConstantS.value,
   afterburnerLightDelayS: F16_ENGINE.afterburnerLightDelayS.value,
-  afterburnerRatePerS: 2
+  afterburnerRatePerS: 2,
+  inlet: "pitot-normal-shock",
+  inletSubsonicRecovery: F16_ENGINE.inletSubsonicRecovery.value,
+  maxCompressorExitTemperatureK: F16_ENGINE.maxCompressorExitTemperatureK.value,
+  installationLossFraction: F16_ENGINE.installationLossFraction.value,
+  reynoldsEfficiencyLoss: F16_ENGINE.reynoldsEfficiencyLoss.value
 };
 
 /** F110 cycle with design temperatures DERIVED from the published SLS dry/AB ratings. */
