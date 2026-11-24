@@ -184,6 +184,20 @@ export interface AircraftSystems {
    * and generators may name these ids instead of an engine id.
    */
   readonly accessoryDrives?: (ctx: DriveContext) => Readonly<Record<string, number>>;
+  /** The aircraft's own variable-intake model, stepped each tick; returns each engine's intake state. */
+  readonly intakes?: {
+    step(ctx: IntakeContext, dt: number): Readonly<Record<string, import("../../../physics/propulsion/components/Inlet.js").InletState>>;
+    reset(): void;
+  };
+}
+
+export interface IntakeContext {
+  readonly sensors: FlightSensors;
+  readonly gearDown: boolean;
+  engineSpeed(engineId: string): number;
+  hydraulicPressurePa(circuitId: string): number;
+  /** Throttle 0..1 (power demand). */
+  readonly throttle: number;
 }
 
 export interface DriveContext {

@@ -12,54 +12,73 @@ import { F34_KG_PER_L } from "./MiG29FuelSystem.js";
 type Snap = AircraftSnapshot;
 const kg = (s: Snap, id: string) => s.fuelTanks?.find((t) => t.id === id)?.kg ?? 0;
 const cap = (s: Snap, id: string) => s.fuelTanks?.find((t) => t.id === id)?.capacityKg ?? 1;
-const falling = (s: Snap, p: Snap | undefined, id: string) => !!p && kg(p, id) - kg(s, id) > 0.05;
-const rising = (s: Snap, p: Snap | undefined, id: string) => !!p && kg(s, id) - kg(p, id) > 0.05;
 const eng = (s: Snap, id: string) => s.engines.find((e) => e.id === id);
 const gbxSpeed = (s: Snap) => { const l = eng(s, "left")?.spoolSpeed ?? 0, r = eng(s, "right")?.spoolSpeed ?? 0; return l >= r + MIG29_HYDRAULICS.gearboxEngineSelectMargin.value ? { v: l, by: "LH" } : { v: r, by: "RH" }; };
 
-function enginesPage(s: Snap): string {
-  const l = eng(s, "left"), r = eng(s, "right"), feed = s.engines.some((e) => e.fuelFlowKgS > 0);
-  const g = gbxSpeed(s);
-  return svg(760, 640, `
-    ${tank(330, 14, 100, 54, kg(s, "tank2"), cap(s, "tank2"), "TANK 2 (FEED)")}${pump(348, 60, feed, 7)}${pump(412, 60, feed, 7)}
-    ${pipe([[348, 68], [348, 110], [230, 110], [230, 150]], { flow: (l?.fuelFlowKgS ?? 0) > 0 })}
-    ${pipe([[412, 68], [412, 110], [530, 110], [530, 150]], { flow: (r?.fuelFlowKgS ?? 0) > 0 })}
-    ${l ? engineCutaway(230, 150, l, "left", `LH ${num(l.spoolSpeed * 100, 1)} % NH`) : ""}
-    ${r ? engineCutaway(530, 150, r, "right", `RH ${num(r.spoolSpeed * 100, 1)} % NH`) : ""}
-    ${box(320, 300, 120, 92, "GEARBOX (GBX)", [`driven by ${g.by}`, `${num(g.v * 100, 1)} %`, "AC+DC GEN · 2 HYD"], g.v > 0.5 ? "on" : "warn")}
-    ${pipe([[285, 345], [320, 345]], { color: "#888" })}${pipe([[440, 345], [475, 345]], { color: "#888" })}
-    ${text(380, 430, "RD-33 × 2", { anchor: "middle", size: 11, color: COLORS.dim })}
-    ${text(380, 452, `${num(s.engines.reduce((a, e) => a + e.netThrustN, 0) / 1000, 1)} kN`, { anchor: "middle", size: 18, weight: 700 })}
-    ${text(380, 472, `${num(s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600)} kg/h`, { anchor: "middle", size: 12 })}
-    ${text(380, 492, `${(s.engines[0]?.control.mode ?? "").toUpperCase()} · ${s.engines.flatMap((e) => e.control.activeLimits).join(", ") || "no limiter"}`, { anchor: "middle", size: 10, color: COLORS.dim })}`);
+/** Live transfer flow between two places (from the fuel system's own report). */
+const flowing = (s: Snap, from: string, to: string) => (s.fuelComponents?.flows ?? []).some((f) => f.from === from && f.to === to && f.kgS > 0.01);
+const pumpOn = (s: Snap, id: string) => (s.fuelComponents?.pumps ?? []).find((p) => p.id === id)?.running ?? false;
+const valveOpen = (s: Snap, id: string) => (s.fuelComponents?.valves ?? []).find((v) => v.id === id)?.open ?? false;
+
+function intakeBox(x: number, s: Snap, id: string, label: string): string {
+  const st = s.inlets?.[id];
+  if (!st) return "";
+  const state = st.mode === "NO HYD" ? "warn" : st.mode === "FOD" ? "shed" : "on";
+  return box(x, 34, 190, 92, `${label} INTAKE · ${st.mode}`, [
+    `ramp ${(st.rampExtension * 100).toFixed(0)} % (sched ${(st.rampScheduled * 100).toFixed(0)} %)`,
+    `aux louvers ${st.auxOpen ? "OPEN" : "closed"}`,
+    `duct ${st.rampExtension > 0.8 ? "CLOSED (FOD)" : "open"}`,
+    `distortion ${(st.distortion * 100).toFixed(0)} %`
+  ], state);
 }
 
-function fuelPage(s: Snap, p: Snap | undefined): string {
+function enginesPage(s: Snap): string {
+  const l = eng(s, "left"), r = eng(s, "right");
+  const g = gbxSpeed(s);
+  const feedL = flowing(s, "tank2", "left") || flowing(s, "accumulator", "left"), feedR = flowing(s, "tank2", "right") || flowing(s, "accumulator", "right");
+  return svg(640, 620, `
+    ${intakeBox(16, s, "left", "LH")}${intakeBox(434, s, "right", "RH")}
+    ${tank(270, 30, 100, 56, kg(s, "tank2"), cap(s, "tank2"), "TANK 2 · FEED")}
+    ${pipe([[300, 86], [300, 118], [100, 118], [100, 150]], { flow: feedL })}${pipe([[340, 86], [340, 118], [540, 118], [540, 150]], { flow: feedR })}
+    ${l ? engineCutaway(100, 150, l, "right", `LH ${num(l.spoolSpeed * 100, 1)} % NH`) : ""}
+    ${r ? engineCutaway(540, 150, r, "left", `RH ${num(r.spoolSpeed * 100, 1)} % NH`) : ""}
+    ${box(240, 515, 160, 54, "GEARBOX (GBX)", [`${g.by} engine · ${num(g.v * 100, 1)} %`, "AC+DC GEN · 2 HYD · fuel"], g.v > 0.5 ? "on" : "warn")}
+    ${text(320, 590, `${num(s.engines.reduce((a, e) => a + e.netThrustN, 0) / 1000, 1)} kN · ${num(s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600)} kg/h`, { anchor: "middle", size: 15, weight: 700 })}
+    ${text(320, 610, `${(s.engines[0]?.control.mode ?? "").toUpperCase()} · ${s.engines.flatMap((e) => e.control.activeLimits).join(", ") || "no limiter"}`, { anchor: "middle", size: 10, color: COLORS.dim })}`);
+}
+
+function fuelPage(s: Snap): string {
   const t = (id: string, x: number, y: number, w: number, h: number, label: string, shape?: string) =>
-    tank(x, y, w, h, kg(s, id), cap(s, id), label, { ...(shape ? { shape } : {}), active: falling(s, p, id) || rising(s, p, id) });
+    tank(x, y, w, h, kg(s, id), cap(s, id), label, { ...(shape ? { shape } : {}), active: (s.fuelComponents?.flows ?? []).some((f) => (f.from === id || f.to === id) && f.kgS > 0.01) });
   const hasCl = s.fuelTanks?.some((x) => x.id === "centerline") ?? false;
   const total = s.fuelKg, ff = s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600;
-  const f = (id: string) => falling(s, p, id);
-  return svg(600, 690, `
+  const outer = (id: string) => flowing(s, id, "tank3");
+  const feed = s.engines.some((e) => flowing(s, "tank2", e.id));
+  const acc = s.engines.some((e) => flowing(s, "accumulator", e.id));
+  return svg(600, 700, `
     ${text(20, 34, `${total.toFixed(0)} kg`, { size: 22 })}
     ${text(20, 56, `${(total / F34_KG_PER_L).toFixed(0)} L F-34`, { size: 12, color: COLORS.dim })}
     ${text(20, 84, `${ff.toFixed(0)} kg/h`, { size: 16 })}
     ${text(20, 104, `endurance ${ff > 1 ? (total / ff * 60).toFixed(0) : "—"} min`, { size: 11, color: COLORS.dim })}
     ${text(20, 130, `CG ${(s.cgFractionMac * 100).toFixed(1)} % MAC`, { size: 13 })}
-    ${kg(s, "tank2") < 550 ? text(20, 156, "550 KG REMAIN", { size: 13, color: COLORS.caution, weight: 700 }) : ""}
-    ${pipe([[300, 110], [300, 130]], { flow: f("tank1") })}
-    ${pipe([[350, 300], [350, 262], [390, 262], [390, 170], [360, 170]], { flow: f("tank3") })}
-    ${pipe([[250, 300], [250, 262], [210, 262], [210, 75], [240, 75]], { flow: f("tank3") && rising(s, p, "tank1") })}
-    ${pipe([[195, 285], [218, 285], [218, 360], [230, 360]], { flow: f("wingL") })}${pipe([[405, 285], [382, 285], [382, 360], [370, 360]], { flow: f("wingR") })}
-    ${pipe([[180, 470], [180, 420], [230, 420]], { flow: f("tank3A1") })}${pipe([[420, 470], [420, 420], [370, 420]], { flow: f("tank3A2") })}
-    ${pipe([[300, 210], [300, 246], [30, 246], [30, 660]], { flow: ff > 0 })}${pipe([[300, 246], [570, 246], [570, 660]], { flow: ff > 0 })}
-    ${t("tank1", 240, 40, 120, 70, "TANK 1")}${pump(258, 100, f("tank1"))}
-    ${t("tank2", 240, 130, 120, 80, "TANK 2 · FEED")}${valve(300, 120, true)}
-    ${t("tank3", 230, 300, 140, 140, "TANK 3")}${pump(250, 428, f("tank3"))}${pump(350, 428, f("tank3") && rising(s, p, "tank1"))}
+    ${text(20, 152, `active-fuel pump ${pumpOn(s, "activeFuel") ? "ON" : "OFF"}`, { size: 11, color: pumpOn(s, "activeFuel") ? COLORS.ok : COLORS.warn })}
+    ${kg(s, "tank2") < 550 ? text(20, 176, "550 KG REMAIN", { size: 13, color: COLORS.caution, weight: 700 }) : ""}
+    ${acc ? text(20, 198, "ACCUMULATOR FEED (low g)", { size: 12, color: COLORS.caution, weight: 700 }) : ""}
+    ${pipe([[300, 110], [300, 130]], { flow: flowing(s, "tank1", "tank2") })}
+    ${pipe([[350, 300], [350, 262], [390, 262], [390, 170], [360, 170]], { flow: flowing(s, "tank3", "tank2") })}
+    ${pipe([[250, 300], [250, 262], [210, 262], [210, 75], [240, 75]], { flow: flowing(s, "tank3", "tank1") })}
+    ${pipe([[195, 285], [218, 285], [218, 360], [230, 360]], { flow: outer("wingL") })}${pipe([[405, 285], [382, 285], [382, 360], [370, 360]], { flow: outer("wingR") })}
+    ${pipe([[180, 470], [180, 420], [230, 420]], { flow: outer("tank3A1") })}${pipe([[420, 470], [420, 420], [370, 420]], { flow: outer("tank3A2") })}
+    ${pipe([[300, 210], [300, 246], [30, 246], [30, 668]], { flow: feed || acc })}${pipe([[300, 246], [570, 246], [570, 668]], { flow: feed || acc })}
+    ${t("tank1", 240, 40, 120, 70, "TANK 1")}${pump(258, 100, pumpOn(s, "tank1Turbo"))}
+    ${t("tank2", 240, 130, 120, 80, "TANK 2 · FEED")}${valve(300, 120, valveOpen(s, "tank1Level"))}
+    ${t("tank3", 230, 300, 140, 140, "TANK 3")}${pump(350, 428, pumpOn(s, "tank3Turbo"))}${pump(250, 428, pumpOn(s, "tank3Jet"))}${valve(390, 230, valveOpen(s, "tank3Level"))}
+    ${text(300, 462, "ACC", { anchor: "middle", size: 9, color: acc ? COLORS.caution : COLORS.dim })}
     ${t("wingL", 45, 262, 150, 70, "WING L", "M45,300 L195,262 L195,312 L65,332 Z")}${t("wingR", 405, 262, 150, 70, "WING R", "M555,300 L405,262 L405,312 L535,332 Z")}
-    ${t("tank3A1", 150, 470, 60, 130, "3A1")}${t("tank3A2", 390, 470, 60, 130, "3A2")}
-    ${text(30, 678, "LH ENG", { anchor: "middle", size: 10 })}${text(570, 678, "RH ENG", { anchor: "middle", size: 10 })}
-    ${hasCl ? `${pipe([[345, 640], [520, 640], [520, 20], [300, 20], [300, 40]], { flow: f("centerline") })}${t("centerline", 255, 615, 90, 55, "CL TANK")}${valve(520, 330, f("centerline") || kg(s, "centerline") > 30)}` : text(300, 650, "no CL tank fitted", { anchor: "middle", size: 10, color: COLORS.dim })}`);
+    ${pump(185, 300, outer("wingL"), 6)}${pump(415, 300, outer("wingR"), 6)}
+    ${t("tank3A1", 150, 470, 60, 130, "3A1")}${t("tank3A2", 390, 470, 60, 130, "3A2")}${pump(180, 590, outer("tank3A1"), 6)}${pump(420, 590, outer("tank3A2"), 6)}
+    ${text(30, 686, "LH ENG", { anchor: "middle", size: 10 })}${text(570, 686, "RH ENG", { anchor: "middle", size: 10 })}
+    ${hasCl ? `${pipe([[345, 640], [520, 640], [520, 20], [300, 20], [300, 40]], { flow: flowing(s, "centerline", "tank1") })}${t("centerline", 255, 615, 90, 55, "CL TANK")}${valve(520, 330, valveOpen(s, "clTransfer"))}` : text(300, 650, "no CL tank fitted", { anchor: "middle", size: 10, color: COLORS.dim })}`);
 }
 
 function electricsPage(s: Snap): string {
@@ -112,7 +131,7 @@ export const MIG29_EFB = {
   title: "MiG-29 EFB",
   pages: [
     { id: "engines", title: "Engines", render: (s: Snap) => enginesPage(s) },
-    { id: "fuel", title: "Fuel", render: (s: Snap, p: Snap | undefined) => fuelPage(s, p) },
+    { id: "fuel", title: "Fuel", render: (s: Snap) => fuelPage(s) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
     { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) }
   ]

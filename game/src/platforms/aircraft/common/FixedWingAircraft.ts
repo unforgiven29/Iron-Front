@@ -15,7 +15,8 @@ import { localAirflow, sampleEnvironment, standardAtmosphere, type EnvironmentCo
 import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
-import type { FuelSystemModel, TankState } from "../../../systems/fuel/FuelTanks.js";
+import type { InletState } from "../../../physics/propulsion/components/Inlet.js";
+import type { FuelComponents, FuelSystemModel, TankState } from "../../../systems/fuel/FuelTanks.js";
 import { ElectricalNetwork, type ElectricalSnapshot } from "../../../systems/electrical/ElectricalNetwork.js";
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
@@ -62,6 +63,10 @@ export interface AircraftSnapshot {
   readonly fuelKg: number;
   /** Per-tank contents (absent without a package fuel system). */
   readonly fuelTanks?: readonly TankState[];
+  /** Fuel pumps, valves and live transfers (when the package fuel system reports them). */
+  readonly fuelComponents?: FuelComponents;
+  /** Each engine's variable-intake state (when the package has an intake model). */
+  readonly inlets?: Readonly<Record<string, InletState>>;
   readonly massKg: number;
   /** Landing gear state (absent when the aircraft has none). */
   readonly gear?: GearStepResult & { readonly handleDown: boolean };
@@ -106,6 +111,7 @@ export class FixedWingAircraft {
   private readonly hydraulics: HydraulicNetwork | undefined;
   private readonly electrical: ElectricalNetwork | undefined;
   private drives: Readonly<Record<string, number>> = {};
+  private inlets: Readonly<Record<string, InletState>> = {};
   private readonly surfaceLimits: ReadonlyMap<string, number>;
   private readonly gear: LandingGear | undefined;
   private gearHandleDown = true;
@@ -186,6 +192,8 @@ export class FixedWingAircraft {
     this.hydraulics?.reset(true);
     this.electrical?.reset();
     this.drives = {};
+    this.inlets = {};
+    this.systems.intakes?.reset();
     this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
     this.gear?.reset(this.gearHandleDown);
     this.gearCrash = undefined;
@@ -309,12 +317,17 @@ export class FixedWingAircraft {
     this.fcsTelemetry = fcs.telemetry ?? {};
     this.annunciations = [...fcs.annunciations, ...(this.fuelSystem?.annunciations() ?? [])];
 
-    const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber,
-      inletCondition: { weightOnWheels: this.gear?.state.weightOnWheels ?? false, equivalentAirspeedMps: Math.sqrt((2 * flow.dynamicPressurePa) / 1.225) } };
+    const eas = Math.sqrt((2 * flow.dynamicPressurePa) / 1.225), wow = this.gear?.state.weightOnWheels ?? false;
+    if (this.systems.intakes) {
+      this.inlets = this.systems.intakes.step({ sensors, gearDown: this.gearHandleDown, engineSpeed: (id) => this.engineCoreSpeed(id), hydraulicPressurePa: (id) => this.hydraulics?.pressurePa(id) ?? 0, throttle: this.throttle }, dt);
+    }
+    const ambientFor = (engineId: string) => ({ temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber,
+      inletCondition: { weightOnWheels: wow, equivalentAirspeedMps: eas, ...(this.inlets[engineId] ? { state: this.inlets[engineId] } : {}) } });
     const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
     const flows: Record<string, number> = {}, speeds: Record<string, number> = {};
     for (const e of this.engines) {
+      const ambient = ambientFor(e.id);
       const fuel = (this.fuelSystem ? this.fuelSystem.engineFuelAvailable(e.id) : this.fuelKg > 0) && !this.fuelCutoff.has(e.id);
       const cmd = e.control.step(this.throttle, { ambient, spoolSpeed: e.core.state.spoolSpeed, fuelAvailable: fuel }, dt);
       const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand, throat: cmd.throat }, ambient, fuel, dt);
@@ -325,7 +338,8 @@ export class FixedWingAircraft {
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
     }
     if (this.fuelSystem) {
-      this.fuelSystem.step({ engineFlowKgS: flows, engineSpeed: speeds, nzG: this.nz, altitudeM: this.env.originAltitudeMslM + st.positionEnuM[2] }, dt);
+      const elecNow = this.electrical?.snapshot;
+      this.fuelSystem.step({ engineFlowKgS: flows, engineSpeed: speeds, nzG: this.nz, altitudeM: this.env.originAltitudeMslM + st.positionEnuM[2], ...(elecNow && elecNow.buses.length ? { busPowered: (id: string) => elecNow.buses.find((b) => b.id === id)?.powered ?? false } : {}) }, dt);
       this.fuelKg = this.fuelSystem.tanks.totalKg();
     } else {
       this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
@@ -416,6 +430,8 @@ export class FixedWingAircraft {
       engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
       fuelKg: this.fuelKg,
       ...(this.fuelSystem ? { fuelTanks: this.fuelSystem.tanks.states() } : {}),
+      ...(this.fuelSystem?.components ? { fuelComponents: this.fuelSystem.components() } : {}),
+      ...(Object.keys(this.inlets).length ? { inlets: this.inlets } : {}),
       massKg: this.body.massProperties.massKg,
       ...(this.gear ? { gear: { ...this.gear.state, handleDown: this.gearHandleDown } } : {}),
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),

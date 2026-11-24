@@ -4,30 +4,13 @@
  * cycle is calibrated to the family-level ratings (uninstalled), with an efficient variable-ramp
  * inlet (MIL-E-5008B recovery) and an ideal nozzle with an estimated thrust coefficient.
  */
-import { milE5008bRecovery, type InletModel } from "../../../physics/propulsion/components/Inlet.js";
+import { mig29Intake } from "./MiG29Intake.js";
 import { idealNozzle, variableConvergentDivergentNozzle } from "../../../physics/propulsion/components/Nozzle.js";
 import type { Table1D } from "../../../physics/aerodynamics/Tables.js";
 import type { FadecSchedule } from "../../../physics/propulsion/Fadec.js";
 import { calibrate, solveCycle, type TurbofanDesign } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import type { EngineInstallation } from "../common/AircraftDefinition.js";
 import { MIG29_ENGINE as E } from "./MiG29Data.js";
-
-/**
- * MiG-29 intake (GAF T.O. 1F-MIG29-1, "Engine air intake system"): on the ground below ≈108 KIAS
- * the forward ramp closes the main duct against FOD and the engine breathes through the spring-
- * loaded louvers in the upper wing root (recovery ESTIMATED). Above that, the variable ramps are
- * scheduled on corrected NL, altitude and Mach (schedule chart FO-6 not available): supersonic
- * recovery uses the MIL-E-5008B reference for an efficient multi-shock ramp inlet.
- * Not modelled: intermittent louver opening in flight (M < 0.3 IDLE / < 0.6 MIL), the anti-surge
- * ramp closure, ramp position indication, inlet distortion.
- */
-export function mig29Intake(): InletModel {
-  const vOpen = E.intakeRampOpenKias.value * 0.514444;
-  return {
-    kind: "mig29-variable-ramp",
-    recovery: (mach, c) => (c?.weightOnWheels && c.equivalentAirspeedMps < vOpen ? E.louverModeRecovery.value : milE5008bRecovery(mach))
-  };
-}
 
 const BASE: TurbofanDesign = {
   airflowKgS: E.airflowKgS.value, bypassRatio: E.bypassRatio.value, overallPressureRatio: E.overallPressureRatio.value, fanPressureRatio: E.fanPressureRatio.value,

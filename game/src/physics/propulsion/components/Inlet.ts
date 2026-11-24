@@ -7,6 +7,22 @@ export interface InletCondition {
   readonly weightOnWheels: boolean;
   /** Equivalent (≈ indicated) airspeed, m/s. */
   readonly equivalentAirspeedMps: number;
+  /** Package intake state (variable ramps / auxiliary doors), when the airframe has one. */
+  readonly state?: InletState;
+}
+
+/** Live state of a variable intake, produced by the aircraft package's own intake model. */
+export interface InletState {
+  /** Forward-ramp extension 0 (duct fully open) … 1 (fully extended / duct closed). */
+  readonly rampExtension: number;
+  /** Extension the ramp schedule currently asks for. */
+  readonly rampScheduled: number;
+  /** Auxiliary (blow-in / louver) doors open. */
+  readonly auxOpen: boolean;
+  /** Operating mode label for displays, e.g. "FOD" / "FLIGHT" / "SCHED 2". */
+  readonly mode: string;
+  /** Engine-face flow distortion index 0 (clean) … 1 (severe), for surge margin. */
+  readonly distortion: number;
 }
 
 export interface InletModel {
