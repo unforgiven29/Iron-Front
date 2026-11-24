@@ -14,9 +14,20 @@ terrain.addTile(generateSyntheticTile({ seed: 1, tileId: "t", originEnuM: [-6000
 const env = { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("c", [0, 0, 0]) };
 
 describe("RD-33 (GAF T.O. 1F-MIG29-1)", () => {
-  it("idle thrust is the published 180 kp (sea-level static, uninstalled)", () => {
+  it("ground idle is the published ≈66 % NH (fig. 1-4) and gives the published 180 kp, with the nozzle fully open as at IDLE", () => {
     const idle = createMiG29Definition().engines[0]!.control.idleSpeed;
-    expect(solveCycle({ ...RD33_DESIGN, installationLossFraction: 0 }, SLS, idle, 0).netThrustN / KP).toBeCloseTo(180, -1.5);
+    expect(idle).toBeCloseTo(0.663, 3);
+    expect(solveCycle({ ...RD33_DESIGN, installationLossFraction: 0 }, SLS, idle, 0, { throat: { kind: "auto", minPosition: 1 } }).netThrustN / KP).toBeCloseTo(180, -1.5);
+  });
+
+  it("variable C-D nozzle: fully open at IDLE, closing toward MIL, opening for afterburner; exhaust expands fully when choked", () => {
+    const d = { ...RD33_DESIGN, installationLossFraction: 0 };
+    const mil = solveCycle(d, SLS, 1, 0), ab = solveCycle(d, SLS, 1, 1);
+    expect(ab.nozzle.throatAreaM2).toBeGreaterThan(mil.nozzle.throatAreaM2 * 1.3);
+    expect(mil.nozzle.exitAreaM2).toBeGreaterThan(mil.nozzle.throatAreaM2);
+    expect(Math.abs(mil.nozzle.exitPressurePa - 101325) / 101325).toBeLessThan(0.15);
+    expect(createMiG29Definition().engines[0]!.control.dryNozzleMinPosition).toBeDefined();
+    expect(mil.exhaustGasTemperatureK).toBeGreaterThan(600);
   });
 
   it("limited power mode gives the published LPM ratings (4,680 kp MIL / 7,520 kp max AB)", () => {

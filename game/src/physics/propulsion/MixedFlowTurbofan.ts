@@ -66,6 +66,12 @@ export interface TurbofanDesign {
    * Reynolds number index RNI = δ2/(θ2^0.5·μ-ratio) drops below 1 (approximated as δ2/θ2^1.25).
    * Default 0 (off).
    */
+  /**
+   * Generic-map shape: corrected airflow ∝ (corrected speed)^k at low speed (≤ 0.65), blending to
+   * linear (k = 1) at 0.9 and above (default k = 1). Real fans lose flow faster than linearly at part
+   * speed; an engine package may fit k to published part-power data.
+   */
+  readonly flowSpeedExponent?: number;
   readonly reynoldsEfficiencyLoss?: number;
 }
 
@@ -155,7 +161,9 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   const etaFan = d.fanEfficiency * reLoss, etaComp = d.compressorEfficiency * reLoss, etaTurb = d.turbineEfficiency * reLoss;
 
   // Generic map laws: corrected flow ∝ Nc, pressure rise ∝ Nc² (each relative to design).
-  const W2 = d.airflowKgS * Nc * delta / Math.sqrt(theta);
+  // Part-speed flow: linear near design speed, steepening to the package exponent at low speed.
+  const kFlow = 1 + ((d.flowSpeedExponent ?? 1) - 1) * Math.min(1, Math.max(0, (0.9 - Nc) / 0.25));
+  const W2 = d.airflowKgS * Nc ** kFlow * delta / Math.sqrt(theta);
   const fpr = 1 + (d.fanPressureRatio - 1) * Nc * Nc;
   const opr = 1 + (d.overallPressureRatio - 1) * Nc * Nc;
   const k = (G_COLD - 1) / G_COLD;
@@ -196,6 +204,8 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
       netThrustN: gross - ram, grossThrustN: gross, ramDragN: ram, airflowKgS: W2,
       fuelFlowKgS: wCore * f + fAb, turbineInletTemperatureK: Tt4, nozzleTemperatureK: Tt7,
       compressorExitPressurePa: pt3, correctedSpeed: Nc, compressorExitTemperatureK: Tt3, nozzle,
+      // Exhaust gas temperature taken at the turbine exit (where e.g. the RD-33 measures it).
+      exhaustGasTemperatureK: Tt5,
       stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: pt2 / pt0, Tt13K: Tt13, pt13Pa: pt13, Tt3K: Tt3, pt3Pa: pt3, Tt4K: Tt4, Tt5K: Tt5, pt5Pa: pt5, Tt6K: Tt6, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: f, bypassRatio: d.bypassRatio }
     };
   };

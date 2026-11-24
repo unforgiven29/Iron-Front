@@ -71,6 +71,8 @@ export interface FcsOutput {
   readonly annunciations: readonly string[];
   /** Mode name shown to the pilot, e.g. "NORM". */
   readonly mode: string;
+  /** Optional internal values for displays (commands, errors, limiter states, gains). UI only. */
+  readonly telemetry?: Readonly<Record<string, number>>;
 }
 
 export interface FlightControlSystem {

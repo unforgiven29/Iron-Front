@@ -77,10 +77,11 @@ test("data panel toggles with I and shows surfaces, engines and systems pages", 
   await page.keyboard.press("i");
   await expect(page.locator(".data-panel")).toBeVisible();
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-1.png` });
-  await page.keyboard.up("d");
   await page.keyboard.press("2");
   await expect(page.locator(".data-panel .efb-svg")).toBeVisible();
+  await page.waitForTimeout(600);
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-2.png` });
+  await page.keyboard.up("d");
   for (const k of ["3", "4", "5"]) {
     await page.keyboard.press(k);
     await expect(page.locator(".data-panel .dp-body > *").first()).toBeVisible();
