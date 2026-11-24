@@ -132,9 +132,9 @@ function throttleSchedule(): Table1D {
 export const F110_DESIGN: TurbofanDesign = sizeNozzle();
 
 /**
- * F110 FADEC schedule. Speeds are FAN (N1) fractions of 8,241 rpm (ground-run MIL). Idle and the
- * intermediate (MIL) limits are DERIVED from the deck: idle N1 3,105 rpm at PLA 20°; at PLA 85°
- * corrected N1 is held near 1.005 until physical N1 reaches ≈8,560 rpm (warm engine face in flight).
+ * F110 FADEC schedule. Speeds are FAN (N1) fractions of 8,241 rpm (ground-run MIL). Idle, the
+ * throttle map and the intermediate (MIL) limit are DERIVED from the deck: idle N1 3,105 rpm at
+ * PLA 20°; at PLA 85° corrected N1 ≈1.006 up to θ1 ≈1.05, then lapsing with engine-face temperature.
  */
 export const F110_CONTROL: FadecSchedule = {
   afterburnerDetentThrottle: E.afterburnerDetentThrottle.value,
@@ -142,6 +142,8 @@ export const F110_CONTROL: FadecSchedule = {
   dryThrottleCorrectedSpeed: throttleSchedule(),
   maxPhysicalSpeed: C.maxPhysicalSpeed.value,
   maxCorrectedSpeed: C.maxCorrectedSpeed.value,
+  // MIL "T2 lapse": corrected N1 held to θ1 1.05, then falling (deck); linear beyond θ1 1.13 (extrapolated).
+  maxCorrectedSpeedByTheta: { breakpoints: [0.7, 1.05, 1.6], values: [C.maxCorrectedSpeed.value, C.maxCorrectedSpeed.value, C.maxCorrectedSpeed.value + C.milCorrectedSpeedLapse.value * (1.6 - 1.05)] },
   accelRatePerS: C.accelRatePerS.value,
   decelRatePerS: C.decelRatePerS.value,
   minBurnerPressurePa: C.minBurnerPressurePa.value,

@@ -90,7 +90,8 @@ export const F16_ENGINE = Object.freeze({
  */
 export const F16_ENGINE_CONTROL = Object.freeze({
   idleSpeed: { value: 3105 / 8241, unit: "fraction of reference N1 (8,241 rpm)", status: "secondary-reported", source: "NASA TM-104326 table 4: GE F110-GE-129 deck, ground idle (PLA 20.4°) N1 3,105 rpm" } as Parameter,
-  maxPhysicalSpeed: { value: 8560 / 8241, unit: "fraction of reference N1", status: "derived", source: "NASA TM-104326 table 5: at PLA 85° with a warm engine face, physical N1 levels off at ≈8,480–8,560 rpm" } as Parameter,
+  maxPhysicalSpeed: { value: 1.10, unit: "fraction of reference N1 (≈9,070 rpm)", status: "estimated", source: "project estimate", note: "Mechanical fan-speed backstop; not reached inside the deck range. The MIL limit is the corrected-speed lapse schedule below" } as Parameter,
+  milCorrectedSpeedLapse: { value: -0.35, unit: "corrected N1 per unit θ1 above θ1 = 1.05", status: "derived", source: "NASA TM-104326 table 5: at PLA 85° corrected N1 ≈1.006 up to θ1 ≈1.05, then 0.994 (θ1 1.086), 0.981 (1.121), 0.978 (1.129)", note: "Linear continuation beyond θ1 = 1.13 (supersonic) is an extrapolation; holding the last value instead would let the engine over-speed (M>2 at 40,000 ft)" } as Parameter,
   maxCorrectedSpeed: { value: 1.006, unit: "fraction", status: "derived", source: "NASA TM-104326 tables 4–5: at PLA 85° corrected N1 is ≈1.001–1.009 until the physical limit is reached" } as Parameter,
   accelRatePerS: { value: 0.15, unit: "fan-speed fraction/s", status: "estimated", source: "project estimate", note: "Idle (0.38) → MIL in ≈4 s; fighter engines are typically specified idle→MIL in about 4–5 s" } as Parameter,
   decelRatePerS: { value: 0.25, unit: "fan-speed fraction/s", status: "estimated", source: "project estimate", note: "Limited by lean-blowout margin" } as Parameter,

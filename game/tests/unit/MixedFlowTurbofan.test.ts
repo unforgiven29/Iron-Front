@@ -102,10 +102,15 @@ describe("FADEC (shared engine control) with the F110 schedule", () => {
     expect(r.s.netThrustN).toBeGreaterThan(0.98 * F16_ENGINE.maxAfterburnerThrustN.value);
   });
 
-  it("MIL follows the deck's schedule: physical N1 cap with a hot engine face, corrected N1 held with a cold one", () => {
-    const hot = scheduleSteadyState(BENCH, F110_CONTROL, "primary", F110_CONTROL.afterburnerDetentThrottle, at(0, 1.2));
-    expect(hot.limits).toContain("max-speed");
-    expect(hot.speed).toBeCloseTo(F110_CONTROL.maxPhysicalSpeed, 6);
+  it("MIL follows the deck's schedule: corrected N1 lapses with a hot engine face, and is held with a cold one", () => {
+    const hotAmb = at(3000, 0.95);
+    const hot = scheduleSteadyState(BENCH, F110_CONTROL, "primary", F110_CONTROL.afterburnerDetentThrottle, hotAmb);
+    const thetaHot = (hotAmb.temperatureK * (1 + 0.2 * 0.95 * 0.95)) / 288.15;
+    expect(hot.limits).toContain("corrected-speed");
+    // Deck: θ1 ≈ 1.12 at MIL gives corrected N1 ≈ 0.98 (TM-104326 points B end / C end).
+    expect(hot.speed / Math.sqrt(thetaHot)).toBeCloseTo(1.006 - 0.35 * (thetaHot - 1.05), 3);
+    expect(hot.speed / Math.sqrt(thetaHot)).toBeGreaterThan(0.97);
+    expect(hot.speed / Math.sqrt(thetaHot)).toBeLessThan(0.99);
     const coldAmb = at(12192, 0.6);
     const cold = scheduleSteadyState(BENCH, F110_CONTROL, "primary", F110_CONTROL.afterburnerDetentThrottle, coldAmb);
     const theta = (coldAmb.temperatureK * (1 + 0.2 * 0.36)) / 288.15;

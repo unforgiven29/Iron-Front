@@ -49,6 +49,8 @@ export interface FadecSchedule {
   readonly maxPhysicalSpeed: number;
   /** Corrected-speed limit (fraction of design); protects the fan on cold, fast days. */
   readonly maxCorrectedSpeed: number;
+  /** Optional: maximum corrected speed as a function of engine-face temperature ratio θ (a "T2 lapse" schedule). */
+  readonly maxCorrectedSpeedByTheta?: Table1D;
   /** Acceleration and deceleration schedules: max change of speed demand, fraction per second. */
   readonly accelRatePerS: number;
   readonly decelRatePerS: number;
@@ -150,7 +152,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
 
   // Corrected-speed limit.
   const theta = thetaOf(ambient);
-  const correctedCap = s.maxCorrectedSpeed * Math.sqrt(theta);
+  const correctedCap = (s.maxCorrectedSpeedByTheta ? Math.min(s.maxCorrectedSpeed, lookup1D(s.maxCorrectedSpeedByTheta, theta).value) : s.maxCorrectedSpeed) * Math.sqrt(theta);
   if (speed > correctedCap) { speed = correctedCap; limits.push("corrected-speed"); }
 
   let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
