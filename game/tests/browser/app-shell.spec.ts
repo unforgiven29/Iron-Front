@@ -62,3 +62,29 @@ test("main game starts the F-16, flies, pauses and resumes without page errors",
   await expect(page.getByRole("link", { name: "Developer tools →" })).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test("data panel toggles with I and shows surfaces, engines and systems pages", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  if (process.env.PANEL_AIRCRAFT) await page.getByRole("combobox", { name: "Aircraft" }).selectOption({ label: process.env.PANEL_AIRCRAFT });
+  await page.getByRole("button", { name: "Air start" }).click();
+  await expect(page.getByRole("dialog", { name: "Game menu" })).toBeHidden({ timeout: 20_000 });
+  const frame = page.locator(".game-frame");
+  await frame.click();
+  await page.keyboard.down("d");
+  await page.waitForTimeout(400);
+  await page.keyboard.press("i");
+  await expect(page.getByText("Surface positions")).toBeVisible();
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-1.png` });
+  await page.keyboard.up("d");
+  await page.keyboard.press("2");
+  await expect(page.getByText(/ENGINE /).first()).toBeVisible();
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-2.png` });
+  await page.keyboard.press("3");
+  await expect(page.getByText("Hydraulics")).toBeVisible();
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-3.png` });
+  await page.keyboard.press("i");
+  await expect(page.getByText("Hydraulics")).toBeHidden();
+  expect(errors).toEqual([]);
+});
