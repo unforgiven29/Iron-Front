@@ -32,7 +32,7 @@ function gauge(cx: number, cy: number, label: string, v: number, lo: number, hi:
 }
 
 function lightsRow(s: Snap, x: number, y: number): string {
-  const all = ["ENGINE", "HYD/OIL PRESS", "FWD FUEL LOW", "AFT FUEL LOW", "FUEL/OIL HOT", "SEC", "ELEC SYS", "GRAVITY FEED"];
+  const all = ["ENGINE", "HYD/OIL PRESS", "ENGINE FAULT", "SEC", "FWD FUEL LOW", "AFT FUEL LOW", "FUEL/OIL HOT", "ELEC SYS"];
   const on = new Set(s.lights.map((l) => l.text));
   return all.map((t, i) => { const lv = s.lights.find((l) => l.text === t)?.level; const col = !on.has(t) ? "#2a2c2f" : lv === "warning" ? "#a31515" : "#a86a00";
     return `<rect x="${x + (i % 4) * 146}" y="${y + Math.floor(i / 4) * 30}" width="140" height="24" rx="3" fill="${col}" stroke="#555"/>${text(x + (i % 4) * 146 + 70, y + Math.floor(i / 4) * 30 + 16, t, { anchor: "middle", size: 10, weight: 700, color: on.has(t) ? "#fff" : "#666" })}`; }).join("");
@@ -54,14 +54,16 @@ function enginePage(s: Snap): string {
     ${tank(250, 232, 100, 44, kg(s, "fwdReservoir") + kg(s, "aftReservoir"), cap(s, "fwdReservoir") + cap(s, "aftReservoir"), "RESERVOIRS", { unit: lb })}
     ${pipe([[300, 276], [300, 300], [250, 300], [250, 330]], { flow: e.fuelFlowKgS > 0 })}
     ${engineCutaway(250, 330, e, "right", `N2 ${num(e.n2Rpm)} rpm`)}
-    ${box(16, 330, 170, 132, sec ? "SEC (MEC)" : "DEC (PRI)", [
-      sec ? "MEC: fuel" : "fuel·nozzle·IGV·AB",
+    ${box(16, 330, 170, 146, ["PRI (DEC)", "HYB VSV", "HYB (MEC fuel)", "SEC (MEC)"][ind(s, "engineControlMode")] ?? "PRI (DEC)", [
+      ["DEC fuel·noz·IGV·AB", "MEC VSV · DEC rest", "MEC fuel+VSV", "MEC only"][ind(s, "engineControlMode")] ?? "",
       `IGV ${Number.isFinite(igv) ? (igv >= 0.99 ? "CLOSED" : igv <= 0.01 ? "OPEN" : `${num((1 - igv) * 100)} % open`) : "—"}${sec ? " (fixed)" : ""}`,
-      `VSV ${vsv > 0 ? `RESET ${num(vsv)} s` : "normal schedule"}`,
+      `VSV ${ind(s, "vsvResetAvailable") === 0 ? "no reset" : vsv > 0 ? `RESET ${num(vsv)} s` : "normal schedule"}`,
+      `TLIM ${ind(s, "temperatureLimiting") === 0 ? "NONE" : "on"} · LOCKUP ${ind(s, "supersonicLockup") ? "ON" : "off"}`,
       `IGN ${ind(s, "highEnergyIgnition") ? "HIGH ENERGY" : ind(s, "lowEnergyIgnition") ? "LOW ENERGY" : "off"}`,
       `AB ${sec ? "INHIBITED" : e.afterburnerLit ? `${e.afterburnerZonesLit}/${e.afterburnerZones} zones` : "off"}`
     ], sec ? "shed" : "on")}
-    ${box(16, 476, 170, 74, "FUEL TO ENGINE", [`${num(fi(s, "feedFuelTemperatureK") - 273.15)} °C after HX`, `main valve ${num(fi(s, "mainValvePosition") * 100)} %`, fi(s, "ffpRunning") ? "FFP running (HYD A)" : "FFP BYPASS"], fi(s, "fuelHot") ? "warn" : "on")}
+    ${box(16, 572, 170, 70, "PFLD", s.faultList.length ? s.faultList.slice(0, 3) : ["no engine PFL"], s.faultList.length ? "shed" : "on")}
+    ${box(16, 486, 170, 74, "FUEL TO ENGINE", [`${num(fi(s, "feedFuelTemperatureK") - 273.15)} °C after HX`, `main valve ${num(fi(s, "mainValvePosition") * 100)} %`, fi(s, "ffpRunning") ? "FFP running (HYD A)" : "FFP BYPASS"], fi(s, "fuelHot") ? "warn" : "on")}
     ${text(16, 772, `${num(e.netThrustN / 4.4482216)} lbf`, { size: 16, weight: 700 })}
     ${text(200, 772, `N1 ${num(e.n1Rpm)} rpm · ${e.control.activeLimits.join(", ") || "no limiter"}`, { size: 10, color: COLORS.dim })}
     ${st ? text(16, 794, `P3/P2 ${num(st.pt3Pa / st.pt2Pa, 1)} · BPR ${num(st.bypassRatio, 2)} · main ${num(st.mainFuelKgS * 3600 / LB)} pph f/a ${num(st.fuelAirRatio, 4)} · AB ${num(st.afterburnerFuelKgS * 3600 / LB)} pph`, { size: 10 }) : ""}

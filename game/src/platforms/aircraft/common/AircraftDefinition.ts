@@ -205,6 +205,15 @@ export interface AircraftSystems {
     readonly valves?: Readonly<Record<string, boolean>>;
     readonly cooling?: Readonly<Record<string, { readonly sinkK: number; readonly conductanceWPerK: number }>>;
   };
+  /**
+   * The aircraft's own engine-control logic above the shared FADEC: mode selection and automatic
+   * transfers (e.g. primary → hybrid → secondary on detected failures), authority overrides, and
+   * the fault lists/lights it raises. Stepped every tick before the engines.
+   */
+  readonly engineControl?: {
+    step(ctx: MonitorContext, dt: number): EngineControlOutput;
+    reset(): void;
+  };
   readonly monitor?: {
     step(ctx: MonitorContext, dt: number): MonitorOutput;
     reset(): void;
@@ -232,6 +241,15 @@ export interface HydraulicLoadContext {
   readonly groundSpeedMps: number;
   readonly fuelComponents?: import("../../../systems/fuel/FuelTanks.js").FuelComponents;
   readonly ambientTemperatureK: number;
+}
+
+export interface EngineControlOutput {
+  /** Per engine: FADEC mode and authority overrides to apply this tick. */
+  readonly commands: Readonly<Record<string, { readonly mode: import("../../../physics/propulsion/Fadec.js").FadecMode; readonly overrides: import("../../../physics/propulsion/Fadec.js").FadecOverrides }>>;
+  readonly indications: Readonly<Record<string, number>>;
+  readonly lights: readonly { readonly text: string; readonly level: "caution" | "warning" }[];
+  /** Fault-list entries (e.g. pilot fault list), for displays. */
+  readonly faultList: readonly string[];
 }
 
 export interface MonitorOutput {
