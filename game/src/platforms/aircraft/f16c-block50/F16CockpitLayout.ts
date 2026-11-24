@@ -7,7 +7,7 @@
  * be used for reach, vision or collision analysis. Body FRD metres from the design eye point.
  */
 import type { CockpitLayout } from "../../../rendering/three/CockpitLayout.js";
-import { F16_SWITCHES } from "./F16Aircraft.js";
+import { F16_SWITCHES } from "./F16Switches.js";
 
 const PANEL = "#2a3036";
 const DARK = "#1b1f23";

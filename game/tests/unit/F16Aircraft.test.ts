@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { uniformWind } from "../../src/physics/environment/Atmosphere.js";
-import { F16Aircraft, F16_SWITCHES, type F16Snapshot } from "../../src/platforms/aircraft/f16c-block50/F16Aircraft.js";
+import type { AircraftSnapshot, FixedWingAircraft } from "../../src/platforms/aircraft/common/FixedWingAircraft.js";
+import { createF16Aircraft, F16_SWITCHES } from "../../src/platforms/aircraft/f16c-block50/F16Aircraft.js";
 import { F16_FLCS_LIMITS } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
 import { generateSyntheticTile, TerrainSurface } from "../../src/world/terrain/Terrain.js";
 
@@ -8,9 +9,9 @@ const D = 180 / Math.PI;
 function jet(speedMps = 200, altitude = 3000) {
   const t = new TerrainSurface();
   t.addTile(generateSyntheticTile({ seed: 1, tileId: "test/flat-ish", originEnuM: [-60000, -60000], spacingM: 1000, columns: 121, rows: 121, baseHeightM: 0, reliefM: 300, featureSizeM: 20000 }));
-  return new F16Aircraft(t, { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("calm", [0, 0, 0]) }, { positionEnuM: [0, 0, altitude], headingRad: 0, speedMps, throttle: 0.5 });
+  return createF16Aircraft(t, { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("calm", [0, 0, 0]) }, { positionEnuM: [0, 0, altitude], headingRad: 0, speedMps, throttle: 0.5 });
 }
-function fly(a: F16Aircraft, seconds: number, each?: (s: F16Snapshot) => void): F16Snapshot {
+function fly(a: FixedWingAircraft, seconds: number, each?: (s: AircraftSnapshot) => void): AircraftSnapshot {
   for (let i = 0; i < Math.round(seconds * 120); i++) { a.stepTick(); each?.(a.snapshot()); }
   return a.snapshot();
 }
@@ -93,7 +94,7 @@ describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS
       a.setPilotInputs({ pitch: 0, roll: 0, yaw: 0 });
       let maxDev = 0;
       fly(a, 3, (s) => { maxDev = Math.max(maxDev, Math.abs(s.alphaRad - a0) * D2); });
-      return { maxDev, mode: a.snapshot().flcsMode };
+      return { maxDev, mode: a.snapshot().fcsMode };
     };
     const norm = growth("NORM"), direct = growth("DIRECT");
     expect(direct.mode).toBe("DIRECT");
@@ -105,7 +106,16 @@ describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS
     const a = jet();
     a.controls.request(F16_SWITCHES.flcsMode, "DIRECT", "test");
     a.reset({ positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.5 });
-    expect(a.snapshot().flcsMode).toBe("NORM");
+    expect(a.snapshot().fcsMode).toBe("NORM");
     expect(a.snapshot().switches[F16_SWITCHES.flcsMode]).toBe("NORM");
+  });
+
+  it("burns fuel and lights the afterburner through the shared runtime", () => {
+    const a = jet();
+    a.setThrottle(1);
+    const before = a.snapshot().fuelKg;
+    const s = fly(a, 8);
+    expect(s.fuelKg).toBeLessThan(before);
+    expect(s.engines[0]?.afterburnerLit).toBe(true);
   });
 });

@@ -1,14 +1,14 @@
 /**
- * F-16C Block 50 aerodynamic assembly, surface actuators and engine.
+ * F-16C Block 50 reduced-table aerodynamic assembly, F110 cycle design and inertia tensor.
  *
  * Owner: F-16 platform package. These are F-16-specific: the shared physics code knows nothing
  * about them, and the MiG-29 will have its own, structurally independent model.
  * Aero data provenance: see AeroData.ts (provisional, early-F-16 low-speed tables).
  */
 import { lookup1D, lookup2D } from "../../../physics/aerodynamics/Tables.js";
-import { calibrate, MixedFlowTurbofan, type Ambient, type TurbofanDesign, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
+import { calibrate, type TurbofanDesign } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { CM, CN_BETA, CL_BETA, CX, CZ0, DAMPING, DCL_DA, DCL_DR, DCN_DA, DCN_DR, F16_AERO_PROVENANCE } from "./AeroData.js";
-import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS } from "./F16Data.js";
+import { F16_ENGINE, F16_GEOMETRY, F16_MASS } from "./F16Data.js";
 
 const RAD = 180 / Math.PI;
 
@@ -83,53 +83,6 @@ export function f16Aerodynamics(input: AeroInput): AeroOutput {
   };
 }
 
-/** First-order, rate- and position-limited surface actuator (source simulation model). */
-export class SurfaceActuator {
-  private position = 0;
-  public constructor(private readonly limitDeg: number, private readonly rateDegS: number, private readonly bandwidthRadS = F16_ACTUATORS.bandwidthRadS.value) {}
-
-  public get positionDeg(): number {
-    return this.position;
-  }
-
-  public reset(positionDeg = 0): void {
-    this.position = Math.max(-this.limitDeg, Math.min(this.limitDeg, positionDeg));
-  }
-
-  /** Move toward the command; never jumps. Returns the achieved position. */
-  public step(commandDeg: number, dt: number): number {
-    const target = Math.max(-this.limitDeg, Math.min(this.limitDeg, commandDeg));
-    const desiredRate = (target - this.position) * this.bandwidthRadS;
-    const rate = Math.max(-this.rateDegS, Math.min(this.rateDegS, desiredRate));
-    const next = this.position + rate * dt;
-    // Do not overshoot the target in one step.
-    this.position = (target - this.position) * (target - next) <= 0 || Math.abs(target - next) < 1e-6 ? target : next;
-    return this.position;
-  }
-}
-
-export function createF16Actuators() {
-  const a = F16_ACTUATORS;
-  return {
-    elevator: new SurfaceActuator(a.elevatorLimitDeg.value, a.elevatorRateDegS.value),
-    aileron: new SurfaceActuator(a.aileronLimitDeg.value, a.aileronRateDegS.value),
-    rudder: new SurfaceActuator(a.rudderLimitDeg.value, a.rudderRateDegS.value)
-  };
-}
-
-export interface EngineState {
-  /** Physical spool speed, fraction of design. */
-  readonly power: number;
-  readonly thrustN: number;
-  readonly fuelFlowKgS: number;
-  readonly fuelKg: number;
-  readonly afterburner: boolean;
-  readonly flameout: boolean;
-  readonly turbineInletTemperatureK: number;
-  readonly nozzleTemperatureK: number;
-  readonly airflowKgS: number;
-}
-
 const F110_DESIGN_BASE: TurbofanDesign = {
   airflowKgS: F16_ENGINE.airflowKgS.value,
   bypassRatio: F16_ENGINE.bypassRatio.value,
@@ -146,41 +99,6 @@ const F110_DESIGN_BASE: TurbofanDesign = {
 
 /** F110 cycle with design temperatures DERIVED from the published SLS dry/AB ratings. */
 export const F110_DESIGN: TurbofanDesign = { ...F110_DESIGN_BASE, ...calibrate(F110_DESIGN_BASE, F16_ENGINE.militaryThrustN.value, F16_ENGINE.maxAfterburnerThrustN.value) };
-
-/** F-16 engine installation: shared gas-path turbofan plus the fuel inventory it draws from. */
-export class F16Engine {
-  private readonly core: MixedFlowTurbofan;
-  private fuel: number;
-  private last: EngineState;
-
-  public constructor(initialThrottle = 0.5, fuelKg = F16_ENGINE.internalFuelKg.value) {
-    this.core = new MixedFlowTurbofan(F110_DESIGN, F16_ENGINE.afterburnerDetentThrottle.value, initialThrottle);
-    this.fuel = fuelKg;
-    this.last = this.wrap(this.core.state);
-  }
-
-  public get state(): EngineState {
-    return this.last;
-  }
-
-  public get fuelKg(): number {
-    return this.fuel;
-  }
-
-  public step(throttle: number, ambient: Ambient, dt: number): EngineState {
-    const s = this.core.step(throttle, ambient, this.fuel > 0, dt);
-    this.fuel = Math.max(0, this.fuel - s.fuelFlowKgS * dt);
-    this.last = this.wrap(s);
-    return this.last;
-  }
-
-  private wrap(s: TurbofanState): EngineState {
-    return {
-      power: s.spoolSpeed, thrustN: s.netThrustN, fuelFlowKgS: s.fuelFlowKgS, fuelKg: this.fuel, afterburner: s.afterburnerLit, flameout: s.flameout,
-      turbineInletTemperatureK: s.turbineInletTemperatureK, nozzleTemperatureK: s.nozzleTemperatureK, airflowKgS: s.airflowKgS
-    };
-  }
-}
 
 /** Inertia tensor about the CG in body FRD from the source's Jx, Jy, Jz, Jxz. */
 export function f16InertiaTensor(): [[number, number, number], [number, number, number], [number, number, number]] {
