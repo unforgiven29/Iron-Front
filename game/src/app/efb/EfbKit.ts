@@ -50,6 +50,21 @@ export function valve(cx: number, cy: number, open: boolean, vertical = true): s
   return `<circle cx="${cx}" cy="${cy}" r="7" fill="#f2f2f2" stroke="${open ? COLORS.line : COLORS.warn}" stroke-width="1.5"/><path d="${bar}" stroke="${open ? "#333" : COLORS.warn}" stroke-width="3"/>`;
 }
 
+/** Check valve (flow direction `dir`): triangle against a bar; filled green while fluid passes. */
+export function checkValve(cx: number, cy: number, dir: "right" | "left" | "up" | "down", passing: boolean): string {
+  const rot = { right: 0, down: 90, left: 180, up: 270 }[dir];
+  return `<g transform="rotate(${rot} ${cx} ${cy})"><rect x="${cx - 8}" y="${cy - 7}" width="16" height="14" fill="${COLORS.panel}" stroke="${COLORS.line}" stroke-width="1"/><path d="M${cx - 5},${cy - 5} L${cx + 3},${cy} L${cx - 5},${cy + 5} Z" fill="${passing ? COLORS.ok : "#555"}"/><path d="M${cx + 4},${cy - 5} v10" stroke="${COLORS.line}" stroke-width="2"/></g>`;
+}
+
+/** Gas-charged accumulator: capsule, fluid level (fraction) in `color`. */
+export function accumulator(x: number, y: number, w: number, h: number, fraction: number, color = "#ff4d7a"): string {
+  const f = clamp01(fraction), id = `acc-${x}-${y}`;
+  return `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(w, h) / 2}"/></clipPath>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(w, h) / 2}" fill="#2a2c2f"/>
+    <rect x="${x}" y="${y + h * (1 - f)}" width="${w}" height="${h * f}" fill="${color}" clip-path="url(#${id})"/>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(w, h) / 2}" fill="none" stroke="${COLORS.line}" stroke-width="1.2"/>`;
+}
+
 /** Generic labelled box (generator, bus, converter) with value lines. */
 export function box(x: number, y: number, w: number, h: number, title: string, lines: readonly string[], state: "on" | "off" | "warn" | "shed" = "on", accent = "#7fd4ff"): string {
   const stroke = state === "off" ? COLORS.dim : state === "warn" ? COLORS.warn : state === "shed" ? COLORS.caution : COLORS.line;

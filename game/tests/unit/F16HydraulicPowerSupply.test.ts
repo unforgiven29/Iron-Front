@@ -88,4 +88,18 @@ describe("F-16 hydraulic power supply (T.O. GR1F-16CJ-1 fig 1-33)", () => {
     const cold = run(new HydraulicNetwork(F16_HYDRAULIC_INSTALLATION), 1, 1, { cooling: () => ({ sinkK: 250, conductanceWPerK: 400 }) });
     expect(cold.circuits.find((c) => c.id === "A")!.coolerBypassed).toBe(true); // below the thermal-bypass temperature
   });
+
+  it("valves act on their own: thermal bypass modulates with temperature; relief valve cracks only above its setting; return flow follows use", () => {
+    const net = new HydraulicNetwork(F16_HYDRAULIC_INSTALLATION);
+    const busy = { elevator: 40, aileron: 60, rudder: 40 };
+    let s = run(net, 1, 1, { cooling: () => ({ sinkK: 300, conductanceWPerK: 400 }) }, busy);
+    const A = () => s.circuits.find((c) => c.id === "A")!;
+    expect(A().coolerValveFraction).toBe(0);
+    expect(A().returnFlowM3s).toBeGreaterThan(0);
+    expect(A().reliefFlowM3s).toBe(0);
+    let t = 0;
+    while ((A().coolerValveFraction ?? 0) === 0 && t < 3000) { s = run(net, 5, 1, { cooling: () => ({ sinkK: 300, conductanceWPerK: 400 }) }, busy); t += 5; }
+    expect(A().coolerValveFraction!).toBeGreaterThan(0);
+    expect(A().coolerValveFraction!).toBeLessThan(1); // modulating, not slammed open
+  });
 });
