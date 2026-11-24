@@ -50,12 +50,19 @@ describe("MiG-29 fuel pumps and valves", () => {
     expect(f.engineFuelAvailable("left")).toBe(true);
     expect(f.components!().pumps.find((p) => p.id === "tank3Turbo")!.running).toBe(true);
   });
-  it("at negative g the accumulator feeds the engines for a few seconds, then they starve", () => {
+  it("negative g: the tank-2 boost pumps keep feeding (GAF T.O.); near-zero g: the accumulator feeds, runs down, then refills itself", () => {
     const f = mig29FuelSystem(); f.reset();
-    step(f, { flow: 2, nz: -0.5 }, 2);
+    step(f, { flow: 2, nz: -1 }, 20);
+    expect(f.engineFuelAvailable("left")).toBe(true);
+    expect(f.components!().flows.some((x) => x.from === "accumulator")).toBe(false);
+    step(f, { flow: 2, nz: 0 }, 3);
     expect(f.engineFuelAvailable("left")).toBe(true);
     expect(f.components!().flows.some((x) => x.from === "accumulator")).toBe(true);
-    step(f, { flow: 2, nz: -0.5 }, 10);
+    const low = f.components!().accumulatorKg!;
+    expect(low).toBeLessThan(f.components!().accumulatorCapacityKg!);
+    step(f, { flow: 2, nz: 1 }, 20);
+    expect(f.components!().accumulatorKg).toBeCloseTo(f.components!().accumulatorCapacityKg!, 3);
+    step(f, { flow: 2, nz: 0 }, 30);
     expect(f.engineFuelAvailable("left")).toBe(false);
   });
   it("without gearbox drive only gravity moves fuel (tank 1 → 2); the CL valve needs DC power", () => {

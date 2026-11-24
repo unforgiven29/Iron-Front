@@ -50,6 +50,8 @@ export interface FlightSensors {
   readonly nyG: number;
   /** Weight-on-wheels (squat switches); false for aircraft without landing gear. */
   readonly weightOnWheels: boolean;
+  /** Gear fully up and locked (undefined for aircraft without landing gear). */
+  readonly gearUpLocked?: boolean;
   readonly alphaRad: number;
   readonly betaRad: number;
   readonly ratesRadps: readonly [number, number, number];

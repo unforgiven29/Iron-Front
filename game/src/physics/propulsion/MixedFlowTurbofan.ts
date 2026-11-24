@@ -99,8 +99,17 @@ export interface EngineStations {
   readonly Tt5K: number; readonly pt5Pa: number;
   readonly Tt6K: number;
   readonly Tt7K: number; readonly pt7Pa: number;
+  /** Main-burner fuel–air ratio (core flow). */
   readonly fuelAirRatio: number;
   readonly bypassRatio: number;
+  /** Core (hot) and bypass (cold) airflow, kg/s; NaN where not computed. */
+  readonly coreFlowKgS: number;
+  readonly bypassFlowKgS: number;
+  /** Main combustor and afterburner fuel flow, kg/s. */
+  readonly mainFuelKgS: number;
+  readonly afterburnerFuelKgS: number;
+  /** Total fuel / total airflow. */
+  readonly totalFuelAirRatio: number;
 }
 
 export interface CycleResult {
@@ -209,7 +218,8 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
       compressorExitPressurePa: pt3, correctedSpeed: Nc, compressorExitTemperatureK: Tt3, nozzle,
       // Exhaust gas temperature taken at the turbine exit (where e.g. the RD-33 measures it).
       exhaustGasTemperatureK: Tt5,
-      stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: pt2 / pt0, Tt13K: Tt13, pt13Pa: pt13, Tt3K: Tt3, pt3Pa: pt3, Tt4K: Tt4, Tt5K: Tt5, pt5Pa: pt5, Tt6K: Tt6, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: f, bypassRatio: d.bypassRatio }
+      stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: pt2 / pt0, Tt13K: Tt13, pt13Pa: pt13, Tt3K: Tt3, pt3Pa: pt3, Tt4K: Tt4, Tt5K: Tt5, pt5Pa: pt5, Tt6K: Tt6, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: f, bypassRatio: d.bypassRatio,
+        coreFlowKgS: wCore, bypassFlowKgS: wBypass, mainFuelKgS: wCore * f, afterburnerFuelKgS: fAb, totalFuelAirRatio: (wCore * f + fAb) / W2 }
     };
   };
 
@@ -250,7 +260,10 @@ function deckCycle(d: TurbofanDesign, deck: GasGeneratorDeck, amb: Ambient, V0: 
     compressorExitPressurePa: gg.compressorDischargePressurePa, correctedSpeed: n1c, compressorExitTemperatureK: Tt3, nozzle,
     n1Rpm: gg.n1Rpm, n2Rpm: gg.n2Rpm, exhaustGasTemperatureK: gg.exhaustGasTemperatureK, outsideDeck: gg.outsideDeck,
     // The deck publishes face, fan/compressor discharge pressures, EGT and nozzle entry; not T4/T5/mixer.
-    stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: Number.NaN, Tt13K: Number.NaN, pt13Pa: gg.fanDischargePressurePa, Tt3K: Tt3, pt3Pa: gg.compressorDischargePressurePa, Tt4K: Number.NaN, Tt5K: gg.exhaustGasTemperatureK, pt5Pa: Number.NaN, Tt6K: gg.nozzleTotalTemperatureK, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: gg.fuelFlowKgS / Math.max(1e-6, airflow), bypassRatio: d.bypassRatio }
+    stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: Number.NaN, Tt13K: Number.NaN, pt13Pa: gg.fanDischargePressurePa, Tt3K: Tt3, pt3Pa: gg.compressorDischargePressurePa, Tt4K: Number.NaN, Tt5K: gg.exhaustGasTemperatureK, pt5Pa: Number.NaN, Tt6K: gg.nozzleTotalTemperatureK, Tt7K: Tt7, pt7Pa: pt7,
+      // The deck gives total airflow; the core/bypass split uses the design bypass ratio.
+      fuelAirRatio: gg.fuelFlowKgS / Math.max(1e-6, airflow / (1 + d.bypassRatio)), bypassRatio: d.bypassRatio,
+      coreFlowKgS: airflow / (1 + d.bypassRatio), bypassFlowKgS: airflow * d.bypassRatio / (1 + d.bypassRatio), mainFuelKgS: gg.fuelFlowKgS, afterburnerFuelKgS: fAb, totalFuelAirRatio: (gg.fuelFlowKgS + fAb) / Math.max(1e-6, airflow) }
   };
 }
 
@@ -302,6 +315,8 @@ export interface EngineDynamicsSpec {
   };
   readonly health?: { readonly oilTimeConstantS: number; readonly oilTemperatureRiseK: number; readonly oilPressureAtMaxPa: number; readonly vibrationAtMax: number };
   readonly afterburner?: { readonly zones: number; readonly zoneDelayS: number; readonly blowoutBurnerPressurePa: number; readonly relightDelayS: number };
+  /** Variable-nozzle actuator: maximum position rate, fraction of travel per second (the actual nozzle lags the schedule). */
+  readonly nozzleRatePerS?: number;
 }
 
 export interface EngineHealth {
@@ -329,6 +344,9 @@ export interface TurbofanState extends CycleResult {
   /** Surge margin, fraction (NaN without a surge model); true while surging / recovering. */
   readonly surgeMargin: number;
   readonly surging: boolean;
+  /** Variable nozzle: position the control asks for vs where the actuator actually is (0 closed … 1 open); NaN if fixed. */
+  readonly nozzleCommandPosition: number;
+  readonly nozzleActualPosition: number;
   readonly health?: EngineHealth;
   readonly flameout: boolean;
 }
@@ -354,6 +372,10 @@ export class MixedFlowTurbofan {
   private surgeSpool = 0;
   private oilK = 288.15;
   private life = { hot: 0, ab: 0, surges: 0 };
+  /** Reported (sensed / metal) temperatures with thermal lag: they do not drop to ambient the instant the fire goes out. */
+  private thermal: Record<string, number> | undefined;
+  private nozzlePos: number | undefined;
+  private nozzleCmd = Number.NaN;
   private last: TurbofanState;
 
   public constructor(private readonly design: TurbofanDesign, initialSpeed: number) {
@@ -368,6 +390,35 @@ export class MixedFlowTurbofan {
     return this.last;
   }
 
+  /**
+   * Thermal lag on the temperatures we REPORT (sensors and hot-section metal). Running: a short
+   * sensor/metal lag (≈1.5 s); shut down: the hot section cools toward the gas temperature over
+   * ≈60 s (ESTIMATED time constants). Physics and limiters use the instantaneous cycle values.
+   */
+  private lagTemperatures(cycle: CycleResult, dt: number, running: boolean): CycleResult {
+    const tau = running ? 1.5 : 60;
+    const k = 1 - Math.exp(-dt / tau);
+    const st = cycle.stations;
+    const raw: Record<string, number> = {
+      tit: cycle.turbineInletTemperatureK, noz: cycle.nozzleTemperatureK, t3: cycle.compressorExitTemperatureK,
+      ...(cycle.exhaustGasTemperatureK !== undefined ? { egt: cycle.exhaustGasTemperatureK } : {}),
+      ...(st ? { s3: st.Tt3K, s4: st.Tt4K, s5: st.Tt5K, s6: st.Tt6K, s7: st.Tt7K } : {})
+    };
+    if (!this.thermal) this.thermal = { ...raw };
+    const out: Record<string, number> = {};
+    for (const [key, v] of Object.entries(raw)) {
+      const prev = this.thermal[key];
+      out[key] = !Number.isFinite(v) ? v : prev === undefined || !Number.isFinite(prev) ? v : prev + (v - prev) * k;
+      this.thermal[key] = out[key]!;
+    }
+    return {
+      ...cycle,
+      turbineInletTemperatureK: out["tit"]!, nozzleTemperatureK: out["noz"]!, compressorExitTemperatureK: out["t3"]!,
+      ...(out["egt"] !== undefined ? { exhaustGasTemperatureK: out["egt"] } : {}),
+      ...(st ? { stations: { ...st, Tt3K: out["s3"]!, Tt4K: out["s4"]!, Tt5K: out["s5"]!, Tt6K: out["s6"]!, Tt7K: out["s7"]! } } : {})
+    };
+  }
+
   private compose(cycle: CycleResult, x: { surgeMargin: number; flameout: boolean }): TurbofanState {
     const dyn = this.design.dynamics, zones = dyn?.afterburner?.zones ?? 0;
     const h = dyn?.health;
@@ -378,6 +429,7 @@ export class MixedFlowTurbofan {
       afterburnerZonesLit: zones ? Math.min(zones, Math.ceil(this.abLit * zones - 1e-6)) : 0, afterburnerZones: zones,
       afterburnerBlowout: this.blowoutTimer > 0,
       surgeMargin: x.surgeMargin, surging: this.surgeTimer > 0,
+      nozzleCommandPosition: Number.isFinite(this.nozzleCmd) ? this.nozzleCmd : cycle.nozzle.position, nozzleActualPosition: cycle.nozzle.position,
       ...(h ? { health: {
         oilTemperatureK: this.oilK, oilPressurePa: h.oilPressureAtMaxPa * this.spool * this.spool,
         vibration: Math.min(2, h.vibrationAtMax * this.spool + (this.surgeTimer > 0 ? 1.2 : 0)),
@@ -396,7 +448,11 @@ export class MixedFlowTurbofan {
       this.spool = Math.max(0, this.spool - this.spool * (dt / (4 * d.rotorTimeConstantS)));
       this.fan = Math.max(0, this.fan - this.fan * (dt / (4 * (dyn?.fanTimeConstantS ?? d.rotorTimeConstantS))));
       this.ab = 0; this.abLit = 0; this.surgeTimer = 0;
-      this.last = this.compose({ ...solveCycle(d, ambient, 0.2, 0), netThrustN: 0, grossThrustN: 0, fuelFlowKgS: 0 }, { surgeMargin: Number.NaN, flameout: true });
+      // Windmilling gas is at ambient-ish temperature; the reported hot-section temperatures cool down from where they were.
+      const windmill = solveCycle(d, ambient, 0.2, 0);
+      const cold = { ...windmill, turbineInletTemperatureK: windmill.compressorExitTemperatureK, nozzleTemperatureK: windmill.compressorExitTemperatureK, exhaustGasTemperatureK: windmill.compressorExitTemperatureK,
+        ...(windmill.stations ? { stations: { ...windmill.stations, Tt4K: windmill.compressorExitTemperatureK, Tt5K: windmill.compressorExitTemperatureK, Tt6K: windmill.compressorExitTemperatureK, Tt7K: windmill.compressorExitTemperatureK } } : {}) };
+      this.last = this.compose({ ...this.lagTemperatures(cold, dt, false), netThrustN: 0, grossThrustN: 0, fuelFlowKgS: 0 }, { surgeMargin: Number.NaN, flameout: true });
       return this.last;
     }
     const before = this.spool;
@@ -421,10 +477,21 @@ export class MixedFlowTurbofan {
       }
     } else this.abLit = this.ab;
     const theta = (ambient.temperatureK * (1 + 0.2 * ambient.mach * ambient.mach)) / T_STD;
-    let cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), this.abLit, { throat: demand.throat ?? { kind: "auto" } });
+    // Nozzle actuator: the schedule (or flow) gives the commanded position; the actuator moves toward it at a finite rate.
+    let throat = demand.throat ?? { kind: "auto" as const };
+    if (dyn?.nozzleRatePerS) {
+      const wanted = solveCycle(d, ambient, this.fan / Math.sqrt(theta), this.abLit, { throat }).nozzle.position;
+      if (Number.isFinite(wanted)) {
+        this.nozzleCmd = wanted;
+        const p0 = this.nozzlePos ?? wanted, step = dyn.nozzleRatePerS * dt;
+        this.nozzlePos = p0 + Math.max(-step, Math.min(step, wanted - p0));
+        throat = { kind: "position", position: this.nozzlePos };
+      }
+    }
+    let cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), this.abLit, { throat });
     if (ab && this.abLit > 0 && cycle.compressorExitPressurePa < ab.blowoutBurnerPressurePa) {
       this.blowoutTimer = ab.relightDelayS; this.abLit = 0;
-      cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), 0, { throat: demand.throat ?? { kind: "auto" } });
+      cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), 0, { throat });
     }
     // Surge margin and surge events (the light-off pressure pulse follows the zones actually lighting).
     const abRise = Math.max(0, this.abLit - abLitBefore) / Math.max(1e-6, dt);
@@ -445,7 +512,7 @@ export class MixedFlowTurbofan {
     const hotT = Number.isFinite(cycle.turbineInletTemperatureK) ? cycle.turbineInletTemperatureK / d.turbineInletTemperatureK : (cycle.exhaustGasTemperatureK ?? 0) / 1000;
     this.life.hot += dt * Math.max(0, hotT) ** 4;
     if (this.abLit > 0) this.life.ab += dt;
-    this.last = this.compose({ ...cycle, netThrustN: Math.max(0, cycle.netThrustN) }, { surgeMargin: margin, flameout: false });
+    this.last = this.compose({ ...this.lagTemperatures(cycle, dt, true), netThrustN: Math.max(0, cycle.netThrustN) }, { surgeMargin: margin, flameout: false });
     return this.last;
   }
 }

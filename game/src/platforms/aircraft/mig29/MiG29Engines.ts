@@ -27,7 +27,8 @@ const BASE: TurbofanDesign = {
     fanTimeConstantS: 0.6,
     surge: { baseMarginByCorrectedSpeed: { breakpoints: [0.5, 0.8, 1.0, 1.08], values: [0.22, 0.2, 0.14, 0.08] }, accelerationPenalty: 0.6, distortionPenalty: 0.25, afterburnerPulsePenalty: 0.03, recoveryS: 3, thrustFractionInSurge: 0.15, egtRiseK: 150 },
     health: { oilTimeConstantS: 120, oilTemperatureRiseK: 85, oilPressureAtMaxPa: 3.5 * 98066.5, vibrationAtMax: 0.45 },
-    afterburner: { zones: 3, zoneDelayS: 0.3, blowoutBurnerPressurePa: 2.5e5, relightDelayS: 3 }
+    afterburner: { zones: 3, zoneDelayS: 0.3, blowoutBurnerPressurePa: 2.5e5, relightDelayS: 3 },
+    nozzleRatePerS: 0.6
   },
   inlet: mig29Intake(), nozzle: idealNozzle(0.97),
   installationLossFraction: E.installationLossFraction.value, reynoldsEfficiencyLoss: 0.05, flowSpeedExponent: E.flowSpeedExponent.value

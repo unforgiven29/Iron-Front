@@ -49,7 +49,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   }, { ...startState(), positionEnuM: [...startState().positionEnuM] });
 
   const source: CockpitViewSource = {
-    snapshot: () => jet.snapshot(),
+    snapshot: () => jet.renderSnapshot(),
     hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
