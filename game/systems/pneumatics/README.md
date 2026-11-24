@@ -1,6 +1,6 @@
 # Aircraft pneumatic and stored-gas systems
 
-**Owner:** game/systems/pneumatics. **Status:** architecture specification; no pneumatic-network solver is implemented.
+**Owner:** game/systems/pneumatics. **Status:** first slice implemented — `game/src/systems/pneumatics/PneumaticNetwork.ts` (see Implementation status). The rest of this guide is the full specification.
 
 Pneumatics is a distinct stored/compressed-gas system. It is not a hydraulic circuit and must not be simulated as a pressure flag or as a branch of the hydraulic solver. Aircraft packages define gas type, reservoirs/bottles, regulators, isolation, valves, actuators and consumers. The shared system models finite gas inventory, pressure and delivery through those paths.
 
@@ -50,3 +50,15 @@ Each gas bottle, fill pressure, volume, consumer, regulator, deployment sequence
 ## First implementation slice
 
 Implement a finite nitrogen bottle, regulator, isolation/check valves, a line and a one-shot emergency actuator. Validate gas inventory, pressure decay, actuation completion/insufficient-pressure failure and replay. Add species/thermal complexity only when it changes behavior.
+
+## Implementation status
+
+Implemented (`game/src/systems/pneumatics/PneumaticNetwork.ts`, tests `game/tests/unit/Pneumatics.test.ts`):
+- Gas systems as lumped ideal-gas nodes (bottles share a manifold), gas inventory in mol, servicing to a charge pressure, no in-flight recharge, optional thermal relaxation to ambient.
+- Check-valve isolation between systems; `check-valve-failed` crossfeeds towards pressure equality (gas conserved).
+- Regulators (outlet = min(setpoint, upstream); failed closed/open), consumers with continuous flow and discrete strokes, supply fraction for the mechanism owner.
+- Faults: system leak, regulator failure, check-valve failure.
+- Aircraft runtime: `AircraftDefinition.pneumatics`, `AircraftSystems.pneumaticLoads` (consumer use, hydraulic pump inlet fraction, alternate gear extension), `FlightSensors.pneumaticPressuresPa`, snapshot `pneumatics`. A landing-gear supply id may name a pneumatic consumer (e.g. brakes).
+- Cross-system: `HydraulicStepOptions.pumpInletFraction` (reservoir pressurisation boundary condition); `LandingGear` per-leg extension with alternate extension rates and normal-actuation isolation.
+
+Not implemented: gas species, adiabatic discharge cooling, line volumes/restriction, stuck/leaking consumer valves, line rupture, blocked charging point, pressure-indication failure, save/replay of network state.

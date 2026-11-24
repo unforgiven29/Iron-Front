@@ -18,11 +18,16 @@
  *  - Forces are returned in the world frame with their body-frame application points; the rigid
  *    body integrates the aircraft. Nothing here moves the aircraft directly.
  * Gear extension/retraction and steering move only as fast as their hydraulic supply allows.
+ * Each leg (wheel) has its own extension; normal actuation moves all legs together. An
+ * alternate (emergency) extension system the package drives can extend individual legs at its
+ * own rate (e.g. a staged pneumatic nose-then-main sequence), and the package can isolate normal
+ * actuation (e.g. shut-off valves closing the hydraulic gear lines). A leg is locked only at full
+ * extension; touching down on an unlocked leg is a crash.
  * A touchdown sink rate above the structural limit collapses the gear; airframe points touching
  * the ground are a crash.
  *
  * Not modelled: wheel spin inertia and spin-up, tyre relaxation, runway surface classes and
- * contamination, brake temperature, gear door sequencing, emergency extension, shimmy, tyre
+ * contamination, brake temperature, gear door sequencing, shimmy, tyre
  * failure, ground effect (aero owner).
  */
 import type { Quaternion, Vector3 } from "../../core/coordinates/CoordinateFrames.js";
@@ -68,6 +73,10 @@ export interface GearInputs {
   readonly steering: number;
   /** Fraction of nominal pressure on a circuit (1 when the aircraft has no hydraulic model). */
   readonly hydraulicFraction: (circuitId: string | undefined) => number;
+  /** Alternate extension: extension rate (fraction of full travel per second) by wheel id. Extends only. */
+  readonly alternateExtensionRatePerS?: Readonly<Record<string, number>>;
+  /** True: normal actuation is cut off (legs neither extend nor retract through it). */
+  readonly normalActuationIsolated?: boolean;
 }
 
 export interface BodyKinematics {
@@ -88,8 +97,10 @@ export interface WheelState {
 export interface GearStepResult {
   readonly forces: readonly { readonly sourceId: string; readonly frame: "world.enu"; readonly forceN: Vector3; readonly applicationPointBodyM: Vector3 }[];
   readonly wheels: readonly WheelState[];
-  /** 0 = up, 1 = down; locked only at 1. */
+  /** 0 = up, 1 = down; the least-extended leg (all locked only at 1). */
   readonly extension: number;
+  /** Extension of each leg, by wheel id. */
+  readonly legExtension: Readonly<Record<string, number>>;
   readonly weightOnWheels: boolean;
   readonly crash?: string;
 }
@@ -100,17 +111,24 @@ const add = (a: Vector3, b: Vector3): Vector3 => [a[0] + b[0], a[1] + b[1], a[2]
 const scale = (a: Vector3, k: number): Vector3 => [a[0] * k, a[1] * k, a[2] * k];
 
 export class LandingGear {
-  private extension = 1;
+  private readonly legs = new Map<string, number>();
   private steeringDeg = 0;
   private wasCompressed = new Set<string>();
   private last: GearStepResult;
 
   public constructor(public readonly spec: LandingGearSpec) {
-    this.last = { forces: [], wheels: [], extension: 1, weightOnWheels: false };
+    for (const w of spec.wheels) this.legs.set(w.id, 1);
+    this.last = { forces: [], wheels: [], extension: 1, legExtension: Object.fromEntries(this.legs), weightOnWheels: false };
+  }
+
+  private get extension(): number {
+    let m = 1;
+    for (const e of this.legs.values()) m = Math.min(m, e);
+    return m;
   }
 
   public reset(down: boolean): void {
-    this.extension = down ? 1 : 0;
+    for (const w of this.spec.wheels) this.legs.set(w.id, down ? 1 : 0);
     this.steeringDeg = 0;
     this.wasCompressed.clear();
   }
@@ -121,7 +139,6 @@ export class LandingGear {
 
   public step(dt: number, body: BodyKinematics, groundHeightM: (x: number, y: number) => number | undefined, input: GearInputs): GearStepResult {
     const s = this.spec;
-    const locked = this.extension >= 1;
 
     const forces: GearStepResult["forces"][number][] = [];
     const wheels: WheelState[] = [];
@@ -141,7 +158,8 @@ export class LandingGear {
       const ground = groundHeightM(p[0], p[1]);
       const penetration = ground === undefined ? -1 : ground - p[2];
       if (penetration <= 0) { this.wasCompressed.delete(w.id); wheels.push({ id: w.id, weightOnWheel: false, compressionM: 0, normalForceN: 0, steeringDeg: steer }); continue; }
-      if (!locked) { crash ??= this.extension > 0 ? "landing gear not locked down at touchdown" : "gear-up landing"; continue; }
+      const leg = this.legs.get(w.id)!;
+      if (leg < 1) { crash ??= leg > 0 ? "landing gear not locked down at touchdown" : "gear-up landing"; continue; }
       const v = add(body.velocityEnuMps, rotateVector(body.bodyToWorld, cross(body.angularVelocityBodyRadps, w.contactPointBodyM)));
       if (!this.wasCompressed.has(w.id) && -v[2] > s.maxSinkRateMps) crash ??= `landing gear collapsed: sink rate ${(-v[2]).toFixed(1)} m/s at touchdown`;
       this.wasCompressed.add(w.id);
@@ -173,10 +191,16 @@ export class LandingGear {
     // Gear actuation (after contact, so the squat-switch interlock uses this step's weight on wheels).
     const wow = wheels.some((w) => w.weightOnWheel);
     const target = input.handleDown || wow ? 1 : 0;
-    const gearRate = input.hydraulicFraction(s.gearCircuitId) / s.transitTimeS;
-    if (target > this.extension) this.extension = Math.min(1, this.extension + gearRate * dt);
-    else if (target < this.extension) this.extension = Math.max(0, this.extension - gearRate * dt);
-    this.last = { forces, wheels, extension: this.extension, weightOnWheels: wow, ...(crash ? { crash } : {}) };
+    const gearRate = input.normalActuationIsolated ? 0 : input.hydraulicFraction(s.gearCircuitId) / s.transitTimeS;
+    for (const w of s.wheels) {
+      let e = this.legs.get(w.id)!;
+      if (target > e) e = Math.min(1, e + gearRate * dt);
+      else if (target < e) e = Math.max(0, e - gearRate * dt);
+      const alt = Math.max(0, input.alternateExtensionRatePerS?.[w.id] ?? 0);
+      if (alt > 0) e = Math.min(1, e + alt * dt);
+      this.legs.set(w.id, e);
+    }
+    this.last = { forces, wheels, extension: this.extension, legExtension: Object.fromEntries(this.legs), weightOnWheels: wow, ...(crash ? { crash } : {}) };
     return this.last;
   }
 }

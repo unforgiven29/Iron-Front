@@ -37,6 +37,17 @@ describe("Landing gear, brakes and steering (shared ground-handling model, F-16 
     expect(s.ground.kind).toBe("on-ground");
   });
 
+  it("air start puts the gear-handle switch UP so one request extends the gear", () => {
+    const a = createF16Aircraft(flat(), env, { positionEnuM: [0, 0, 1500], headingRad: 0, speedMps: 120, throttle: 0.6 });
+    fly(a, 0.05);
+    expect(a.snapshot().switches[F16_SWITCHES.gearHandle]).toBe("UP");
+    expect(a.snapshot().gear?.extension).toBe(0);
+    expect(a.controls.request(F16_SWITCHES.gearHandle, "DN", "test").accepted).toBe(true);
+    const s = fly(a, 10);
+    expect(s.gear?.handleDown).toBe(true);
+    expect(s.gear?.extension).toBe(1);
+  });
+
   it("will not retract the gear with weight on wheels (squat-switch interlock)", () => {
     const a = onGround();
     a.controls.request(F16_SWITCHES.gearHandle, "UP", "test");

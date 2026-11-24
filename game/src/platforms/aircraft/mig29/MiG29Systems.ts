@@ -94,6 +94,8 @@ export const MIG29_LANDING_GEAR: LandingGearSpec = {
   ],
   transitTimeS: 8, /* GAF T.O.: extension 7–8 s, retraction 9–10 s (single transit time) */ // Gear and NWS behind the pressure limiter; wheel brakes are pneumatic (GAF T.O.), not hydraulic.
   gearCircuitId: "main.util", steeringCircuitId: "main.util",
+  // Normal wheel brakes: pneumatic, regulated from the main nitrogen system (MiG29Pneumatics.ts).
+  brakeCircuitId: "brakes.normal",
   maxSinkRateMps: G.maxSinkRateMps.value, restCgHeightM: z - 0.11,
   // Estimated strike points: nose, tail (≈13° tail-strike pitch), wingtips, belly.
   airframePointsBodyM: [[8.5, 0, 0.7], [-8, 0, 0.1], [0, -5.6, 1.1], [0, 5.6, 1.1], [0, 0, 1.3]]

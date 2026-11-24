@@ -16,9 +16,19 @@ import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_HYDRAULICS as HYD, MIG29_MASS as M } from "./MiG29Data.js";
 import { mig29IntakeSystem } from "./MiG29Intake.js";
 import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
+import { leakForTimeConstant, mig29PneumaticLoads, MIG29_EMERGENCY_GEAR_POSITIONS, MIG29_PNEUMATIC_INSTALLATION } from "./MiG29Pneumatics.js";
+import { MIG29_PNEUMATICS as PN } from "./MiG29Data.js";
 import { mig29AccessoryDrives, mig29HydraulicLoads, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
-export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault",
+/** Pneumatic test faults: leaks bleed a system with a 2-minute time constant (simulation choice). */
+const PNEU_FAULTS = {
+  NORMAL: [],
+  "MAIN LEAK": [{ kind: "system-leak", systemId: "main", leakMolSPerPa: leakForTimeConstant(PN.mainVolumeM3.value, 120) }],
+  "EMERG LEAK": [{ kind: "system-leak", systemId: "emergency", leakMolSPerPa: leakForTimeConstant(PN.emergencyVolumeM3.value, 120) }],
+  "RES REG FAIL": [{ kind: "regulator-failed", regulatorId: "reg.reservoir", mode: "closed" }]
+} as const satisfies Record<string, readonly import("../../../systems/pneumatics/PneumaticNetwork.js").PneumaticFault[]>;
+
+export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", emergencyGear: "mig29.gear.emergency", pneumaticFault: "mig29.test.pneumatic-fault", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault",
   batGnd: "mig29.elec.bat-gnd", dcGen: "mig29.elec.dc-gen", acGen: "mig29.elec.ac-gen", pto: "mig29.elec.pto" });
 
 /** Electrical test faults (simulation only). CSD OVERSPEED = automatic CSD disconnect at 14,300–14,500 rpm (GAF T.O.). */
@@ -102,6 +112,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     ],
     engines: mig29Engines(options.engineMode ?? "NPM"),
     hydraulics: MIG29_HYDRAULIC_INSTALLATION,
+    pneumatics: MIG29_PNEUMATIC_INSTALLATION,
     landingGear: MIG29_LANDING_GEAR,
     createFuelSystem: () => mig29FuelSystem(),
     electrical: MIG29_ELECTRICAL_INSTALLATION,
@@ -143,11 +154,22 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
         ...(ELEC_FAULTS[elec.fault as keyof typeof ELEC_FAULTS] ?? []),
         ...(elec.batGnd ? [] : ["battery"]), ...(elec.dcGen ? [] : ["gen.dc"]), ...(elec.acGen ? [] : ["gen.ac"]), ...(elec.pto ? [] : ["pto", "pto36"])
       ]);
-      let speedbrakeSwitch = false;
+      let speedbrakeSwitch = false, emergencyHandle = "STOWED";
       const switches: SwitchBinding[] = [
         { key: "f", definition: { id: MIG29_SWITCHES.sau, ownerId: "mig29.sau", label: "SAU (TEST)", positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "Simulation test switch for the stability-augmentation dampers" }, onChange: (to) => { fcs.setSau(to as SauMode); return { accepted: true }; } },
         { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { speedbrakeSwitch = to === "EXTEND"; return { accepted: true }; } },
-        { key: "g", definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
+        { key: "g", gearHandle: { up: "UP", down: "DN" }, definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
+        {
+          key: "u",
+          definition: { id: MIG29_SWITCHES.emergencyGear, ownerId: "mig29.gear.emergency", label: "EMERG GEAR", positions: [...MIG29_EMERGENCY_GEAR_POSITIONS], defaultPosition: "STOWED", provenance: "GAF T.O. 1F-MIG29-1: EMERG GEAR handle — pull aft (nose gear), then rotate 90° clockwise and pull full aft (main gear)" },
+          // Mechanical staging: the main-gear position is reachable only from the nose position.
+          onChange: (to) => { const ok = to !== "MAIN" || emergencyHandle === "NOSE"; if (ok) emergencyHandle = to; return ok ? { accepted: true } : { accepted: false, reason: "rotate and pull from the NOSE position" }; }
+        },
+        {
+          key: "k",
+          definition: { id: MIG29_SWITCHES.pneumaticFault, ownerId: "mig29.pneumatics", label: "PNEU FAULT (TEST)", positions: Object.keys(PNEU_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: nitrogen leaks and regulator failure" },
+          onChange: (to, ctx) => { ctx.setPneumaticFaults(PNEU_FAULTS[to as keyof typeof PNEU_FAULTS] ?? []); return { accepted: true }; }
+        },
         { key: "h", definition: { id: MIG29_SWITCHES.hydraulicFault, ownerId: "mig29.hydraulics", label: "HYD FAULT (TEST)", positions: ["NORMAL", "MAIN PUMP FAIL", "BOOSTER PUMP FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch" }, onChange: (to, ctx) => { ctx.setHydraulicFaults(to === "NORMAL" ? [] : [{ kind: "pump-failed", pumpId: to.startsWith("MAIN") ? "pump.main" : "pump.booster" }]); return { accepted: true }; } },
         { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: Object.keys(ELEC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: generator, CSD and transformer failures" }, onChange: (to, ctx) => { elec.fault = to; applyElec(ctx); return { accepted: true }; } },
         ...([["batGnd", "BAT-GND SUPPLY"], ["dcGen", "DC GEN"], ["acGen", "AC GEN"], ["pto", "PTO"]] as const).map(([k, label]): SwitchBinding => ({
@@ -172,7 +194,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
           return sb === undefined ? out : { ...out, commands: { ...out.commands, speedbrake: sb * blow } };
         }
       };
-      return { aero: mig29Aerodynamics(), fcs: guardedFcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]), hydraulicLoads: mig29HydraulicLoads() };
+      return { aero: mig29Aerodynamics(), fcs: guardedFcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]), hydraulicLoads: mig29HydraulicLoads(), pneumaticLoads: mig29PneumaticLoads(MIG29_SWITCHES.emergencyGear) };
     }
   };
 }
