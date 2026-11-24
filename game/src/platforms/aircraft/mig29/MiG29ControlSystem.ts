@@ -55,7 +55,11 @@ export function mig29ControlSystem(): FlightControlSystem & { setSau(mode: SauMo
     step: (pilot, s, surfaces, dt) => {
       const [p, q, r] = s.ratesRadps.map((x) => x * DEG) as [number, number, number];
       const alpha = s.alphaRad * DEG;
-      const damp = sau === "ON" ? 1 : 0;
+      // The SAU/AFCS is shed when the AC bus is on the PTO converter or the DC bus is on batteries
+      // (GAF T.O. electrical failure lists); without an electrical installation it is always powered.
+      const bus = (id: string) => { const b = s.electricalBuses?.[id]; return b === undefined || (b.powered && !b.shed); };
+      const sauPowered = bus("ac") && bus("dc");
+      const damp = sau === "ON" && sauPowered ? 1 : 0;
       const lefOut = (surfaces["lef"] ?? 0) > 1;
       const [upAuth, downAuth] = stabilatorAuthority(s.trueAirspeedMps * KT, pressureAltitudeFt(s.staticPressurePa));
       // Automatic trim: hands-off, drive pitch rate to zero, within 80 % of the available authority.
@@ -76,7 +80,7 @@ export function mig29ControlSystem(): FlightControlSystem & { setSau(mode: SauMo
       const rudder = clamp(-K.rudderLimitDeg.value * pilot.yaw + damp * K.yawDamperDegPerDegS.value * r * clamp(s.dynamicPressurePa / 20_000, 0.2, 1) + ari, -K.rudderLimitDeg.value, K.rudderLimitDeg.value);
       return {
         mode: `SAU ${sau}`,
-        annunciations: [...(sau === "OFF" ? ["SAU OFF (TEST)"] : []), ...(kicker > 0 ? ["AOA LIMIT"] : [])],
+        annunciations: [...(sau === "OFF" ? ["SAU OFF (TEST)"] : !sauPowered ? ["SAU OFF (NO POWER)"] : []), ...(kicker > 0 ? ["AOA LIMIT"] : [])],
         commands: { elevator, aileron, differentialStabilator, rudder, speedbrake: speedbrake ? 60 : 0 }
       };
     }

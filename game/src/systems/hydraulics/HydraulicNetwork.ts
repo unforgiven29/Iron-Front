@@ -141,6 +141,7 @@ export class HydraulicNetwork {
   public reset(pressurised: boolean): void {
     for (const c of this.installation.circuits) { this.pressure.set(c.id, pressurised ? c.nominalPressurePa : 0); this.pumpFlow.set(c.id, 0); this.demand.set(c.id, 0); }
     this.faults = [];
+    this.externalStart = false;
     this.eu = { state: "off", t: 0, remaining: this.installation.emergencyUnit?.enduranceS ?? 0 };
   }
 
@@ -202,10 +203,15 @@ export class HydraulicNetwork {
     return this.snapshot();
   }
 
+  private externalStart = false;
+
+  /** A package's own logic may start the emergency unit (e.g. on loss of electrical generators). */
+  public commandEmergencyStart(): void { this.externalStart = true; }
+
   private stepEmergencyUnit(dt: number): void {
     const u = this.installation.emergencyUnit;
     if (!u) return;
-    const allLow = u.autoStartCircuits.every((id) => this.pressurePa(id) < u.autoStartWhenAllBelowPa);
+    const allLow = this.externalStart || u.autoStartCircuits.every((id) => this.pressurePa(id) < u.autoStartWhenAllBelowPa);
     if (this.eu.state === "off" && allLow) this.eu = { ...this.eu, state: "starting", t: 0 };
     if (this.eu.state === "starting") { this.eu.t += dt; if (this.eu.t >= u.startDelayS) this.eu.state = "running"; }
     if (this.eu.state === "running") { this.eu.remaining -= dt; if (this.eu.remaining <= 0) { this.eu.remaining = 0; this.eu.state = "depleted"; } }

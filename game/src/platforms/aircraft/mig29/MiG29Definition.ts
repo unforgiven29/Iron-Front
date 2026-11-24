@@ -14,9 +14,9 @@ import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_MASS as M } from "./MiG29Data.js";
 import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
-import { MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
+import { mig29AccessoryDrives, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
-export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine" });
+export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault" });
 
 export const MIG29_MANIFEST: ModuleManifest = {
   manifestSchemaVersion: 1,
@@ -98,6 +98,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     hydraulics: MIG29_HYDRAULIC_INSTALLATION,
     landingGear: MIG29_LANDING_GEAR,
     createFuelSystem: () => mig29FuelSystem(),
+    electrical: MIG29_ELECTRICAL_INSTALLATION,
     cockpit: MIG29_COCKPIT_LAYOUT,
     mfdPages: { "panel-left": enginePanel, "panel-right": systemsPanel },
     annunciate: (s) => {
@@ -105,6 +106,12 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
       for (const e of s.engines) if (e.flameout) out.push({ text: `${e.id.toUpperCase()} ENGINE OUT`, level: "warning" });
       const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < 0.4 * 21e6).map((c) => c.id.toUpperCase());
       if (low.length) out.push({ text: `HYD ${low.join("+")} LOW`, level: low.length > 1 ? "warning" : "caution" });
+      // AEKRAN generator captions (GAF T.O.: "AC GEN", "DC GEN", "TWO GEN").
+      const online = (id: string) => s.electrical?.sources.find((x) => x.id === id)?.online ?? true;
+      const ac = online("gen.ac"), dc = online("gen.dc");
+      if (!ac && !dc) out.push({ text: "TWO GEN", level: "warning" });
+      else if (!ac) out.push({ text: "AC GEN", level: "caution" });
+      else if (!dc) out.push({ text: "DC GEN", level: "caution" });
       return out;
     },
     createSystems: () => {
@@ -114,9 +121,10 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
         { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { fcs.setSpeedbrake(to === "EXTEND"); return { accepted: true }; } },
         { key: "g", definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
         { key: "h", definition: { id: MIG29_SWITCHES.hydraulicFault, ownerId: "mig29.hydraulics", label: "HYD FAULT (TEST)", positions: ["NORMAL", "MAIN PUMP FAIL", "BOOSTER PUMP FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch" }, onChange: (to, ctx) => { ctx.setHydraulicFaults(to === "NORMAL" ? [] : [{ kind: "pump-failed", pumpId: to.startsWith("MAIN") ? "pump.main" : "pump.booster" }]); return { accepted: true }; } },
+        { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: ["NORMAL", "AC GEN FAIL", "DC GEN FAIL", "BOTH GEN FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch: generator failures" }, onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "AC GEN FAIL" ? ["gen.ac"] : to === "DC GEN FAIL" ? ["gen.dc"] : ["gen.ac", "gen.dc"]); return { accepted: true }; } },
         { key: "l", definition: { id: MIG29_SWITCHES.leftEngine, ownerId: "mig29.engines", label: "L ENGINE (TEST)", positions: ["RUN", "CUT"], defaultPosition: "RUN", provenance: "Simulation test switch: shuts off fuel to the left engine" }, onChange: (to, ctx) => { ctx.setEngineFuelCutoff("left", to === "CUT"); return { accepted: true }; } }
       ];
-      return { aero: mig29Aerodynamics(), fcs, switches, devices: lefSchedule() };
+      return { aero: mig29Aerodynamics(), fcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives() };
     }
   };
 }

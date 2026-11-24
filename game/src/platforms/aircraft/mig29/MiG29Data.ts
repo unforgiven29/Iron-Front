@@ -139,11 +139,30 @@ export const MIG29_CONTROLS = Object.freeze({
 });
 
 export const MIG29_HYDRAULICS = Object.freeze({
+  reliefPressurePa: P(24e6, "Pa", "primary-published", GAF_TO, "Relief valves open at 240 kp/cm²"),
+  accumulatorPrechargePa: P(8e6, "Pa", "primary-published", GAF_TO, "Both accumulators charged with nitrogen at 80 kp/cm²"),
+  lowPressurePa: P(10e6, "Pa", "primary-published", GAF_TO, "Emergency pump auto-start (both systems) and low-pressure threshold, 100 kp/cm²"),
+  emergencyPumpMinEngineSpeed: P(0.85, "fraction", "primary-published", GAF_TO, "Emergency pump supports basic control at an RPM of both engines of at least 85 % (fuel-pressure driven)"),
+  emergencyPumpFlowFraction: P(0.15, "fraction of a main pump", "estimated", EST, "'Delivery rate permits only severely degraded aircraft control'"),
+  gearboxEngineSelectMargin: P(0.07, "fraction", "primary-published", GAF_TO, "GBX normally driven by the RH engine; LH engine drives it if its RPM exceeds RH by 7 % or more (freewheel clutch)"),
   nominalPressurePa: P(21e6, "Pa", "primary-published", GAF_TO, "Main and boost systems, pumps operate between 190 and 220 kp/cm² (mid-band); relief 240; low warning 100"),
   pumpRatedFlowM3s: P(1.6e-3, "m³/s", "estimated", EST, "One pump per system, on separate engines"),
   displacementM3PerDeg: P(1.4e-5, "m³/deg", "estimated", EST),
   hingeLoadFractionAtReference: P(0.5, "-", "estimated", EST),
   hingeReferenceDynamicPressurePa: P(60_000, "Pa", "estimated", EST)
+});
+
+export const MIG29_ELECTRICAL = Object.freeze({
+  acGeneratorW: P(30_000, "VA", "primary-published", GAF_TO, "Three-phase 115/200 V 400 Hz, constant-speed drive on the GBX"),
+  dcGeneratorW: P(12_000, "W", "primary-published", GAF_TO, "28.5 V, 400 A, on the GBX"),
+  ptoConverterW: P(1_500, "VA", "primary-published", GAF_TO, "DC/AC converter PTO, minimum 1.5 kVA at 115 V"),
+  generatorMinDriveFraction: P(0.55, "fraction", "primary-published", GAF_TO, "The engine fault detection unit engages the AC generator when NH exceeds 55 %"),
+  batteryVoltage: P(27.6, "V", "primary-published", GAF_TO, "Two silver-zinc batteries, nominal 27.6 V (≥22 V at 200 A); not charged by the generator"),
+  batteryCapacityAh: P(50, "Ah (both)", "estimated", EST, "Capacity not given in Section 1"),
+  acEssentialLoadW: P(1_200, "W", "estimated", EST, "Flight-essential AC consumers (must fit the PTO)"),
+  acSheddableLoadW: P(14_000, "W", "estimated", EST, "Shed on PTO: INS heaters, radar/sight, IRST/LRF/HMS, probe/windshield heaters, AFCS, armament, IFF encoder (GAF list)"),
+  dcEssentialLoadW: P(2_500, "W", "estimated", EST),
+  dcSheddableLoadW: P(3_500, "W", "estimated", EST, "Shed on batteries: damping (SAU), NB, … (VIWAS 'Dämpfung aus, NB aus')")
 });
 
 export const MIG29_GEAR = Object.freeze({
