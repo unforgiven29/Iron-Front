@@ -2,6 +2,7 @@
  * F-16C Block 50 package definition: everything aircraft-specific, expressed through the shared
  * AircraftDefinition contract. The shared FixedWingAircraft runtime flies it.
  */
+import { F16_EFB } from "./F16Efb.js";
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import { groundEffect, groundEffectPitchIncrement, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
 import { buffetIntensity, LaggedFlowState, smoothStep } from "../../../physics/aerodynamics/UnsteadyFlow.js";
@@ -190,6 +191,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     electrical: F16_ELECTRICAL_INSTALLATION,
     systemsCoupling: f16SystemsCoupling,
     cockpit: F16_COCKPIT_LAYOUT,
+    efb: F16_EFB,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createSystems: () => {
       const fcs = f16Fcs();

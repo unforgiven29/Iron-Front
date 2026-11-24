@@ -4,6 +4,7 @@
  * Shared code used: the FixedWingAircraft runtime, rigid body, atmosphere, terrain, propulsion
  * (generic-map cycle + FADEC), hydraulics, ground handling, ground effect, cockpit renderer.
  */
+import { MIG29_EFB } from "./MiG29Efb.js";
 import type { PerformanceOptions } from "../common/Performance.js";
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { AircraftDefinition, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
@@ -100,6 +101,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     createFuelSystem: () => mig29FuelSystem(),
     electrical: MIG29_ELECTRICAL_INSTALLATION,
     cockpit: MIG29_COCKPIT_LAYOUT,
+    efb: MIG29_EFB,
     mfdPages: { "panel-left": enginePanel, "panel-right": systemsPanel },
     annunciate: (s) => {
       const out: { text: string; level: "caution" | "warning" }[] = [];

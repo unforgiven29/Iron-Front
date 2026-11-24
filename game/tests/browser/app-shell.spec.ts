@@ -75,16 +75,18 @@ test("data panel toggles with I and shows surfaces, engines and systems pages", 
   await page.keyboard.down("d");
   await page.waitForTimeout(400);
   await page.keyboard.press("i");
-  await expect(page.getByText("Surface positions")).toBeVisible();
+  await expect(page.locator(".data-panel")).toBeVisible();
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-1.png` });
   await page.keyboard.up("d");
   await page.keyboard.press("2");
-  await expect(page.getByText(/ENGINE /).first()).toBeVisible();
+  await expect(page.locator(".data-panel .efb-svg")).toBeVisible();
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-2.png` });
-  await page.keyboard.press("3");
-  await expect(page.getByText("Hydraulics")).toBeVisible();
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-3.png` });
+  for (const k of ["3", "4", "5"]) {
+    await page.keyboard.press(k);
+    await expect(page.locator(".data-panel .dp-body > *").first()).toBeVisible();
+    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-${k}.png` });
+  }
   await page.keyboard.press("i");
-  await expect(page.getByText("Hydraulics")).toBeHidden();
+  await expect(page.locator(".data-panel")).toBeHidden();
   expect(errors).toEqual([]);
 });

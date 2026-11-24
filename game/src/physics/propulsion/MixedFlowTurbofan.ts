@@ -77,6 +77,23 @@ export interface Ambient {
   readonly inletCondition?: InletCondition;
 }
 
+/**
+ * Engine station values (SAE ARP755 numbering): 2 engine face, 13 fan exit, 3 compressor exit,
+ * 4 turbine inlet, 5 turbine exit, 6 mixer, 7 afterburner exit / nozzle entry. NaN where the model
+ * does not compute a station (e.g. a data deck that does not publish it).
+ */
+export interface EngineStations {
+  readonly Tt2K: number; readonly pt2Pa: number; readonly inletRecovery: number;
+  readonly Tt13K: number; readonly pt13Pa: number;
+  readonly Tt3K: number; readonly pt3Pa: number;
+  readonly Tt4K: number;
+  readonly Tt5K: number; readonly pt5Pa: number;
+  readonly Tt6K: number;
+  readonly Tt7K: number; readonly pt7Pa: number;
+  readonly fuelAirRatio: number;
+  readonly bypassRatio: number;
+}
+
 export interface CycleResult {
   readonly netThrustN: number;
   readonly grossThrustN: number;
@@ -97,6 +114,8 @@ export interface CycleResult {
   readonly n2Rpm?: number;
   readonly exhaustGasTemperatureK?: number;
   readonly outsideDeck?: boolean;
+  /** Station temperatures and pressures through the engine. */
+  readonly stations?: EngineStations;
 }
 
 export interface CycleOptions {
@@ -176,7 +195,8 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
     return {
       netThrustN: gross - ram, grossThrustN: gross, ramDragN: ram, airflowKgS: W2,
       fuelFlowKgS: wCore * f + fAb, turbineInletTemperatureK: Tt4, nozzleTemperatureK: Tt7,
-      compressorExitPressurePa: pt3, correctedSpeed: Nc, compressorExitTemperatureK: Tt3, nozzle
+      compressorExitPressurePa: pt3, correctedSpeed: Nc, compressorExitTemperatureK: Tt3, nozzle,
+      stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: pt2 / pt0, Tt13K: Tt13, pt13Pa: pt13, Tt3K: Tt3, pt3Pa: pt3, Tt4K: Tt4, Tt5K: Tt5, pt5Pa: pt5, Tt6K: Tt6, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: f, bypassRatio: d.bypassRatio }
     };
   };
 
@@ -215,7 +235,9 @@ function deckCycle(d: TurbofanDesign, deck: GasGeneratorDeck, amb: Ambient, V0: 
     netThrustN: gross - ram, grossThrustN: gross, ramDragN: ram, airflowKgS: airflow,
     fuelFlowKgS: gg.fuelFlowKgS + fAb, turbineInletTemperatureK: Number.NaN, nozzleTemperatureK: Tt7,
     compressorExitPressurePa: gg.compressorDischargePressurePa, correctedSpeed: n1c, compressorExitTemperatureK: Tt3, nozzle,
-    n1Rpm: gg.n1Rpm, n2Rpm: gg.n2Rpm, exhaustGasTemperatureK: gg.exhaustGasTemperatureK, outsideDeck: gg.outsideDeck
+    n1Rpm: gg.n1Rpm, n2Rpm: gg.n2Rpm, exhaustGasTemperatureK: gg.exhaustGasTemperatureK, outsideDeck: gg.outsideDeck,
+    // The deck publishes face, fan/compressor discharge pressures, EGT and nozzle entry; not T4/T5/mixer.
+    stations: { Tt2K: Tt2, pt2Pa: pt2, inletRecovery: Number.NaN, Tt13K: Number.NaN, pt13Pa: gg.fanDischargePressurePa, Tt3K: Tt3, pt3Pa: gg.compressorDischargePressurePa, Tt4K: Number.NaN, Tt5K: gg.exhaustGasTemperatureK, pt5Pa: Number.NaN, Tt6K: gg.nozzleTotalTemperatureK, Tt7K: Tt7, pt7Pa: pt7, fuelAirRatio: gg.fuelFlowKgS / Math.max(1e-6, airflow), bypassRatio: d.bypassRatio }
   };
 }
 

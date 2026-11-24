@@ -215,6 +215,14 @@ export interface AircraftDefinition {
   readonly cockpit: CockpitLayout;
   /** Aircraft-specific cautions and warnings built from the snapshot (e.g. hydraulic pressure lights). */
   readonly annunciate?: (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[];
+  /**
+   * The aircraft's own electronic flight bag (EFB) systems pages: SVG/HTML markup built from the
+   * snapshot (UI only). `previous` is a snapshot ≈1 s older, for showing which transfers are active.
+   */
+  readonly efb?: {
+    readonly title: string;
+    readonly pages: readonly { readonly id: string; readonly title: string; render(s: import("./FixedWingAircraft.js").AircraftSnapshot, previous: import("./FixedWingAircraft.js").AircraftSnapshot | undefined): string }[];
+  };
   /** Pilot-facing MFD pages built from the snapshot (package decides what to show). */
   readonly mfdPages?: Readonly<Record<string, (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => { title: string; lines: string[] }>>;
   createSystems(): AircraftSystems;
