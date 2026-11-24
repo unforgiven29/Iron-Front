@@ -92,6 +92,6 @@ describe("runtime: fuel moves the CG and changes mass and inertia", () => {
       // F-16: the fwd/aft balancing keeps the CG nearly fixed.
       if (name === "MiG-29") expect(shift).toBeGreaterThan(0.005); else expect(shift).toBeLessThan(0.01);
       expect(shift).toBeLessThan(0.06);
-    });
+    }, 20_000); // simulates 2 minutes of full-throttle flight
   }
 });
