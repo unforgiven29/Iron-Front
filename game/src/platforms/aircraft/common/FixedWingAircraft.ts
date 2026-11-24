@@ -196,7 +196,7 @@ export class FixedWingAircraft {
     });
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
-    this.hydraulics?.reset(true);
+    this.hydraulics?.reset(true, sampleEnvironment(this.env, this.body.state.positionEnuM, 0).atmosphere.temperatureK);
     this.electrical?.reset();
     this.drives = {};
     this.inlets = {};
@@ -390,7 +390,21 @@ export class FixedWingAircraft {
       emergencyUnitRunning: hyd?.emergencyUnit?.state === "running"
     }) ?? {};
     const drive = (id: string) => this.drives[id] ?? this.engineCoreSpeed(id);
-    this.hydraulics?.step(dt, drive, this.surfaceRates);
+    let hydOpts: import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicStepOptions = { ambientK: env.atmosphere.temperatureK };
+    if (this.hydraulics && this.systems.hydraulicLoads) {
+      const fc = this.fuelSystem?.components?.();
+      const loads = this.systems.hydraulicLoads({
+        sensors, pilot: this.pilot, switches: this.controls.snapshot(), ambientTemperatureK: env.atmosphere.temperatureK,
+        engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
+        groundSpeedMps: Math.hypot(st.velocityEnuMps[0], st.velocityEnuMps[1]),
+        ...(this.gear ? { gear: { extension: this.gear.state.extension, handleDown: this.gearHandleDown, weightOnWheels: this.gear.state.weightOnWheels } } : {}),
+        ...(fc ? { fuelComponents: fc } : {})
+      }, dt);
+      for (const [id, open] of Object.entries(loads.valves ?? {})) this.hydraulics.setValve(id, open);
+      const cooling = loads.cooling;
+      hydOpts = { ...hydOpts, consumerDemand: loads.demand, ...(cooling ? { cooling: (id: string) => cooling[id] } : {}) };
+    }
+    this.hydraulics?.step(dt, drive, this.surfaceRates, hydOpts);
     const elec = this.electrical?.step(dt, drive);
     const coupling = this.definition.systemsCoupling?.({ ...(elec ? { electrical: elec } : {}), ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}) });
     if (coupling?.startEmergencyUnit) this.hydraulics?.commandEmergencyStart();
@@ -418,7 +432,7 @@ export class FixedWingAircraft {
     if (this.gear) {
       const result = this.gear.step(dt, st, (x, y) => { const g = this.terrain.sample(x, y); return g.status === "valid" ? g.heightM : undefined; }, {
         handleDown: this.gearHandleDown, brakes: this.pilot.brakes ?? 0, steering: this.pilot.yaw,
-        hydraulicFraction: (id) => { if (!id || !this.hydraulics) return 1; const c = this.definition.hydraulics?.circuits.find((x) => x.id === id); return c ? Math.min(1, this.hydraulics.pressurePa(id) / c.nominalPressurePa) : 1; }
+        hydraulicFraction: (id) => (!id || !this.hydraulics ? 1 : this.hydraulics.supplyFraction(id))
       });
       for (const f of result.forces) forces.push(f);
       if (result.crash) this.gearCrash = result.crash;

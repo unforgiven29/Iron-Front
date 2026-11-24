@@ -116,9 +116,8 @@ export const F16_ENGINE_CONTROL = Object.freeze({
  * System A when both normal systems are lost. Component sizes are NOT public: estimated.
  */
 const PSI = 6894.757, GPM = 6.309e-5, LITRE = 1e-3, IN3 = 1.6387e-5;
-const HYD_MANUAL = "HAF T.O. GR1F16CJ-1 (Block 50/52+), via game/modules/planes/F-16/systems/hydraulics.md";
 export const F16_HYDRAULICS = Object.freeze({
-  nominalPressurePa: { value: 3000 * PSI, unit: "Pa", status: "secondary-reported", source: HYD_MANUAL, note: "3000 psi, systems A and B" } as Parameter,
+  nominalPressurePa: { value: 3000 * PSI, unit: "Pa", status: "primary-published", source: "T.O. GR1F-16CJ-1 (HAF Block 50/52+) Section I, Hydraulic System", note: "3000 psi systems A and B" } as Parameter,
   reliefPressurePa: { value: 3650 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "Typical relief setting above a 3000-psi system" } as Parameter,
   pumpRatedFlowM3s: { value: 35 * GPM, unit: "m³/s", status: "estimated", source: "project estimate", note: "Engine-driven pump flow at intermediate core speed; real F-16 pump curves not public" } as Parameter,
   pumpCompensatorBandPa: { value: 200 * PSI, unit: "Pa", status: "estimated", source: "project estimate" } as Parameter,
@@ -127,7 +126,7 @@ export const F16_HYDRAULICS = Object.freeze({
   leakageM3sPerPa: { value: (0.4 * GPM) / (3000 * PSI), unit: "m³/s/Pa", status: "estimated", source: "project estimate", note: "≈0.4 gpm internal leakage at 3000 psi" } as Parameter,
   flcsAccumulatorGasM3: { value: 1.0 * LITRE, unit: "m³", status: "estimated", source: "project estimate", note: "FLCS accumulator per system (manual: exists; size not public)" } as Parameter,
   flcsAccumulatorPrechargePa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate" } as Parameter,
-  epuAutoStartBelowPa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "Manual: EPU starts on dual hydraulic loss (and electrical triggers, not modelled); threshold not verified" } as Parameter,
+  epuAutoStartBelowPa: { value: 1000 * PSI, unit: "Pa", status: "primary-published", source: "T.O. GR1F-16CJ-1 (HAF Block 50/52+) Section I, Hydraulic System", note: "EPU activates when both hydraulic system pressures fall below 1000 psi (or both generators fail)" } as Parameter,
   epuStartDelayS: { value: 2, unit: "s", status: "estimated", source: "project estimate", note: "FLCS accumulators bridge this gap (manual)" } as Parameter,
   epuEnduranceS: { value: 600, unit: "s", status: "estimated", source: "project estimate", note: "Hydrazine-limited; real figure depends on bleed-air assist and load" } as Parameter,
   epuPumpFlowM3s: { value: 10 * GPM, unit: "m³/s", status: "estimated", source: "project estimate", note: "Emergency pump, much smaller than the engine-driven pumps" } as Parameter,
@@ -138,7 +137,7 @@ export const F16_HYDRAULICS = Object.freeze({
   hingeLoadFractionAtReference: { value: 0.6, unit: "fraction of full-pressure (two-system) force", status: "estimated", source: "project estimate", note: "Hinge load at full deflection and the reference dynamic pressure; no F-16 hinge-moment data. Gives ≈ full rate at low q̄ and reduced rate at high q̄, more so on one system (manual: 'reduced')" } as Parameter,
   hingeReferenceDynamicPressurePa: { value: 60_000, unit: "Pa", status: "estimated", source: "project estimate", note: "≈ M0.9 at sea level" } as Parameter,
   lefDisplacementM3PerDeg: { value: 0.5 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate", note: "Leading-edge flap drive, fed by A and B (manual)" } as Parameter,
-  cautionBelowPa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "HYD/OIL PRESS caution threshold not verified for Block 50" } as Parameter
+  cautionBelowPa: { value: 1000 * PSI, unit: "Pa", status: "primary-published", source: "T.O. GR1F-16CJ-1 (HAF Block 50/52+) Section I, Hydraulic System", note: "HYD/OIL PRESS warning below 1000 psi in A or B" } as Parameter
 });
 
 /**

@@ -17,7 +17,7 @@ import { F16FlightControls, ROLL_GAINS } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
-import { F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
+import { f16HydraulicLoads, F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
 import { F16_LANDING_GEAR } from "./F16LandingGear.js";
 import { f16Monitor } from "./F16Monitor.js";
 import { F16_SWITCHES, F16_TEST_CG, F16_TEST_HYDRAULIC_FAULTS } from "./F16Switches.js";
@@ -283,7 +283,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         }
       };
       const devices = f16Devices(model);
-      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), monitor: f16Monitor(), ...(devices ? { devices } : {}) };
+      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), monitor: f16Monitor(), hydraulicLoads: f16HydraulicLoads(), ...(devices ? { devices } : {}) };
     }
   };
 }

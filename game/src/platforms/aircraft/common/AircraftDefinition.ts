@@ -196,6 +196,15 @@ export interface AircraftSystems {
    * accessory indications such as oil pressure, ignition, IGVs). Runs every tick after the engines,
    * fuel, hydraulic and electrical systems; it observes them and never changes them.
    */
+  /**
+   * The aircraft's own hydraulic utility logic: activity of each hydraulic consumer (0..1),
+   * isolation-valve positions and the cooler (heat exchanger) each circuit sees this tick.
+   */
+  readonly hydraulicLoads?: (ctx: HydraulicLoadContext, dt: number) => {
+    readonly demand: Readonly<Record<string, number>>;
+    readonly valves?: Readonly<Record<string, boolean>>;
+    readonly cooling?: Readonly<Record<string, { readonly sinkK: number; readonly conductanceWPerK: number }>>;
+  };
   readonly monitor?: {
     step(ctx: MonitorContext, dt: number): MonitorOutput;
     reset(): void;
@@ -211,6 +220,18 @@ export interface MonitorContext {
   readonly fuelTanks?: readonly import("../../../systems/fuel/FuelTanks.js").TankState[];
   readonly switches: Readonly<Record<string, string>>;
   readonly pilot: PilotInputs;
+}
+
+export interface HydraulicLoadContext {
+  readonly sensors: FlightSensors;
+  readonly pilot: PilotInputs;
+  readonly switches: Readonly<Record<string, string>>;
+  readonly engines: readonly import("./FixedWingAircraft.js").EngineSnapshot[];
+  /** Gear extension 0..1 and handle, when the aircraft has gear. */
+  readonly gear?: { readonly extension: number; readonly handleDown: boolean; readonly weightOnWheels: boolean };
+  readonly groundSpeedMps: number;
+  readonly fuelComponents?: import("../../../systems/fuel/FuelTanks.js").FuelComponents;
+  readonly ambientTemperatureK: number;
 }
 
 export interface MonitorOutput {
