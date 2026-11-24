@@ -67,19 +67,18 @@ export const F16_ENGINE = Object.freeze({
   airflowKgS: { value: 270 * 0.45359237, unit: "kg/s", status: "secondary-reported", source: PUBLIC_F110, note: "≈270 lb/s design airflow" } as Parameter,
   bypassRatio: { value: 0.76, unit: "-", status: "secondary-reported", source: PUBLIC_F110 } as Parameter,
   overallPressureRatio: { value: 30.7, unit: "-", status: "secondary-reported", source: PUBLIC_F110 } as Parameter,
-  fanPressureRatio: { value: 3.0, unit: "-", status: "estimated", source: "project estimate", note: "Sensitivity checked: 3.0 vs 3.2 changes thrust/TSFC by <1 %" } as Parameter,
+  fanPressureRatio: { value: 3.5, unit: "-", status: "secondary-reported", source: "NASA TM-104326 table 4: PT2.5/P1 = 3.50 at intermediate power", note: "Only used by the generic map path; the F110 uses the deck tables" } as Parameter,
   componentEfficiencies: { value: Number.NaN, unit: "-", status: "estimated", source: "project estimate", note: "fan 0.86, compressor 0.86, turbine 0.89, burner 0.99, AB 0.90, nozzle Cv 0.98 — typical for the class" } as Parameter,
   rotorTimeConstantS: { value: 0.3, unit: "s", status: "estimated", source: "project estimate", note: "Spool inertia lag to a FADEC speed demand; the FADEC acceleration schedule dominates the throttle response" } as Parameter,
   afterburnerDetentThrottle: { value: 0.77, unit: "throttle fraction", status: "secondary-reported", source: SL, note: "Throttle position of the MIL/AB break in the source simulation" } as Parameter,
   inletSubsonicRecovery: { value: 0.98, unit: "-", status: "estimated", source: "project estimate", note: "Fixed pitot (normal-shock) inlet; supersonic recovery is exact normal-shock gas dynamics" } as Parameter,
-  maxCompressorExitTemperatureK: { value: 1020, unit: "K", status: "derived", source: "Calibrated: the one value that reproduces both published points — sea-level max ≈ M1.2 and 40,000 ft max sustained ≈ M1.89 (F-16 performance references)", note: "Real F110 T3 limit not public. Sensitivity (with C-D nozzle, installation and Reynolds losses): 980 K → SL M1.21 / 40k M1.81; 1000 K → M1.24 / M1.84; 1020 K → M1.27 / M1.87 (chosen)" } as Parameter,
   installationLossFraction: { value: 0.05, unit: "fraction of gross thrust", status: "estimated", source: "project estimate", note: "Typical fighter installation losses (bleed, power extraction, spillage); applied in calibration so the SLS rating is met installed" } as Parameter,
   reynoldsEfficiencyLoss: { value: 0.06, unit: "-", status: "estimated", source: "project estimate", note: "Component efficiency falls by up to ~6 % at very low Reynolds-number index (high altitude); typical magnitude for small turbofans" } as Parameter,
-  nozzleThrustCoefficient: { value: 0.98, unit: "-", status: "estimated", source: "project estimate", note: "Gross thrust coefficient Cfg of a fighter C-D nozzle (friction, divergence, leakage); typical 0.97–0.99" } as Parameter,
-  nozzleClosedThroatFractionOfMil: { value: 0.9, unit: "fraction of the MIL throat area", status: "estimated", source: "project estimate", note: "Closed (minimum) throat relative to the area the cycle needs at sea-level-static MIL. Real F110 areas not public. Sets how much a closed nozzle (SEC) costs" } as Parameter,
+  nozzleThrustCoefficient: { value: 0.978, unit: "-", status: "derived", source: "NASA TM-104326 table 4: deck Fg ÷ C-D nozzle physics at the deck P8/T8/W8 (0.96 unchoked part power, 0.978 at MIL; scheduled with NPR in F110Engine.ts)" } as Parameter,
+  nozzleClosedThroatFractionOfMil: { value: 1.0, unit: "fraction of the MIL throat area", status: "secondary-reported", source: "NASA TM-104326 tables 4–6: the F110 throat is at its smallest (≈444–452 in²) at intermediate power and opens at part power (≈460–520 in²) and idle (≈960 in²)", note: "Closed = the MIL position, so a closed nozzle (SEC) does not cost MIL thrust" } as Parameter,
   nozzleOpenThroatFractionOfMaxAb: { value: 1.3, unit: "fraction of the max-AB throat area", status: "estimated", source: "project estimate", note: "Fully open throat relative to the area the cycle needs at sea-level-static max afterburner" } as Parameter,
-  nozzleExitAreaRatioClosed: { value: 1.1, unit: "A9/A8", status: "estimated", source: "project estimate", note: "Linked C-D exit/throat ratio at the closed position (dry power)" } as Parameter,
-  nozzleExitAreaRatioOpen: { value: 1.3, unit: "A9/A8", status: "estimated", source: "project estimate", note: "Linked C-D exit/throat ratio fully open (afterburner)" } as Parameter,
+  nozzleExitAreaRatioClosed: { value: 1.07, unit: "A9/A8", status: "secondary-reported", source: "NASA TM-104326 (deck AE9/AE8 ≈1.07 at sea-level MIL); the schedule against NPR in F110Engine.ts is used instead" } as Parameter,
+  nozzleExitAreaRatioOpen: { value: 1.22, unit: "A9/A8", status: "estimated", source: "Held at the highest-NPR deck value (≈1.22); no afterburner data" } as Parameter,
   internalFuelKg: { value: 3175, unit: "kg", status: "primary-published", source: "USAF F-16 fact sheet", note: "Family-level figure; tank layout/feed not modelled" } as Parameter
 });
 
@@ -90,18 +89,18 @@ export const F16_ENGINE = Object.freeze({
  * F110 control laws are not public.
  */
 export const F16_ENGINE_CONTROL = Object.freeze({
-  idleSpeed: { value: 0.72, unit: "fraction of design speed", status: "estimated", source: "project estimate", note: "Gives ≈7 % of max thrust at sea-level idle" } as Parameter,
-  maxCorrectedSpeed: { value: 1.05, unit: "fraction", status: "estimated", source: "project estimate", note: "Corrected fan-speed limit" } as Parameter,
-  accelRatePerS: { value: 0.08, unit: "fraction/s", status: "estimated", source: "project estimate", note: "Idle → MIL in ≈3.5 s; fighter engines are typically specified idle→MIL in about 4–5 s" } as Parameter,
-  decelRatePerS: { value: 0.15, unit: "fraction/s", status: "estimated", source: "project estimate", note: "Limited by lean-blowout margin" } as Parameter,
-  turbineTemperatureMarginK: { value: 30, unit: "K", status: "estimated", source: "project estimate", note: "TIT limit = calibrated MIL turbine inlet temperature + this margin. Real F110 FTIT limits are not used: this model's TIT is a generic-map quantity, not measured FTIT" } as Parameter,
+  idleSpeed: { value: 3105 / 8241, unit: "fraction of reference N1 (8,241 rpm)", status: "secondary-reported", source: "NASA TM-104326 table 4: GE F110-GE-129 deck, ground idle (PLA 20.4°) N1 3,105 rpm" } as Parameter,
+  maxPhysicalSpeed: { value: 8560 / 8241, unit: "fraction of reference N1", status: "derived", source: "NASA TM-104326 table 5: at PLA 85° with a warm engine face, physical N1 levels off at ≈8,480–8,560 rpm" } as Parameter,
+  maxCorrectedSpeed: { value: 1.006, unit: "fraction", status: "derived", source: "NASA TM-104326 tables 4–5: at PLA 85° corrected N1 is ≈1.001–1.009 until the physical limit is reached" } as Parameter,
+  accelRatePerS: { value: 0.15, unit: "fan-speed fraction/s", status: "estimated", source: "project estimate", note: "Idle (0.38) → MIL in ≈4 s; fighter engines are typically specified idle→MIL in about 4–5 s" } as Parameter,
+  decelRatePerS: { value: 0.25, unit: "fan-speed fraction/s", status: "estimated", source: "project estimate", note: "Limited by lean-blowout margin" } as Parameter,
   minBurnerPressurePa: { value: 150_000, unit: "Pa", status: "estimated", source: "project estimate", note: "Raises idle at very high altitude (≈19 km and above at low Mach with this generic map) to keep combustion stable" } as Parameter,
   afterburnerMinSpeedFraction: { value: 0.97, unit: "fraction of scheduled MIL speed", status: "estimated", source: "project estimate" } as Parameter,
   afterburnerMinBurnerPressurePa: { value: 100_000, unit: "Pa", status: "estimated", source: "project estimate", note: "Light-off envelope; blocks AB light only at very high altitude/low speed" } as Parameter,
   afterburnerLightDelayS: { value: 0.4, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
   afterburnerRatePerS: { value: 2, unit: "1/s", status: "estimated", source: "project estimate", note: "Zone sequencing simplified to a rate" } as Parameter,
   secNozzleClosed: { value: 1, unit: "boolean", status: "secondary-reported", source: "Public F-16 checklists (ENG CONT – SEC: nozzle closes, NOZ POS < 5 %)", note: "SEC thrust loss then follows from the closed throat via the FADEC nozzle-area limiter; the real SEC thrust is not public" } as Parameter,
-  secAccelRatePerS: { value: 0.05, unit: "fraction/s", status: "estimated", source: "project estimate", note: "Hydromechanical backup control: slower, conservative schedule" } as Parameter,
+  secAccelRatePerS: { value: 0.09, unit: "fan-speed fraction/s", status: "estimated", source: "project estimate", note: "Hydromechanical backup control: slower, conservative schedule" } as Parameter,
   secAfterburnerInhibited: { value: 1, unit: "boolean", status: "secondary-reported", source: "Widely reported F-16 SEC-mode behaviour (afterburner inhibited); Block 50 flight manual not verified" } as Parameter
 });
 

@@ -16,20 +16,28 @@ const steady = (altM: number, mach: number, ab: number, spool = 1) => {
 /** Thrust-specific fuel consumption, lb/(lbf·h). */
 const tsfc = (r: ReturnType<typeof solveCycle>) => (r.fuelFlowKgS / 0.45359237 * 3600) / (r.netThrustN / LBF);
 
-describe("F110 gas-path cycle (calibrated to published SLS ratings)", () => {
-  it("hits the published sea-level-static dry and afterburning thrust", () => {
-    expect(steady(0, 0, 0).netThrustN).toBeCloseTo(F16_ENGINE.militaryThrustN.value, 0);
-    expect(steady(0, 0, 1).netThrustN).toBeCloseTo(F16_ENGINE.maxAfterburnerThrustN.value, 0);
+/** Test-stand (uninstalled) F110: bellmouth inlet, no installation losses. */
+const BENCH = { ...F110_DESIGN, installationLossFraction: 0, inlet: { kind: "bellmouth", recovery: () => 1 } };
+const bench = (ab: number, n1c = F110_CONTROL.maxCorrectedSpeed) => solveCycle(BENCH, at(0, 0), n1c, ab);
+
+describe("F110 engine (GE deck gas generator + calibrated afterburner)", () => {
+  it("matches the published uninstalled ratings: afterburner calibrated to 29,000 lbf, dry ≈17,000 lbf predicted by the deck", () => {
+    expect(bench(1, 1).netThrustN).toBeCloseTo(F16_ENGINE.maxAfterburnerThrustN.value, 0);
+    expect(bench(0).netThrustN / LBF).toBeGreaterThan(16_000);
+    expect(bench(0).netThrustN / LBF).toBeLessThan(18_200);
   });
 
-  it("produces realistic fuel consumption and temperatures it was NOT tuned to", () => {
-    expect(tsfc(steady(0, 0, 0))).toBeGreaterThan(0.6);
-    expect(tsfc(steady(0, 0, 0))).toBeLessThan(0.85);
-    expect(tsfc(steady(0, 0, 1))).toBeGreaterThan(1.6);
-    expect(tsfc(steady(0, 0, 1))).toBeLessThan(2.3);
-    expect(F110_DESIGN.turbineInletTemperatureK).toBeGreaterThan(1300);
-    expect(F110_DESIGN.turbineInletTemperatureK).toBeLessThan(1900);
+  it("produces realistic fuel consumption, spool speeds and exhaust temperature", () => {
+    expect(tsfc(bench(0))).toBeGreaterThan(0.6);
+    expect(tsfc(bench(0))).toBeLessThan(0.85);
+    expect(tsfc(bench(1, 1))).toBeGreaterThan(1.6);
+    expect(tsfc(bench(1, 1))).toBeLessThan(2.3);
     expect(F110_DESIGN.afterburnerMaxTemperatureK).toBeLessThan(2400);
+    const mil = bench(0, 1);
+    expect(mil.n1Rpm).toBeCloseTo(8241, -1);
+    expect(mil.n2Rpm).toBeCloseTo(14709, -2);
+    expect(mil.exhaustGasTemperatureK).toBeGreaterThan(1000);
+    expect(mil.outsideDeck).toBe(false);
   });
 
   it("lapses with altitude, gains ram airflow with Mach, and keeps afterburning thrust supersonic", () => {
@@ -43,18 +51,18 @@ describe("F110 gas-path cycle (calibrated to published SLS ratings)", () => {
     expect(inletRecovery(2)).toBeCloseTo(0.925, 3);
   });
 
-  it("idles at a few percent of max thrust", () => {
-    const idle = steady(0, 0, 0, F110_CONTROL.idleSpeed).netThrustN;
-    expect(idle).toBeGreaterThan(0.02 * F16_ENGINE.maxAfterburnerThrustN.value);
-    expect(idle).toBeLessThan(0.12 * F16_ENGINE.maxAfterburnerThrustN.value);
+  it("idles at a few hundred lbf, like the deck's ground idle", () => {
+    const idle = bench(0, F110_CONTROL.idleSpeed).netThrustN / LBF;
+    expect(idle).toBeGreaterThan(200);
+    expect(idle).toBeLessThan(1000);
   });
 
   it("the plant follows a demand with rotor lag and flames out without fuel", () => {
-    const e = new MixedFlowTurbofan(F110_DESIGN, 0.72);
+    const e = new MixedFlowTurbofan(BENCH, F110_CONTROL.idleSpeed);
     const sl = at(0, 0);
     let s = e.step({ speed: 1, afterburner: 0 }, sl, true, 0.1);
-    expect(s.spoolSpeed).toBeGreaterThan(0.72);
-    expect(s.spoolSpeed).toBeLessThan(0.9);
+    expect(s.spoolSpeed).toBeGreaterThan(F110_CONTROL.idleSpeed);
+    expect(s.spoolSpeed).toBeLessThan(0.75);
     for (let i = 0; i < 30; i++) s = e.step({ speed: 1, afterburner: 1 }, sl, true, 0.1);
     expect(s.netThrustN).toBeGreaterThan(0.99 * F16_ENGINE.maxAfterburnerThrustN.value);
     s = e.step({ speed: 1, afterburner: 1 }, sl, false, 0.1);
@@ -72,51 +80,59 @@ describe("FADEC (shared engine control) with the F110 schedule", () => {
     return { out, s };
   };
   const make = (throttle: number, amb: ReturnType<typeof at>) => {
-    const f = new Fadec(F110_DESIGN, F110_CONTROL, throttle, amb);
-    return { f, e: new MixedFlowTurbofan(F110_DESIGN, f.initialSpeed) };
+    const f = new Fadec(BENCH, F110_CONTROL, throttle, amb);
+    return { f, e: new MixedFlowTurbofan(BENCH, f.initialSpeed) };
   };
 
-  it("slams idle → MIL through the acceleration schedule, then lights the afterburner only after the core is up", () => {
+  it("uses the deck's throttle map: PLA 48.9° gives corrected N1 ≈ 0.835 at sea level", () => {
+    const throttle = ((48.9 - 20) / 65) * F110_CONTROL.afterburnerDetentThrottle;
+    expect(scheduleSteadyState(BENCH, F110_CONTROL, "primary", throttle, at(0, 0)).speed).toBeCloseTo(0.835, 2);
+  });
+
+  it("slams idle → MIL through the acceleration schedule (≈4 s), then lights the afterburner only after the core is up", () => {
     const sl = at(0, 0);
     const { f, e } = make(0, sl);
     let r = run(f, e, 1, sl, 1);
     expect(r.out.activeLimits).toContain("acceleration");
     expect(r.s.afterburnerLit).toBe(false);
-    r = run(f, e, 1, sl, 2);
-    expect(r.s.spoolSpeed).toBeLessThan(0.99); // ≈3.5 s idle → MIL, not instant
-    r = run(f, e, 1, sl, 3);
+    r = run(f, e, 1, sl, 1.5);
+    expect(r.s.spoolSpeed).toBeLessThan(0.95);
+    r = run(f, e, 1, sl, 4);
     expect(r.s.afterburnerLit).toBe(true);
     expect(r.s.netThrustN).toBeGreaterThan(0.98 * F16_ENGINE.maxAfterburnerThrustN.value);
   });
 
-  it("holds the compressor-exit temperature limit at high Mach (model-based limiter)", () => {
-    const hot = at(0, 1.2);
-    const op = scheduleSteadyState(F110_DESIGN, F110_CONTROL, "primary", 1, hot);
-    expect(op.limits).toContain("compressor-exit-temperature");
-    const theta = (hot.temperatureK * (1 + 0.2 * 1.44)) / 288.15;
-    expect(solveCycle(F110_DESIGN, hot, op.speed / Math.sqrt(theta), op.afterburner).compressorExitTemperatureK).toBeLessThanOrEqual(F110_CONTROL.maxCompressorExitTemperatureK! + 0.5);
+  it("MIL follows the deck's schedule: physical N1 cap with a hot engine face, corrected N1 held with a cold one", () => {
+    const hot = scheduleSteadyState(BENCH, F110_CONTROL, "primary", F110_CONTROL.afterburnerDetentThrottle, at(0, 1.2));
+    expect(hot.limits).toContain("max-speed");
+    expect(hot.speed).toBeCloseTo(F110_CONTROL.maxPhysicalSpeed, 6);
+    const coldAmb = at(12192, 0.6);
+    const cold = scheduleSteadyState(BENCH, F110_CONTROL, "primary", F110_CONTROL.afterburnerDetentThrottle, coldAmb);
+    const theta = (coldAmb.temperatureK * (1 + 0.2 * 0.36)) / 288.15;
+    expect(cold.limits).not.toContain("max-speed");
+    expect(cold.speed / Math.sqrt(theta)).toBeCloseTo(1.001, 2);
   });
 
-  it("raises idle at high altitude to keep burner pressure (minimum-pressure limiter)", () => {
-    const high = at(20000, 0.4); // the generic map keeps burner pressure high, so only very high altitude binds
-    const op = scheduleSteadyState(F110_DESIGN, F110_CONTROL, "primary", 0, high);
+  it("raises idle at very high altitude to keep burner pressure (minimum-pressure limiter)", () => {
+    const op = scheduleSteadyState(BENCH, F110_CONTROL, "primary", 0, at(20000, 0.4));
     expect(op.limits).toContain("min-burner-pressure");
-    expect(op.speed).toBeGreaterThan(F110_CONTROL.idleSpeed);
   });
 
-  it("SEC (backup) closes the nozzle, which costs thrust through back-pressure and the turbine limit, and inhibits the afterburner", () => {
+  it("SEC (backup) closes the nozzle (≈ the MIL position, so MIL thrust is kept), slows acceleration and inhibits the afterburner", () => {
     const sl = at(0, 0);
-    const { f, e } = make(0.5, sl);
-    f.setMode("backup");
-    const r = run(f, e, 1, sl, 10);
+    const pri = make(1, sl), sec = make(1, sl);
+    sec.f.setMode("backup");
+    const p = run(pri.f, pri.e, F110_CONTROL.afterburnerDetentThrottle, sl, 3);
+    const r = run(sec.f, sec.e, 1, sl, 3);
     expect(r.out.mode).toBe("backup");
     expect(r.s.afterburnerLit).toBe(false);
     expect(r.out.activeLimits).toContain("afterburner-inhibited");
     expect(r.out.throat).toEqual({ kind: "position", position: 0 });
-    expect(r.out.activeLimits).toContain("nozzle-area");
-    expect(r.out.activeLimits).toContain("turbine-inlet-temperature");
-    expect(r.s.netThrustN).toBeLessThan(F16_ENGINE.militaryThrustN.value);
-    expect(r.s.netThrustN).toBeGreaterThan(0.75 * F16_ENGINE.militaryThrustN.value);
+    expect(Math.abs(r.s.netThrustN - p.s.netThrustN) / p.s.netThrustN).toBeLessThan(0.03);
+    const slow = make(0, sl);
+    slow.f.setMode("backup");
+    const fast = make(0, sl);
+    expect(run(slow.f, slow.e, 0.77, sl, 2).s.spoolSpeed).toBeLessThan(run(fast.f, fast.e, 0.77, sl, 2).s.spoolSpeed);
   });
 });
 
@@ -149,10 +165,13 @@ describe("Nozzle component (variable convergent–divergent)", () => {
     expect(closed.throatAreaRatio).toBeGreaterThan(1);
   });
 
-  it("a held-closed throat makes the cycle run its turbine hotter (back-pressure matching)", () => {
+  it("generic-map engines: a held-closed throat makes the cycle run its turbine hotter (back-pressure matching)", () => {
     const sl = at(0, 0);
-    const open = solveCycle(F110_DESIGN, sl, 0.95, 0);
-    const closed = solveCycle(F110_DESIGN, sl, 0.95, 0, { throat: { kind: "position", position: 0 } });
+    const { gasGenerator: _deck, ...withoutDeck } = F110_DESIGN;
+    void _deck;
+    const generic = { ...withoutDeck, turbineInletTemperatureK: 1600, afterburnerMaxTemperatureK: 2000, nozzle: variableConvergentDivergentNozzle({ minThroatAreaM2: 0.22, maxThroatAreaM2: 0.6, exitAreaRatioClosed: 1.1, exitAreaRatioOpen: 1.3, thrustCoefficient: 0.98 }) };
+    const open = solveCycle(generic, sl, 0.95, 0);
+    const closed = solveCycle(generic, sl, 0.95, 0, { throat: { kind: "position", position: 0 } });
     expect(closed.backPressureLimited).toBe(true);
     expect(closed.turbineInletTemperatureK).toBeGreaterThan(open.turbineInletTemperatureK);
     expect(closed.nozzle.throatAreaRatio).toBeLessThanOrEqual(1 + 1e-6);

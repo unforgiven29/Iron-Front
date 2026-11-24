@@ -24,6 +24,7 @@
  * instead keeps the throat large enough, and slows the engine when it cannot), inlet distortion, relight.
  */
 
+import { evaluateGasGenerator, type GasGeneratorDeck } from "./components/GasGeneratorDeck.js";
 import type { InletModel } from "./components/Inlet.js";
 import type { NozzleModel, NozzleResult, ThroatCommand } from "./components/Nozzle.js";
 
@@ -48,6 +49,13 @@ export interface TurbofanDesign {
   readonly rotorTimeConstantS: number;
   /** Inlet component (total-pressure recovery). */
   readonly inlet: InletModel;
+  /**
+   * Optional data-driven gas generator. When present, the dry engine (fan → mixer) comes from
+   * these corrected tables instead of the generic maps; the inlet, afterburner and nozzle are
+   * still the physical components. Generic map parameters are then unused except the
+   * afterburner temperature and efficiency.
+   */
+  readonly gasGenerator?: GasGeneratorDeck;
   /** Exhaust nozzle component (throat, expansion, gross thrust). */
   readonly nozzle: NozzleModel;
   /** Fraction of net thrust lost to installation (bleed, power extraction, spillage, nozzle). Default 0. */
@@ -81,6 +89,11 @@ export interface CycleResult {
   readonly nozzle: NozzleResult;
   /** True when the nozzle throat was too small and the turbine ran hotter to push the flow through. */
   readonly backPressureLimited?: boolean;
+  /** Data-driven engines: spool speeds, measured-type exhaust gas temperature and deck-range flag. */
+  readonly n1Rpm?: number;
+  readonly n2Rpm?: number;
+  readonly exhaustGasTemperatureK?: number;
+  readonly outsideDeck?: boolean;
 }
 
 export interface CycleOptions {
@@ -113,6 +126,7 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   const Tt2 = Tt0, pt2 = pt0 * d.inlet.recovery(M);
   const theta = Tt2 / T_STD, delta = pt2 / P_STD;
   const Nc = Math.max(0.2, Math.min(1.05, correctedSpeed));
+  if (d.gasGenerator) return deckCycle(d, d.gasGenerator, amb, V0, Tt2, pt2, Nc, abFraction, tab, opts);
   // Reynolds-number index (approximation δ/θ^1.25) and the resulting efficiency loss.
   const rni = delta / theta ** 1.25;
   const reLoss = 1 - (d.reynoldsEfficiencyLoss ?? 0) * Math.max(0, 1 - rni);
@@ -179,15 +193,44 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   return { ...hot(hi), backPressureLimited: true };
 }
 
-/** Solve the design TIT and maximum AB temperature so sea-level-static thrust matches the given ratings. */
-export function calibrate(d: TurbofanDesign, militaryThrustN: number, maxAfterburnerThrustN: number): { turbineInletTemperatureK: number; afterburnerMaxTemperatureK: number } {
+/** Dry gas generator from corrected deck tables; afterburner, nozzle and ram drag from physics. */
+function deckCycle(d: TurbofanDesign, deck: GasGeneratorDeck, amb: Ambient, V0: number, Tt2: number, pt2: number, n1c: number, abFraction: number, tab: number, opts: CycleOptions): CycleResult {
+  const gg = evaluateGasGenerator(deck, Tt2, pt2, n1c);
+  const ab = Math.max(0, Math.min(1, abFraction));
+  const cp8 = 1105, g8 = 1.35; // mixed dry exhaust (TM-104326 GAM7 ≈ 1.35 at intermediate)
+  const Tt7 = ab > 0 ? gg.nozzleTotalTemperatureK + (Math.max(tab, gg.nozzleTotalTemperatureK) - gg.nozzleTotalTemperatureK) * ab : gg.nozzleTotalTemperatureK;
+  const fAb = ab > 0 ? (gg.nozzleFlowKgS * cp8 * (Tt7 - gg.nozzleTotalTemperatureK)) / (d.afterburnerEfficiency * LHV) : 0;
+  const pt7 = gg.nozzleTotalPressurePa * (ab > 0 ? 0.95 : 1); // afterburner heat-addition (Rayleigh) loss when lit
+  const nozzle = d.nozzle.evaluate({ massFlowKgS: gg.nozzleFlowKgS + fAb, totalPressurePa: pt7, totalTemperatureK: Tt7, gamma: ab > 0 ? 1.3 : g8, cpJkgK: cp8, ambientPressurePa: amb.pressurePa }, opts.throat ?? { kind: "auto" });
+  const airflow = gg.nozzleFlowKgS - gg.fuelFlowKgS;
+  const gross = nozzle.grossThrustN * (1 - (d.installationLossFraction ?? 0)), ram = airflow * V0;
+  // Compressor-exit temperature is not in the deck: ESTIMATED from the deck pressure ratio with a
+  // polytropic efficiency of 0.88 (typical for the class).
+  const pr3 = gg.compressorDischargePressurePa / pt2;
+  const Tt3 = Tt2 * pr3 ** ((G_COLD - 1) / G_COLD / 0.88);
+  return {
+    netThrustN: gross - ram, grossThrustN: gross, ramDragN: ram, airflowKgS: airflow,
+    fuelFlowKgS: gg.fuelFlowKgS + fAb, turbineInletTemperatureK: Number.NaN, nozzleTemperatureK: Tt7,
+    compressorExitPressurePa: gg.compressorDischargePressurePa, correctedSpeed: n1c, compressorExitTemperatureK: Tt3, nozzle,
+    n1Rpm: gg.n1Rpm, n2Rpm: gg.n2Rpm, exhaustGasTemperatureK: gg.exhaustGasTemperatureK, outsideDeck: gg.outsideDeck
+  };
+}
+
+/**
+ * Solve the design TIT and maximum AB temperature so UNINSTALLED sea-level-static thrust (bellmouth
+ * inlet, no installation loss) matches the given ratings — published engine ratings are test-stand
+ * values. Installation losses then apply only in the aircraft.
+ */
+export function calibrate(design: TurbofanDesign, militaryThrustN: number, maxAfterburnerThrustN: number): { turbineInletTemperatureK: number; afterburnerMaxTemperatureK: number } {
   const sls: Ambient = { temperatureK: T_STD, pressurePa: P_STD, mach: 0 };
+  const d: TurbofanDesign = { ...design, installationLossFraction: 0, inlet: { kind: "bellmouth", recovery: () => 1 } };
   const bisect = (fn: (x: number) => number, lo: number, hi: number) => {
     if (fn(lo) * fn(hi) > 0) throw new RangeError("Engine calibration target is not reachable with this cycle.");
     for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (fn(lo) * fn(mid) <= 0) hi = mid; else lo = mid; }
     return (lo + hi) / 2;
   };
-  const tit = bisect((t) => solveCycle(d, sls, 1, 0, { turbineInletTemperatureK: t }).netThrustN - militaryThrustN, 1000, 2400);
+  // A data-driven gas generator already fixes dry thrust: only the afterburner is calibrated.
+  const tit = d.gasGenerator ? d.turbineInletTemperatureK : bisect((t) => solveCycle(d, sls, 1, 0, { turbineInletTemperatureK: t }).netThrustN - militaryThrustN, 1000, 2400);
   const tab = bisect((t) => solveCycle(d, sls, 1, 1, { turbineInletTemperatureK: tit, afterburnerMaxTemperatureK: t }).netThrustN - maxAfterburnerThrustN, 1200, 2600);
   return { turbineInletTemperatureK: tit, afterburnerMaxTemperatureK: tab };
 }
