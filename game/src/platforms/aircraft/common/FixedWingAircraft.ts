@@ -89,6 +89,7 @@ export class FixedWingAircraft {
   private pilot: PilotInputs = { pitch: 0, roll: 0, yaw: 0 };
   private throttle = 0.5;
   private nz = 1;
+  private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
   private annunciations: readonly string[] = [];
@@ -143,6 +144,7 @@ export class FixedWingAircraft {
     }
     this.pilot = { pitch: 0, roll: 0, yaw: 0 };
     this.nz = 1;
+    this.ny = 0;
     this.devicePositions = {};
     this.fcsMode = this.systems.fcs.mode();
     this.annunciations = [];
@@ -197,7 +199,7 @@ export class FixedWingAircraft {
     const beta = V > 1 ? Math.asin(clamp(v / V, -1, 1)) : 0;
     const att = attitude(st.bodyToWorld);
     const sensors: FlightSensors = {
-      nzG: this.nz, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
+      nzG: this.nz, nyG: this.ny, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll
     };
@@ -236,6 +238,7 @@ export class FixedWingAircraft {
     const q = st.bodyToWorld;
     const fBody = rotateVector([-q[0], -q[1], -q[2], q[3]], loads.forceEnuN);
     this.nz = -fBody[2] / (this.body.massProperties.massKg * 9.80665);
+    this.ny = fBody[1] / (this.body.massProperties.massKg * 9.80665);
     this.air = { alpha, beta, tas: V, eas: Math.sqrt((2 * flow.dynamicPressurePa) / SEA_LEVEL_DENSITY), mach: flow.machNumber, outside: aero.outsideEnvelope, reasons: aero.envelopeReasons };
   }
 

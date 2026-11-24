@@ -40,6 +40,8 @@ export interface ControlSurfaceSpec {
 /** What onboard sensors give the flight-control system (ideal measurements for now). */
 export interface FlightSensors {
   readonly nzG: number;
+  /** Lateral load factor (g), positive to the right. */
+  readonly nyG: number;
   readonly alphaRad: number;
   readonly betaRad: number;
   readonly ratesRadps: readonly [number, number, number];
