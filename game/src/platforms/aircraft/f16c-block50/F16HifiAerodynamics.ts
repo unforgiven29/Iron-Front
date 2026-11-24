@@ -19,6 +19,11 @@ const RAD = 180 / Math.PI;
 export interface HifiAeroInput extends AeroInput {
   /** Achieved leading-edge flap deflection, deg (0 = retracted, 25 = full down). */
   readonly lefDeg: number;
+  /**
+   * Multipliers on control-surface increments (1 = low-speed tables). Used for Mach effects on
+   * control power, which the low-speed data does not contain.
+   */
+  readonly controlEffectiveness?: { readonly pitch: number; readonly roll: number; readonly yaw: number };
 }
 
 export function f16HifiAerodynamics(input: HifiAeroInput): AeroOutput {
@@ -35,12 +40,17 @@ export function f16HifiAerodynamics(input: HifiAeroInput): AeroOutput {
   const L = (t: (typeof HIFI)[keyof typeof HIFI], ...x: number[]) => { const v = lookupND(t, x); clamped ||= v.clamped; return v.value; };
 
   // Base coefficients and their values at zero stabilator (for increments).
-  const Cx = L(HIFI.Cx, a, beta, el), Cz = L(HIFI.Cz, a, beta, el), Cm = L(HIFI.Cm, a, beta, el);
+  const eff = input.controlEffectiveness ?? { pitch: 1, roll: 1, yaw: 1 };
+  // Stabilator: the tables are nonlinear in deflection, so its increment over zero deflection is scaled.
+  const Cx0 = L(HIFI.Cx, a, beta, 0), Cz0 = L(HIFI.Cz, a, beta, 0), Cm0 = L(HIFI.Cm, a, beta, 0);
+  const Cx = Cx0 + (L(HIFI.Cx, a, beta, el) - Cx0) * eff.pitch;
+  const Cz = Cz0 + (L(HIFI.Cz, a, beta, el) - Cz0) * eff.pitch;
+  const Cm = Cm0 + (L(HIFI.Cm, a, beta, el) - Cm0) * eff.pitch;
   const Cy = L(HIFI.Cy, a, beta), Cn = L(HIFI.Cn, a, beta, el), Cl = L(HIFI.Cl, a, beta, el);
   const Cn0 = L(HIFI.Cn, a, beta, 0), Cl0 = L(HIFI.Cl, a, beta, 0);
   const CxLef = L(HIFI.Cx_lef, a, beta), CzLef = L(HIFI.Cz_lef, a, beta), CmLef = L(HIFI.Cm_lef, a, beta);
   const CyLef = L(HIFI.Cy_lef, a, beta), CnLef = L(HIFI.Cn_lef, a, beta), ClLef = L(HIFI.Cl_lef, a, beta);
-  const dCxLef = CxLef - L(HIFI.Cx, a, beta, 0), dCzLef = CzLef - L(HIFI.Cz, a, beta, 0), dCmLef = CmLef - L(HIFI.Cm, a, beta, 0);
+  const dCxLef = CxLef - Cx0, dCzLef = CzLef - Cz0, dCmLef = CmLef - Cm0;
   const dCyLef = CyLef - Cy, dCnLef = CnLef - Cn0, dClLef = ClLef - Cl0;
 
   // Damping and their LEF increments.
@@ -52,11 +62,13 @@ export function f16HifiAerodynamics(input: HifiAeroInput): AeroOutput {
   const clr = L(HIFI.CLr, a) + L(HIFI.delta_CLr_lef, a) * dlef, clp = L(HIFI.CLp, a) + L(HIFI.delta_CLp_lef, a) * dlef;
 
   // Control increments.
-  const dCyR = L(HIFI.Cy_r30, a, beta) - Cy, dCnR = L(HIFI.Cn_r30, a, beta) - Cn0, dClR = L(HIFI.Cl_r30, a, beta) - Cl0;
-  const dCyA = L(HIFI.Cy_a20, a, beta) - Cy, dCnA = L(HIFI.Cn_a20, a, beta) - Cn0, dClA = L(HIFI.Cl_a20, a, beta) - Cl0;
-  const dCyALef = L(HIFI.Cy_a20_lef, a, beta) - CyLef - dCyA;
-  const dCnALef = L(HIFI.Cn_a20_lef, a, beta) - CnLef - dCnA;
-  const dClALef = L(HIFI.Cl_a20_lef, a, beta) - ClLef - dClA;
+  // (The "aileron" tables are TP-1538's combined roll control: flaperons with differential tail at 4:1.)
+  const dCyR = (L(HIFI.Cy_r30, a, beta) - Cy) * eff.yaw, dCnR = (L(HIFI.Cn_r30, a, beta) - Cn0) * eff.yaw, dClR = (L(HIFI.Cl_r30, a, beta) - Cl0) * eff.yaw;
+  const dCyA0 = L(HIFI.Cy_a20, a, beta) - Cy, dCnA0 = L(HIFI.Cn_a20, a, beta) - Cn0, dClA0 = L(HIFI.Cl_a20, a, beta) - Cl0;
+  const dCyA = dCyA0 * eff.roll, dCnA = dCnA0 * eff.roll, dClA = dClA0 * eff.roll;
+  const dCyALef = (L(HIFI.Cy_a20_lef, a, beta) - CyLef - dCyA0) * eff.roll;
+  const dCnALef = (L(HIFI.Cn_a20_lef, a, beta) - CnLef - dCnA0) * eff.roll;
+  const dClALef = (L(HIFI.Cl_a20_lef, a, beta) - ClLef - dClA0) * eff.roll;
 
   const dCnBeta = L(HIFI.delta_CNbeta, a), dClBeta = L(HIFI.delta_CLbeta, a), dCm = L(HIFI.delta_Cm, a), etaEl = L(HIFI.eta_el, el);
 

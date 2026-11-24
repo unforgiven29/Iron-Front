@@ -93,7 +93,7 @@ export const F16_FLCS_LIMITS = Object.freeze({
   maxPositiveG: { value: 9, unit: "g", status: "primary-published", source: "USAF F-16 fact sheet ('can withstand up to 9 G's')" } as Parameter,
   maxNegativeG: { value: -3, unit: "g", status: "estimated", source: "project estimate", note: "Commonly cited family limit; Block 50 manual not verified" } as Parameter,
   alphaLimitDeg: { value: 25, unit: "deg", status: "estimated", source: "project estimate", note: "F-16 FLCS AoA limiter is documented in the flight manual family; exact Block 50 value not verified" } as Parameter,
-  maxRollRateDegS: { value: 308, unit: "deg/s", status: "estimated", source: "Commonly cited F-16 FLCS roll-rate command limit; primary source (Droste & Walker, AIAA case study) not accessible" } as Parameter
+  maxRollRateDegS: { value: 308, unit: "deg/s", status: "secondary-reported", source: "NASA TP-1538 (Nguyen et al., 1979) p. 34 and fig. 64: roll-rate command system, maximum 308°/s", note: "Simulator control system of an F-16-class configuration, not the Block 50 OFP" } as Parameter
 });
 
 /** Every parameter, for listing and audit. */

@@ -15,7 +15,11 @@
  * interpolation between the low-speed tables (M ≈ 0.2) and the M 1.6 data, with drag rise
  * starting at M 0.85 and reaching the supersonic level by M 1.2. Subsonic lift-curve-slope growth
  * uses the DATCOM/Helmbold relation for AR 3.0, Λ(c/2) ≈ 32° (planform values: estimated).
- * Control-surface effectiveness changes with Mach are not modelled (no data).
+ * Control-surface effectiveness with Mach (ESTIMATED, no public F-16 data): each control's
+ * increment is scaled by the same lift-curve-slope ratio as the wing (liftScale). The all-moving
+ * stabilator and the flaperons are lifting surfaces whose effectiveness follows their own
+ * lift-curve slope: rising subsonic (Prandtl–Glauert/Helmbold), and falling supersonic in
+ * proportion to the measured TP-3355 trend (≈ 1/√(M²−1)).
  */
 import { f16HifiAerodynamics } from "./F16HifiAerodynamics.js";
 
@@ -101,6 +105,12 @@ export function compressibilityFactors(mach: number): CompressibilityFactors {
   return { liftScale, deltaCdMin: superCd * rise, deltaK: superK * rise, deltaDCmdCL: superCm * acShift, basis: "estimated" };
 }
 
+/** Mach multipliers on control-surface increments (ESTIMATED; see file header). */
+export function controlEffectiveness(mach: number): { readonly pitch: number; readonly roll: number; readonly yaw: number } {
+  const k = compressibilityFactors(mach).liftScale;
+  return { pitch: k, roll: k, yaw: k };
+}
+
 /** C1-continuous 0→1 ramp. */
 function smooth(x: number): number {
   const t = Math.max(0, Math.min(1, x));
@@ -111,7 +121,7 @@ function smooth(x: number): number {
  * Apply compressibility to low-speed body-axis coefficients at angle of attack α.
  * Lift is scaled only for the attached-flow part (blended out between α 12° and 20°, where the
  * low-speed separated-flow data is kept); drag and pitching-moment increments follow the
- * stability-axis lift coefficient.
+ * stability-axis lift coefficient at every alpha.
  */
 export function applyCompressibility(c: { cx: number; cz: number; cm: number }, alphaRad: number, mach: number): { cx: number; cz: number; cm: number } {
   const f = compressibilityFactors(mach);
@@ -123,6 +133,8 @@ export function applyCompressibility(c: { cx: number; cz: number; cm: number }, 
   const ref = LOW_SPEED_REFERENCE;
   cl = ref.cl0 + (cl - ref.cl0) * (1 + (f.liftScale - 1) * attached);
   cd += f.deltaCdMin + f.deltaK * (cl - ref.cl0) ** 2;
-  const cm = c.cm + f.deltaDCmdCL * (cl - ref.cl0) * attached;
+  // The aerodynamic-centre shift is applied at every alpha (not faded with attached flow): fading
+  // it would remove supersonic stability above ~15° α and create an artificial pitch-up.
+  const cm = c.cm + f.deltaDCmdCL * (cl - ref.cl0);
   return { cx: -cd * ca + cl * sa, cz: -cl * ca - cd * sa, cm };
 }

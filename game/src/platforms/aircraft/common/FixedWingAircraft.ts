@@ -186,7 +186,7 @@ export class FixedWingAircraft {
     const att = attitude(st.bodyToWorld);
     const sensors: FlightSensors = {
       nzG: this.nz, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
-      dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber,
+      dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll
     };
 

@@ -6,7 +6,7 @@ import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
-import { applyCompressibility, compressibilityFactors } from "./F16Compressibility.js";
+import { applyCompressibility, compressibilityFactors, controlEffectiveness } from "./F16Compressibility.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { f16Aerodynamics, F110_DESIGN, f16InertiaTensor } from "./F16FlightModel.js";
@@ -41,7 +41,7 @@ function f16Aero(model: F16AeroModelId): AeroModel {
     compute: (input) => {
       const surfaces = { elevatorDeg: input.surfaces["elevator"] ?? 0, aileronDeg: input.surfaces["aileron"] ?? 0, rudderDeg: input.surfaces["rudder"] ?? 0 };
       const base = { ...input, surfaces };
-      const out = model === "hifi" ? f16HifiAerodynamics({ ...base, lefDeg: input.surfaces["lef"] ?? 0 }) : f16Aerodynamics(base);
+      const out = model === "hifi" ? f16HifiAerodynamics({ ...base, lefDeg: input.surfaces["lef"] ?? 0, controlEffectiveness: controlEffectiveness(input.mach) }) : f16Aerodynamics(base);
       // Compressibility (NASA TP-3355 supersonic data; transonic estimated) on the low-speed tables.
       const c = applyCompressibility(out.coefficients, input.alphaRad, input.mach);
       // Speedbrake drag along the air-relative velocity (estimated ΔCD; see F16_SPEEDBRAKE).
@@ -115,7 +115,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
   return {
     manifest: F16_MANIFEST,
     displayName: "F-16C Block 50",
-    dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6), F110 gas-path engine calibrated to published thrust, project-designed fly-by-wire.",
+    dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6; NASA TP-3355 supersonic corrections, transonic estimated), F110 gas-path engine calibrated to published thrust, project-designed fly-by-wire.",
     mass: { emptyMassKg: F16_MASS.emptyMassKg.value, inertiaKgM2: f16InertiaTensor(), referenceMassKg: F16_MASS.massKg.value, cgFractionMac: F16_MASS.cgFractionMac.value, internalFuelKg: F16_ENGINE.internalFuelKg.value },
     surfaces: [
       { id: "elevator", limitDeg: a.elevatorLimitDeg.value, rateDegS: a.elevatorRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },

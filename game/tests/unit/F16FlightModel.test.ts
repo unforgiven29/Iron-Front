@@ -79,3 +79,19 @@ describe("shared surface actuator", () => {
   });
 
 });
+
+describe("F-16 FLCS roll-rate limiting (NASA TP-1538 control system B)", () => {
+  it("reduces the commandable roll rate with low dynamic pressure and high alpha, never below 80°/s", async () => {
+    const { F16FlightControls } = await import("../../src/platforms/aircraft/f16c-block50/F16FlightControls.js");
+    const cmd = (q: number, alphaDeg: number) => {
+      const f = new F16FlightControls();
+      const D = Math.PI / 180;
+      return f.step({ pitch: 0, roll: 1, yaw: 0 }, { nzG: 1, alphaRad: alphaDeg * D, betaRad: 0, ratesRadps: [0, 0, 0], dynamicPressurePa: q, trueAirspeedMps: 150, pitchRad: 0, rollRad: 0 }, 1 / 120).rollRateCommandRadps / D;
+    };
+    expect(cmd(20000, 5)).toBeCloseTo(308, 6);
+    expect(cmd(6500, 5)).toBeCloseTo(308 - 0.0115 * 4000, 6);
+    // At 25° alpha the alpha term removes 40°/s (the pitch loop may add nose-down stabilator, removing more).
+    expect(cmd(20000, 25)).toBeLessThanOrEqual(308 - 40 + 1e-9);
+    expect(cmd(1000, 30)).toBe(80);
+  });
+});

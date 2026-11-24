@@ -45,6 +45,8 @@ export interface FlightSensors {
   readonly dynamicPressurePa: number;
   readonly staticPressurePa: number;
   readonly mach: number;
+  /** True airspeed from the air-data system, m/s. */
+  readonly trueAirspeedMps: number;
   readonly pitchRad: number;
   readonly rollRad: number;
 }
