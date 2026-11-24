@@ -11,7 +11,6 @@ import { solveCycle } from "../physics/propulsion/MixedFlowTurbofan.js";
 import type { AircraftSnapshot, EngineSnapshot } from "../platforms/aircraft/common/FixedWingAircraft.js";
 
 const DEG = 180 / Math.PI, KT = 1.943844, FT = 3.28084, KGF = 9.80665;
-type Page = "surfaces" | "engines" | "systems";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 /** Fixed-point text, or "—" where the engine/aero model does not compute the quantity. */
@@ -148,34 +147,44 @@ function systemsPage(s: AircraftSnapshot, def: AircraftDefinition): string {
 
 export function mountDataPanel(frame: HTMLElement, definition: AircraftDefinition, snapshot: () => AircraftSnapshot): { onKey(key: string): boolean; update(): void } {
   const root = document.createElement("div");
-  root.className = "data-panel";
+  root.className = "data-panel efb";
   root.hidden = true;
   const tabs = document.createElement("div");
   tabs.className = "dp-tabs";
   const body = document.createElement("div");
   body.className = "dp-body";
-  let page: Page = "surfaces";
-  const pages: [Page, string][] = [["surfaces", "1 SURFACES"], ["engines", "2 ENGINES"], ["systems", "3 SYSTEMS"]];
+  // The aircraft's own EFB pages, then the shared flight-controls page. Aircraft without an EFB get
+  // the generic engine/systems pages.
+  const maxThrustN = Math.max(1, ...definition.engines.map((e) => solveCycle({ ...e.design, installationLossFraction: 0 }, { temperatureK: 288.15, pressurePa: 101325, mach: 0 }, 1, 1).netThrustN));
+  const pages: { id: string; title: string; render: (s: AircraftSnapshot, p: AircraftSnapshot | undefined) => string }[] = [
+    ...(definition.efb?.pages ?? [
+      { id: "engines", title: "Engines", render: (s: AircraftSnapshot) => enginesPage(s, maxThrustN) },
+      { id: "systems", title: "Systems", render: (s: AircraftSnapshot) => systemsPage(s, definition) }
+    ]),
+    { id: "controls", title: "Flight Controls", render: (s: AircraftSnapshot) => surfacesPage(s, definition) }
+  ];
+  let page = 0;
   const renderTabs = () => {
-    tabs.replaceChildren(...pages.map(([p, label]) => {
+    tabs.replaceChildren(...pages.map((p, i) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.textContent = label;
-      b.className = p === page ? "active" : "";
-      b.addEventListener("click", (ev) => { ev.stopPropagation(); page = p; renderTabs(); update(true); frame.focus(); });
+      b.textContent = p.title;
+      b.title = `${i + 1}`;
+      b.className = i === page ? "active" : "";
+      b.addEventListener("click", (ev) => { ev.stopPropagation(); page = i; renderTabs(); update(true); frame.focus(); });
       return b;
-    }), Object.assign(document.createElement("span"), { className: "dp-hint", textContent: `${definition.displayName} · I to close` }));
+    }), Object.assign(document.createElement("span"), { className: "dp-hint", textContent: `${definition.efb?.title ?? definition.displayName} · I close · 1–${pages.length} pages` }));
   };
-  // Gauge full scale: each engine's own sea-level-static max-afterburner thrust from its cycle model.
-  const maxThrustN = Math.max(1, ...definition.engines.map((e) => solveCycle({ ...e.design, installationLossFraction: 0 }, { temperatureK: 288.15, pressurePa: 101325, mach: 0 }, 1, 1).netThrustN));
-  let lastUpdate = 0;
+  let lastUpdate = 0, previous: AircraftSnapshot | undefined, previousAt = 0, current: AircraftSnapshot | undefined;
   const update = (force = false) => {
     if (root.hidden) return;
     const now = performance.now();
     if (!force && now - lastUpdate < 100) return; // ≈10 Hz is plenty for a data page
     lastUpdate = now;
     const s = snapshot();
-    body.innerHTML = page === "surfaces" ? surfacesPage(s, definition) : page === "engines" ? enginesPage(s, maxThrustN) : systemsPage(s, definition);
+    // Keep a ≈1 s old snapshot so pages can show which transfers are active.
+    if (!current || now - previousAt > 1000) { previous = current; previousAt = now; current = s; }
+    body.innerHTML = pages[page]!.render(s, previous);
   };
   renderTabs();
   root.append(tabs, body);
@@ -184,8 +193,8 @@ export function mountDataPanel(frame: HTMLElement, definition: AircraftDefinitio
     onKey: (key) => {
       if (key === "i") { root.hidden = !root.hidden; update(true); return true; }
       if (root.hidden) return false;
-      const p = ({ "1": "surfaces", "2": "engines", "3": "systems" } as Record<string, Page>)[key];
-      if (p) { page = p; renderTabs(); update(true); return true; }
+      const n = Number(key);
+      if (Number.isInteger(n) && n >= 1 && n <= pages.length) { page = n - 1; renderTabs(); update(true); return true; }
       return false;
     },
     update: () => update()
