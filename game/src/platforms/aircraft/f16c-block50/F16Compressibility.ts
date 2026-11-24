@@ -11,6 +11,7 @@
  *   M1.6 pitching moment at 0.35c: dCm/dCL ≈ −0.255 (aerodynamic centre ≈ 25 % MAC aft of CG)
  * The wind-tunnel model is an F-16C configuration but not a verified Block 50 production fit.
  *
+ * Transonic drag-due-to-lift bump: DERIVED from T.O. GR1F-16CJ-1-1 fig. B8-48 (see TRANSONIC_K_BUMP).
  * ESTIMATED: the transonic region (M 0.85–1.6) has no public F-16 data. It is a smooth
  * interpolation between the low-speed tables (M ≈ 0.2) and the M 1.6 data, with drag rise
  * starting at M 0.85 and reaching the supersonic level by M 1.2. Subsonic lift-curve-slope growth
@@ -42,6 +43,14 @@ export const TP3355_F16C = Object.freeze({
   inducedK16: 0.24,
   dCmdCL16: -0.255
 });
+
+/**
+ * Transonic lift-dependent drag (shock-induced separation at high CL), a Gaussian bump in the
+ * drag-due-to-lift factor K centred near M 1.0. DERIVED: fitted to the sustained-turn (Ps = 0)
+ * boundary of T.O. GR1F-16CJ-1-1 figure B8-48 (F-16CJ Block 50, F110-GE-129, flight-test basis,
+ * sea level, 26,000 lb, drag index 50). See tests/unit/F16SustainedTurn.test.ts.
+ */
+export const TRANSONIC_K_BUMP: { amplitude: number; centreMach: number; widthMach: number } = { amplitude: 0.3, centreMach: 1.05, widthMach: 0.1 };
 
 /** Low-speed reference characteristics DERIVED from the hifi tables (clean, β = 0, q = 0, LEF 0). */
 export const LOW_SPEED_REFERENCE = (() => {
@@ -102,7 +111,8 @@ export function compressibilityFactors(mach: number): CompressibilityFactors {
   const rise = smooth((M - 0.85) / 0.35);
   // Aerodynamic-centre shift mostly across M 0.85–1.3.
   const acShift = smooth((M - 0.85) / 0.45);
-  return { liftScale, deltaCdMin: superCd * rise, deltaK: superK * rise, deltaDCmdCL: superCm * acShift, basis: "estimated" };
+  const bump = TRANSONIC_K_BUMP.amplitude * Math.exp(-(((M - TRANSONIC_K_BUMP.centreMach) / TRANSONIC_K_BUMP.widthMach) ** 2));
+  return { liftScale, deltaCdMin: superCd * rise, deltaK: superK * rise + bump, deltaDCmdCL: superCm * acShift, basis: "estimated" };
 }
 
 /** Mach multipliers on control-surface increments (ESTIMATED; see file header). */
