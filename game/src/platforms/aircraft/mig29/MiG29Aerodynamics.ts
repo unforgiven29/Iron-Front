@@ -8,7 +8,7 @@
  *    Kv·sin²α·cosα for the LERX/wing; leading-edge flaps add lift; past the stall α the attached
  *    model blends to flat-plate normal force 1.2·sin α.
  *  - Drag: CD0(M) (estimated drag rise) + K·CL², K = 1/(πAe) subsonic, 1/CLα supersonic (no
- *    leading-edge suction); separated flow adds the flat-plate component.
+ *    leading-edge suction), plus K2·(CL − CLbreak)² above the break CL (two-segment polar); separated flow adds the flat-plate component.
  *  - Pitch: Cm = −SM(M)·CL + Cmδe·δe·η(M) + Cmq·q·c/2V (static margin moves aft supersonic).
  *  - Lateral-directional: constant estimated derivatives, Cnβ reduced at high α.
  *  - Ground effect: shared physics/aerodynamics/GroundEffect.ts.
@@ -74,7 +74,8 @@ export function mig29Aerodynamics(): AeroModel {
       const K = M <= 0.9 ? 1 / (Math.PI * AR * A.oswaldEfficiency.value) : M >= 1.2 ? 1 / liftSlope(M) : (1 / (Math.PI * AR * A.oswaldEfficiency.value)) + ((1 / liftSlope(1.2)) - (1 / (Math.PI * AR * A.oswaldEfficiency.value))) * smooth((M - 0.9) / 0.3);
       const gear = Math.max(0, Math.min(1, s["gear"] ?? 0));
       const brake = Math.max(0, Math.min(1, (s["speedbrake"] ?? 0) / 60));
-      const cd = zeroLiftDrag(M) + K * ge.inducedDragFactor * attachedCl * attachedCl * (1 - sep) + flatCn * sa * sep
+      const overBreak = Math.max(0, Math.abs(attachedCl) - A.highLiftDragBreakCl.value);
+      const cd = zeroLiftDrag(M) + (K * ge.inducedDragFactor * attachedCl * attachedCl + A.highLiftDragFactor.value * overBreak * overBreak) * (1 - sep) + flatCn * sa * sep
         + A.speedbrakeDrag.value * brake + A.gearDrag.value * gear;
 
       // Moments.
