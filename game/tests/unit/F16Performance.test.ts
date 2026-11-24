@@ -115,38 +115,43 @@ describe("F-16 weight, speedbrake and FLCS behaviour", () => {
       a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
       // Alpha may drift slowly as speed bleeds off (the limiter allows more alpha as g falls), so
       // porpoising is measured as reversals of alpha after the initial capture, not total spread.
-      let maxAlpha = 0, prev = 0, prevSlope = 0, swing = 0, lastTurn = Number.NaN;
+      let maxAlpha = 0, prev = 0, prevSlope = 0, swing = 0, lastTurn = Number.NaN, reversalsOver05 = 0;
       for (let i = 1; i <= 720; i++) {
         a.stepTick();
         const al = a.snapshot().alphaRad / DEG;
         maxAlpha = Math.max(maxAlpha, al);
         const slope = Math.sign(al - prev);
         if (i > 240 && slope !== 0 && prevSlope !== 0 && slope !== prevSlope) {
-          if (!Number.isNaN(lastTurn)) swing = Math.max(swing, Math.abs(prev - lastTurn));
+          if (!Number.isNaN(lastTurn)) { swing = Math.max(swing, Math.abs(prev - lastTurn)); if (Math.abs(prev - lastTurn) > 0.5) reversalsOver05++; }
           lastTurn = prev;
         }
         if (slope !== 0) prevSlope = slope;
         prev = al;
       }
       expect(maxAlpha).toBeLessThan(25.5);
-      expect(swing).toBeLessThan(1);
+      // Porpoising = repeated alpha reversals; one capture overshoot (≈1°, as in TP-1538) is allowed.
+      expect(reversalsOver05).toBeLessThanOrEqual(1);
+      expect(swing).toBeLessThan(1.5);
     }
   });
 
   it("reaches about 9 g but never over-g's, subsonic and supersonic (pitch law + over-g protection)", () => {
-    for (const [ft, mach, minG] of [[10000, 0.9, 8.8], [10000, 1.2, 8.3], [40000, 1.9, 8.3]] as const) {
+    // TP-1538 law: g is reduced by 0.322 g/deg of (pitch-rate-led) alpha above 15°. Mach 0.9 / 10,000 ft
+    // peaks ≈8.7 g as the jet slows; Mach 1.9 / 40,000 ft needs ≈15° alpha for 9 g and peaks ≈8.2 g.
+    for (const [ft, mach, minG] of [[10000, 0.9, 8.5], [10000, 1.2, 8.3], [40000, 1.9, 8.0]] as const) {
       const h = ft * FT;
       const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, h], headingRad: 0, speedMps: mach * standardAtmosphere(h).speedOfSoundMps, throttle: 1 });
       fly(a, 1);
       a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
       let g = 0;
-      for (let i = 0; i < 5 * 120; i++) { a.stepTick(); g = Math.max(g, a.snapshot().nzG); }
+      // TP-1538's PI g loop builds load factor over several seconds at full aft stick.
+      for (let i = 0; i < 8 * 120; i++) { a.stepTick(); g = Math.max(g, a.snapshot().nzG); }
       expect(g).toBeGreaterThan(minG);
       expect(g).toBeLessThan(9.4);
     }
   });
 
-  it("rolls near the 308°/s command at medium and high speed without large overshoot on release", () => {
+  it("rolls fast at medium and high speed (TP-1538 proportional roll CAS) without large overshoot on release", () => {
     for (const kcas of [300, 400, 500]) {
       const h = 10000 * FT, atm = standardAtmosphere(h);
       const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, h], headingRad: 0, speedMps: kcas * 0.5144 * Math.sqrt(1.225 / atm.densityKgM3), throttle: 0.75 });
@@ -157,10 +162,26 @@ describe("F-16 weight, speedbrake and FLCS behaviour", () => {
       a.setPilotInputs({ pitch: 0, roll: 0, yaw: 0 });
       let back = 0;
       for (let i = 0; i < 180; i++) { a.stepTick(); back = Math.min(back, a.snapshot().ratesRadps[0] / DEG); }
-      expect(peak).toBeGreaterThan(270);
+      // TP-1538's roll loop is proportional (0.12 deg per deg/s through 10/(s+10)), so the achieved
+      // rate settles below the 308°/s command; ≈215–240°/s at these speeds with this aero data.
+      expect(peak).toBeGreaterThan(190);
       expect(peak).toBeLessThan(325);
       expect(back).toBeGreaterThan(-10);
     }
+  });
+
+  it("reproduces NASA TP-1538 figure 30: full-stick roll from 1-g flight at the AoA limit, 30,000 ft (control system B)", () => {
+    // Published: commanded rate limited to ≈165°/s, achieved maximum ≈70°/s, α stays ≤ 26°, small sideslip.
+    const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, 9144], headingRad: 0, speedMps: 150, throttle: 0.6 });
+    a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
+    for (let i = 0; i < 120 * 90; i++) { a.stepTick(); const z = a.snapshot(); if (z.alphaRad / DEG > 24 && z.nzG < 1.15 && Math.abs(z.ratesRadps[1] / DEG) < 1) break; }
+    a.setPilotInputs({ pitch: 1, roll: 1, yaw: 0 });
+    let p = 0, alpha = 0, beta = 0;
+    for (let i = 0; i < 120 * 6; i++) { a.stepTick(); const z = a.snapshot(); p = Math.max(p, z.ratesRadps[0] / DEG); alpha = Math.max(alpha, z.alphaRad / DEG); beta = Math.max(beta, Math.abs(z.betaRad / DEG)); }
+    expect(p).toBeGreaterThan(45);
+    expect(p).toBeLessThan(95);
+    expect(alpha).toBeLessThan(26.5);
+    expect(beta).toBeLessThan(5);
   });
 
   it("ARI keeps a loaded roll coordinated (small sideslip)", () => {

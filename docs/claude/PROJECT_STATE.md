@@ -131,6 +131,16 @@ Build and test narrow, replaceable services in this order:
    - Engine calibration now targets UNINSTALLED ratings (test-stand values); before, the installed thrust was calibrated to them, overstating the engine by the installation loss (≈5 %).
    - Afterburner: thermodynamic, max temperature calibrated to 29,000 lbf uninstalled (no AB data).
    - Max level speed: sea level M1.25 (published ≈1.2, +4 %), 40,000 ft M1.81 (published 1.89 sustained, −4 %). Remaining uncertainty: the MIL lapse beyond θ1 1.13 is extrapolated; installation loss and afterburner are estimated. Sea-level best climb ≈65,800 ft/min.
+13. **Done, sourced:** F-16 FLCS replaced by the NASA TP-1538 appendix A control laws (figures 62–65) plus that report's control-system-B protections (roll-rate limiting, roll-coupling pseudo-alpha).
+   - Files: `flcs/PitchChannel.ts`, `RollChannel.ts`, `YawChannel.ts`, `Filters.ts` (exact ZOH first-order sections, Tustin biquad for the roll notch).
+   - Deviations, documented in each file: 9 g limit (source simulator 8 g), automatic roll trim (source: pilot trim input), linear pedal gradient (figure 65b not read).
+   - Validation: reproduces TP-1538 figure 30 (full-stick roll from 1 g at the AoA limit, 30,000 ft): max roll rate 54°/s vs ≈70°/s published, AoA ≤ 25.5° vs ≤ 26°, sideslip 4.4° vs < 3°.
+   - Behaviour change vs the previous project-designed law: slower g onset (PI g loop with washed-out pitch-rate blending; ≈6 g in 1 s, ≈8.7 g peak at M0.9/10,000 ft), roll ≈215–240°/s at 300–500 KCAS (proportional roll loop), crisp roll stop. Tests were re-baselined to the published law.
+14. **Done, sizes estimated:** shared hydraulic network `game/src/systems/hydraulics/HydraulicNetwork.ts` (owner `game/systems/hydraulics`).
+   - Lumped circuits (fluid + accumulator compliance), pressure-compensated engine-driven pumps following engine core speed, accumulators, an emergency unit (auto-start, delay, endurance), leakage/relief, injected faults.
+   - Actuator authority from servo-valve physics (rate ∝ √(1 − load/force capacity)); surfaces with no supply hold position. Actual surface motion is the network's flow demand.
+   - F-16 installation (`F16Hydraulics.ts`): systems A and B at 3000 psi, F110-driven pumps, FLCS accumulators, EPU pump on A; stabilator/roll/rudder dual-fed, speedbrake on A. Test switch H (pump faults); FLCS MFD shows HYD A/B psi and EPU state; HYD PRESS / EPU cautions.
+   - Not modelled: utilities on B (gear, brakes, NWS…), LEF actuators, EPU electrical half, reservoirs, temperature, hinge-moment loads (constant design load fraction).
 4. **Done:** app routes. `/` is the full-screen F-16 game with a start/pause menu (`game/src/app/GameScreen.ts`, `F16Session.ts`). `/#debug` is the developer tools page (foundation status, runtime monitor, debug flyer).
 3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 

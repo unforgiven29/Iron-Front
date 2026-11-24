@@ -12,11 +12,14 @@ export interface PilotInputs {
 export interface FlcsSensors {
   /** Normal load factor (g), positive in a pull. */
   readonly nzG: number;
+  /** Lateral load factor (g), positive to the right. */
+  readonly nyG: number;
   readonly alphaRad: number;
   readonly betaRad: number;
   /** Body rates p, q, r (rad/s). */
   readonly ratesRadps: readonly [number, number, number];
   readonly dynamicPressurePa: number;
+  readonly staticPressurePa: number;
   readonly trueAirspeedMps: number;
   readonly pitchRad: number;
   readonly rollRad: number;
@@ -25,8 +28,6 @@ export interface FlcsSensors {
 /** What every channel receives each step besides its own pilot input. */
 export interface ChannelContext {
   readonly sensors: FlcsSensors;
-  /** Gain schedule q_ref / q, limited (higher at low dynamic pressure). */
-  readonly schedule: number;
   readonly dt: number;
 }
 

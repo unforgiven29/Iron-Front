@@ -15,6 +15,7 @@ import { localAirflow, sampleEnvironment, standardAtmosphere, type EnvironmentCo
 import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
+import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
 import type { AircraftDefinition, AircraftSystems, FlightSensors, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
 import { SurfaceActuator } from "./SurfaceActuator.js";
@@ -56,6 +57,8 @@ export interface AircraftSnapshot {
   readonly engines: readonly EngineSnapshot[];
   readonly fuelKg: number;
   readonly massKg: number;
+  /** Hydraulic network state (absent when the aircraft has none). */
+  readonly hydraulics?: HydraulicSnapshot;
   readonly fcsMode: string;
   readonly annunciations: readonly string[];
   readonly cgFractionMac: number;
@@ -82,6 +85,8 @@ export class FixedWingAircraft {
   public readonly controls = new ControlRegistry();
   private readonly systems: AircraftSystems;
   private readonly actuators: ReadonlyMap<string, SurfaceActuator>;
+  private readonly hydraulics: HydraulicNetwork | undefined;
+  private surfaceRates: Record<string, number> = {};
   private engines: { id: string; control: Fadec; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
   private body!: RigidBody;
   private fuelKg = 0;
@@ -89,6 +94,7 @@ export class FixedWingAircraft {
   private pilot: PilotInputs = { pitch: 0, roll: 0, yaw: 0 };
   private throttle = 0.5;
   private nz = 1;
+  private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
   private annunciations: readonly string[] = [];
@@ -101,7 +107,9 @@ export class FixedWingAircraft {
     this.systems = definition.createSystems();
     this.cgFractionMac = definition.mass.cgFractionMac;
     this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS)]));
+    this.hydraulics = definition.hydraulics ? new HydraulicNetwork(definition.hydraulics) : undefined;
     const context = {
+      setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
       setCgFractionMac: (v: number) => { this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
     };
@@ -135,6 +143,8 @@ export class FixedWingAircraft {
     });
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
+    this.hydraulics?.reset(true);
+    this.surfaceRates = {};
     this.systems.fcs.reset();
     this.systems.devices?.reset();
     // Switches return to their defaults (owner logic decides what that means).
@@ -143,6 +153,7 @@ export class FixedWingAircraft {
     }
     this.pilot = { pitch: 0, roll: 0, yaw: 0 };
     this.nz = 1;
+    this.ny = 0;
     this.devicePositions = {};
     this.fcsMode = this.systems.fcs.mode();
     this.annunciations = [];
@@ -171,6 +182,14 @@ export class FixedWingAircraft {
     return this.last;
   }
 
+  /** Engine core (gearbox drive) speed as a fraction of its reference, for engine-driven pumps. */
+  private engineCoreSpeed(engineId: string): number {
+    const e = this.engines.find((x) => x.id === engineId);
+    if (!e) return 0;
+    const st = e.core.state, deck = e.install.design.gasGenerator;
+    return deck && st.n2Rpm !== undefined && !st.flameout ? st.n2Rpm / deck.referenceN2Rpm : st.spoolSpeed;
+  }
+
   /** Current mass properties: empty mass + fuel, inertia scaled with mass (see MassProperties). */
   private massProperties(): { massKg: number; inertiaKgM2: Matrix3 } {
     const m = this.definition.mass;
@@ -197,13 +216,19 @@ export class FixedWingAircraft {
     const beta = V > 1 ? Math.asin(clamp(v / V, -1, 1)) : 0;
     const att = attitude(st.bodyToWorld);
     const sensors: FlightSensors = {
-      nzG: this.nz, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
+      nzG: this.nz, nyG: this.ny, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll
     };
 
     const fcs = this.systems.fcs.step(this.pilot, sensors, this.surfacePositions(), dt);
-    for (const [id, actuator] of this.actuators) actuator.step(fcs.commands[id] ?? 0, dt);
+    // Actuators move only as fast as their hydraulic supply allows; their actual motion is the
+    // network's flow demand for the next step.
+    for (const [id, actuator] of this.actuators) {
+      const before = actuator.positionDeg;
+      actuator.step(fcs.commands[id] ?? 0, dt, this.hydraulics?.rateFraction(id) ?? 1);
+      this.surfaceRates[id] = (actuator.positionDeg - before) / dt;
+    }
     this.devicePositions = this.systems.devices?.step(sensors, dt) ?? {};
     this.fcsMode = fcs.mode;
     this.annunciations = fcs.annunciations;
@@ -220,6 +245,7 @@ export class FixedWingAircraft {
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
     }
     this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
+    this.hydraulics?.step(dt, (engineId) => this.engineCoreSpeed(engineId), this.surfaceRates);
     // Mass properties change only between integration steps.
     this.body.setMassProperties(this.massProperties());
 
@@ -236,6 +262,7 @@ export class FixedWingAircraft {
     const q = st.bodyToWorld;
     const fBody = rotateVector([-q[0], -q[1], -q[2], q[3]], loads.forceEnuN);
     this.nz = -fBody[2] / (this.body.massProperties.massKg * 9.80665);
+    this.ny = fBody[1] / (this.body.massProperties.massKg * 9.80665);
     this.air = { alpha, beta, tas: V, eas: Math.sqrt((2 * flow.dynamicPressurePa) / SEA_LEVEL_DENSITY), mach: flow.machNumber, outside: aero.outsideEnvelope, reasons: aero.envelopeReasons };
   }
 
@@ -275,6 +302,7 @@ export class FixedWingAircraft {
       engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
       fuelKg: this.fuelKg,
       massKg: this.body.massProperties.massKg,
+      ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
       fcsMode: this.fcsMode,
       annunciations: this.annunciations,
       cgFractionMac: this.cgFractionMac,

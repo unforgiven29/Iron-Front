@@ -38,6 +38,8 @@ own way.
      control mode with `ctx.setEngineControlMode(engineId, "primary" | "backup")`.
    - Keep the flight-control system readable by splitting it per axis, as the F-16 does in
      `f16c-block50/flcs/` (`PitchChannel`, `RollChannel`, `YawChannel`, wired by `F16FlightControls`).
+   - `hydraulics` (optional): a `HydraulicInstallation` for the shared network in `game/src/systems/hydraulics/` — circuits, pumps and their drive, accumulators, emergency unit, and which circuit feeds each surface's actuator chambers. Surfaces listed there move only as fast as their supply allows.
+   - `annunciate` (optional): the aircraft's own cautions/warnings from the snapshot (e.g. hydraulic pressure lights).
    - `switches`: switch definitions with their owner logic and optional keyboard keys.
    - `cockpit`: a `CockpitLayout`; `mfdPages`: functions that build MFD text from the snapshot.
    - `manifest`: id, version, `provides: platform.aircraft.definition`.

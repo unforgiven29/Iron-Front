@@ -1,31 +1,40 @@
 /**
- * F-16 FLCS pitch channel (PROJECT-DESIGNED gains; structure from NASA TP-1538 and the F-16
- * manual family): g command with attitude-compensated neutral, alpha fed back into the
- * integrated g error (AoA limiting), a hard alpha backstop, over-g protection, pitch-rate damping.
- * Output: stabilator ("elevator") command, deg, positive = nose down.
+ * F-16 FLCS pitch channel: NASA TP-1538 (Nguyen et al., 1979) appendix A, figure 62 "basic pitch
+ * control system (control system A)", with the control-system-B roll-coupling modification
+ * (figures 28–29). Implemented block for block:
+ *
+ *   stick force → 60/(s+60) → command gradient (fig 62e, g) → limit [neg-g(q̄) fig 62b, +limit]
+ *     → 8.3/(s+8.3) = command
+ *   α → limit [−5°, 30°] → 10/(s+10) = α_f;  q → s/(s+1) = q_w;  (nz − 1) → 50/(s+50)
+ *   feedback F = (3s+12)/(s+12) · [ 0.322·max(0, 0.7·K_q(q̄)·q_w + α_f + Δα_p − 15) + 0.334·q_w + (nz−1)_f ]
+ *   error e = F + max(0, α_f + Δα_p − 20.4) − command
+ *   δh = 1.5·K_loop(q̄)·e · (1 + 5/s)   [integrator ±25°]  + 0.5·α_f
+ *   Δα_p (system B) = clamp(0.67/(s+0.67)·0.15·|p| − 3, 0, 5.4)
+ * Units: g, deg, deg/s; δh positive = trailing edge down (nose down).
+ *
+ * Deviation from the source: the positive g limit is the F-16C's published 9 g (TP-1538's
+ * simulator used 8 g); the AoA limit in 1-g flight is then ≈26° instead of ≈25°. Pitch trim
+ * (±2.4 g in the source) is not wired to a cockpit control yet.
  */
 import { F16_ACTUATORS, F16_FLCS_LIMITS } from "../F16Data.js";
+import { Lag, LeadLag, schedule, Washout } from "./Filters.js";
 import { clamp, DEG, type ChannelContext } from "./FlcsTypes.js";
 
+/** Figure 62(e) pitch command gradient, stick force (N, + = pull) → incremental g. */
+export const PITCH_COMMAND_GRADIENT: readonly (readonly [number, number])[] = [[-80, -4], [-30, -0.8], [-8, 0], [8, 0], [35, 0.4], [180, 10.8]];
+/** Stick force at full deflection: aft reaches the positive g limit, forward is the gradient's end. */
+export const STICK_FORCE_N = { aft: 35 + (F16_FLCS_LIMITS.maxPositiveG.value - 1 - 0.4) / ((10.8 - 0.4) / 145), forward: 80 };
+/** Figure 62(b): negative g limit vs q̄ (kN/m²). */
+export const NEGATIVE_G_LIMIT: readonly (readonly [number, number])[] = [[1.7, -1], [8.9, -4]];
+/** Figure 62(c): pitch-rate gain vs q̄ (kN/m²). */
+export const PITCH_RATE_GAIN: readonly (readonly [number, number])[] = [[5.2, 1], [15.5, 0.42]];
+/** Figure 62(d): pitch-loop gain vs q̄ (kN/m²). */
+export const PITCH_LOOP_GAIN: readonly (readonly [number, number])[] = [[10, 1], [43, 0.4]];
+
 export const PITCH_GAINS = Object.freeze({
-  pitchProportionalDegPerG: 1.5,
-  pitchIntegralDegPerGs: 4,
-  /** The integral gain is scheduled with (q_ref/q)^this: weaker than the proportional path's 1/q. */
-  pitchIntegralScheduleExponent: 0.5,
-  pitchRateDampingDegPerRadps: 22,
-  /** Pilot g-command prefilter time constant (s). */
-  commandPrefilterS: 0.3,
-  /** AoA feedback into the g-error path: g per degree of (predicted) alpha above the onset. */
-  alphaFeedbackGPerDeg: 0.8,
-  alphaFeedbackOnsetDeg: 17,
-  /** Direct nose-down stabilator per degree of predicted alpha above the AoA limit (backstop). */
-  alphaBackstopDegPerDeg: 3,
-  /** Look-ahead (s) applied to the alpha rate in the AoA limiter. */
-  alphaLimiterLeadS: 0.3,
-  /** Over-g protection: nose-down stabilator per g of load factor (predicted ahead) above the limit (not q-scheduled). */
-  overGDegPerG: 4,
-  /** Look-ahead (s) on the load-factor rate for over-g protection. */
-  overGLeadS: 0.15
+  alphaFeedbackOnsetDeg: 15, alphaFeedbackGPerDeg: 0.322, alphaLimitOnsetDeg: 20.4, alphaLimitGPerDeg: 1,
+  pitchRateInAlphaPath: 0.7, pitchRateFeedback: 0.334, forwardGainDegPerG: 1.5, integralPerS: 5, integratorLimitDeg: 25,
+  alphaStabilityDegPerDeg: 0.5
 });
 
 export interface PitchOutput {
@@ -36,62 +45,47 @@ export interface PitchOutput {
 }
 
 export class PitchChannel {
-  /** Integrated g error, held directly as stabilator degrees (so q-scheduling cannot change it). */
+  private readonly stickFilter = new Lag(60);
+  private readonly commandFilter = new Lag(8.3);
+  private readonly alphaFilter = new Lag(10);
+  private readonly pitchRateWashout = new Washout(1, 1);
+  private readonly nzFilter = new Lag(50);
+  private readonly feedbackLeadLag = new LeadLag(3, 12, 12);
+  private readonly rollCoupling = new Lag(0.67);
   private integralDeg = 0;
-  private filteredNzCmd = 1;
-  private lastNz = 1;
-  private lastAlpha = Number.NaN;
-  private alphaRate = 0;
 
   public reset(): void {
+    for (const f of [this.stickFilter, this.commandFilter, this.alphaFilter, this.pitchRateWashout, this.nzFilter, this.feedbackLeadLag, this.rollCoupling]) f.reset();
     this.integralDeg = 0;
-    this.filteredNzCmd = 1;
-    this.lastNz = 1;
-    this.lastAlpha = Number.NaN;
-    this.alphaRate = 0;
   }
 
-  public step(stickPitch: number, { sensors: s, schedule, dt }: ChannelContext): PitchOutput {
-    const g = PITCH_GAINS, lim = F16_FLCS_LIMITS;
-    const q = s.ratesRadps[1];
-
-    // g command. Stick neutral holds the 1-g flight-path value (attitude compensated).
-    const neutral = Math.cos(s.pitchRad) / Math.max(0.5, Math.cos(s.rollRad));
+  public step(stickPitch: number, { sensors: s, dt }: ChannelContext): PitchOutput {
+    const g = PITCH_GAINS;
+    const qbarK = s.dynamicPressurePa / 1000;
     const stick = clamp(stickPitch, -1, 1);
-    let nzCmd = stick >= 0 ? neutral + stick * (lim.maxPositiveG.value - neutral) : neutral + stick * (neutral - lim.maxNegativeG.value);
-    nzCmd = clamp(nzCmd, lim.maxNegativeG.value, lim.maxPositiveG.value);
-    this.filteredNzCmd += (nzCmd - this.filteredNzCmd) * (1 - Math.exp(-dt / g.commandPrefilterS));
+    const force = this.stickFilter.step(stick >= 0 ? stick * STICK_FORCE_N.aft : stick * STICK_FORCE_N.forward, dt);
+    const gradient = schedule(PITCH_COMMAND_GRADIENT, force);
+    const limited = Math.max(schedule(NEGATIVE_G_LIMIT, qbarK), Math.min(F16_FLCS_LIMITS.maxPositiveG.value - 1, gradient));
+    const command = this.commandFilter.step(limited, dt);
 
-    // AoA limiting (F-16 structure): above an onset, alpha — predicted a short time ahead from the
-    // filtered alpha rate — is fed back INTO the g-error path, so a single integrator settles where
-    // nz command − nz = K·(α − onset). Full g is available at moderate alpha, and the available
-    // g falls as alpha rises; nothing winds up against a separate limiter. Alpha rate, not pitch
-    // rate, is used for the lead: in a steady turn q is large but alpha is constant.
-    if (Number.isNaN(this.lastAlpha)) this.lastAlpha = s.alphaRad;
-    const rawRate = dt > 0 ? (s.alphaRad - this.lastAlpha) / dt : 0;
-    this.lastAlpha = s.alphaRad;
-    this.alphaRate += (rawRate - this.alphaRate) * (1 - Math.exp(-dt / 0.05));
-    const alphaPred = (s.alphaRad + g.alphaLimiterLeadS * Math.max(0, this.alphaRate)) * DEG;
-    const alphaFeedbackG = g.alphaFeedbackGPerDeg * Math.max(0, alphaPred - g.alphaFeedbackOnsetDeg);
-    // Hard backstop at the AoA limit itself (direct nose-down, not through the integrator).
-    const backstopDeg = g.alphaBackstopDegPerDeg * Math.max(0, alphaPred - lim.alphaLimitDeg.value);
-    const alphaLimiting = alphaFeedbackG > 0.5 || backstopDeg > 0;
+    const alphaF = this.alphaFilter.step(clamp(s.alphaRad * DEG, -5, 30), dt);
+    const qW = this.pitchRateWashout.step(s.ratesRadps[1] * DEG, dt);
+    const nzF = this.nzFilter.step(s.nzG - 1, dt);
+    const dAlphaP = clamp(this.rollCoupling.step(0.15 * Math.abs(s.ratesRadps[0] * DEG), dt) - 3, 0, 5.4);
+    const alphaForLimiter = alphaF + dAlphaP;
 
-    const error = this.filteredNzCmd - s.nzG - alphaFeedbackG;
-    // Over-g protection: load factor predicted a short time ahead beyond the structural limit
-    // drives the stabilator nose-down, so a stored integrator cannot carry the jet past 9 g.
-    const nzRate = dt > 0 ? (s.nzG - this.lastNz) / dt : 0;
-    this.lastNz = s.nzG;
-    const overG = Math.max(0, s.nzG + g.overGLeadS * nzRate - lim.maxPositiveG.value);
+    const alphaPath = g.alphaFeedbackGPerDeg * Math.max(0, g.pitchRateInAlphaPath * schedule(PITCH_RATE_GAIN, qbarK) * qW + alphaForLimiter - g.alphaFeedbackOnsetDeg);
+    const feedback = this.feedbackLeadLag.step(alphaPath + g.pitchRateFeedback * qW + nzF, dt);
+    const limiter = g.alphaLimitGPerDeg * Math.max(0, alphaForLimiter - g.alphaLimitOnsetDeg);
+    const error = feedback + limiter - command;
+
+    const u = g.forwardGainDegPerG * schedule(PITCH_LOOP_GAIN, qbarK) * error;
+    this.integralDeg = clamp(this.integralDeg + g.integralPerS * u * dt, -g.integratorLimitDeg, g.integratorLimitDeg);
     const elevLimit = F16_ACTUATORS.elevatorLimitDeg.value;
-    const unsaturated = (-g.pitchProportionalDegPerG * error + g.pitchRateDampingDegPerRadps * q) * schedule + g.overGDegPerG * overG + backstopDeg + this.integralDeg;
-    // Integrator in stabilator degrees, limited to the stabilator travel. Anti-windup: it does not
-    // integrate further into saturation, and it bleeds off while the backstop or over-g act.
-    if (backstopDeg > 0 || overG > 0) {
-      this.integralDeg *= Math.exp(-dt / 0.3);
-    } else if (Math.abs(unsaturated) < elevLimit || Math.sign(unsaturated) !== -Math.sign(error)) {
-      this.integralDeg = clamp(this.integralDeg - g.pitchIntegralDegPerGs * error * Math.pow(schedule, g.pitchIntegralScheduleExponent) * dt, -elevLimit, elevLimit);
-    }
-    return { elevatorDeg: clamp(unsaturated, -elevLimit, elevLimit), nzCommandG: this.filteredNzCmd, alphaLimiting };
+    return {
+      elevatorDeg: clamp(u + this.integralDeg + g.alphaStabilityDegPerDeg * alphaF, -elevLimit, elevLimit),
+      nzCommandG: 1 + command,
+      alphaLimiting: alphaPath > 0.5 || limiter > 0
+    };
   }
 }

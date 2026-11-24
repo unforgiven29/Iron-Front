@@ -16,7 +16,7 @@ function fly(a: FixedWingAircraft, seconds: number, each?: (s: AircraftSnapshot)
   return a.snapshot();
 }
 
-describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS)", () => {
+describe("F-16C Block 50 vertical slice (provisional data, NASA TP-1538 control laws)", () => {
   it("holds 1 g hands-off without diverging or faulting", () => {
     const s = fly(jet(), 10);
     expect(s.faults).toEqual([]);
@@ -27,10 +27,12 @@ describe("F-16C Block 50 vertical slice (provisional data, project-designed FLCS
   });
 
   it("tracks a g command without sustained oscillation", () => {
-    const a = jet();
-    a.setPilotInputs({ pitch: 0.5, roll: 0, yaw: 0 }); // ≈ 5 g
+    const a = jet(250); // fast enough that ≈5.5 g needs little alpha (below the 15° AoA-feedback onset)
+    // TP-1538 stick gradient (fig 62e) is nonlinear: 60 % aft stick ≈ 5.5 g commanded. The
+    // published PI g loop with washed-out pitch-rate blending converges over several seconds.
+    a.setPilotInputs({ pitch: 0.6, roll: 0, yaw: 0 });
     let peak = 0;
-    fly(a, 3, (s) => { peak = Math.max(peak, s.nzG); });
+    fly(a, 8, (s) => { peak = Math.max(peak, s.nzG); });
     expect(peak).toBeGreaterThan(4.5);
     expect(peak).toBeLessThan(6.5);
   });

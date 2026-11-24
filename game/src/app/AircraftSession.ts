@@ -40,7 +40,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
 
   const source: CockpitViewSource = {
     snapshot: () => jet.snapshot(),
-    hud: () => hud(jet.snapshot()),
+    hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
   };
@@ -96,7 +96,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   };
 }
 
-function hud(s: AircraftSnapshot): HudData {
+function hud(s: AircraftSnapshot, annunciate?: (s: AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[]): HudData {
   const warnings: { text: string; level: "caution" | "warning" }[] = [];
   if (s.ground.kind === "crashed") warnings.push({ text: `CRASHED at ${(s.ground.impactSpeedMps * KT).toFixed(0)} kt — press R`, level: "warning" });
   if (s.ground.kind === "terrain-unknown") warnings.push({ text: "TERRAIN DATA UNAVAILABLE", level: "caution" });
@@ -105,6 +105,7 @@ function hud(s: AircraftSnapshot): HudData {
   if (s.outsideAeroEnvelope) warnings.push({ text: "OUTSIDE AERO DATA ENVELOPE", level: "caution" });
   if (s.engines.some((e) => e.flameout)) warnings.push({ text: "ENGINE FLAMEOUT — FUEL", level: "warning" });
   if (s.engines.some((e) => e.control.mode === "backup")) warnings.push({ text: "ENGINE CONTROL: BACKUP (SEC)", level: "caution" });
+  for (const a of annunciate?.(s) ?? []) warnings.push({ text: a.text, level: a.level });
   if (s.faults.length > 0) warnings.push({ text: `SIM FAULT: ${s.faults[s.faults.length - 1]}`, level: "warning" });
   return {
     airspeedKt: s.equivalentAirspeedMps * KT,
