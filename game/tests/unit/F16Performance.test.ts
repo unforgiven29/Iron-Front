@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { uniformWind } from "../../src/physics/environment/Atmosphere.js";
+import { standardAtmosphere, uniformWind } from "../../src/physics/environment/Atmosphere.js";
 import { normalShockRecovery } from "../../src/physics/propulsion/MixedFlowTurbofan.js";
 import { bestClimbRate, maxLevelMach } from "../../src/platforms/aircraft/common/Performance.js";
 import { createF16Aircraft, F16_SWITCHES } from "../../src/platforms/aircraft/f16c-block50/F16Aircraft.js";
-import { applyCompressibility, compressibilityFactors, LOW_SPEED_REFERENCE, TP3355_F16C } from "../../src/platforms/aircraft/f16c-block50/F16Compressibility.js";
+import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW_SPEED_REFERENCE, TP3355_F16C } from "../../src/platforms/aircraft/f16c-block50/F16Compressibility.js";
 import { F16_MASS } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
 import { createF16Definition } from "../../src/platforms/aircraft/f16c-block50/F16Definition.js";
 import { F16_PERFORMANCE_OPTIONS } from "../../src/platforms/aircraft/f16c-block50/F16Performance.js";
@@ -34,6 +34,19 @@ describe("F-16 compressibility (NASA TP-3355 supersonic data)", () => {
     expect(compressibilityFactors(0.2).basis).toBe("low-speed");
     expect(compressibilityFactors(1.0).basis).toBe("estimated");
     expect(compressibilityFactors(2.0).basis).toBe("measured");
+  });
+
+  it("keeps supersonic static stability at high alpha (no artificial pitch-up above 15°)", () => {
+    const def = createF16Definition();
+    const aero = def.createSystems().aero;
+    const cmAt = (alphaDeg: number) => aero.compute({ alphaRad: alphaDeg * DEG, betaRad: 0, trueAirspeedMps: 470, dynamicPressurePa: 30000, mach: 1.6, ratesRadps: [0, 0, 0], surfaces: { elevator: 0, lef: 0 }, cgFractionMac: 0.35 }).momentBodyNm[1];
+    for (let a = 4; a <= 22; a += 2) expect(cmAt(a + 2)).toBeLessThan(cmAt(a));
+  });
+
+  it("scales control power with Mach (estimated): stronger subsonic, weaker high supersonic", () => {
+    expect(controlEffectiveness(0.2).pitch).toBeCloseTo(1, 6);
+    expect(controlEffectiveness(0.85).pitch).toBeGreaterThan(1.1);
+    expect(controlEffectiveness(2.0).roll).toBeLessThan(0.85);
   });
 
   it("uses exact normal-shock recovery for the F-16's fixed pitot inlet", () => {
@@ -100,15 +113,53 @@ describe("F-16 weight, speedbrake and FLCS behaviour", () => {
       const a = jet(speed);
       a.setThrottle(0.8);
       a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
-      let maxAlpha = 0, lo = 99, hi = -99;
+      // Alpha may drift slowly as speed bleeds off (the limiter allows more alpha as g falls), so
+      // porpoising is measured as reversals of alpha after the initial capture, not total spread.
+      let maxAlpha = 0, prev = 0, prevSlope = 0, swing = 0, lastTurn = Number.NaN;
       for (let i = 1; i <= 720; i++) {
         a.stepTick();
         const al = a.snapshot().alphaRad / DEG;
         maxAlpha = Math.max(maxAlpha, al);
-        if (i > 360) { lo = Math.min(lo, al); hi = Math.max(hi, al); }
+        const slope = Math.sign(al - prev);
+        if (i > 240 && slope !== 0 && prevSlope !== 0 && slope !== prevSlope) {
+          if (!Number.isNaN(lastTurn)) swing = Math.max(swing, Math.abs(prev - lastTurn));
+          lastTurn = prev;
+        }
+        if (slope !== 0) prevSlope = slope;
+        prev = al;
       }
       expect(maxAlpha).toBeLessThan(25.5);
-      expect(hi - lo).toBeLessThan(2);
+      expect(swing).toBeLessThan(1);
+    }
+  });
+
+  it("reaches about 9 g but never over-g's, subsonic and supersonic (pitch law + over-g protection)", () => {
+    for (const [ft, mach, minG] of [[10000, 0.9, 8.8], [10000, 1.2, 8.3], [40000, 1.9, 8.3]] as const) {
+      const h = ft * FT;
+      const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, h], headingRad: 0, speedMps: mach * standardAtmosphere(h).speedOfSoundMps, throttle: 1 });
+      fly(a, 1);
+      a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
+      let g = 0;
+      for (let i = 0; i < 5 * 120; i++) { a.stepTick(); g = Math.max(g, a.snapshot().nzG); }
+      expect(g).toBeGreaterThan(minG);
+      expect(g).toBeLessThan(9.4);
+    }
+  });
+
+  it("rolls near the 308°/s command at medium and high speed without large overshoot on release", () => {
+    for (const kcas of [300, 400, 500]) {
+      const h = 10000 * FT, atm = standardAtmosphere(h);
+      const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, h], headingRad: 0, speedMps: kcas * 0.5144 * Math.sqrt(1.225 / atm.densityKgM3), throttle: 0.75 });
+      fly(a, 1);
+      a.setPilotInputs({ pitch: 0, roll: 1, yaw: 0 });
+      let peak = 0;
+      for (let i = 0; i < 240; i++) { a.stepTick(); peak = Math.max(peak, a.snapshot().ratesRadps[0] / DEG); }
+      a.setPilotInputs({ pitch: 0, roll: 0, yaw: 0 });
+      let back = 0;
+      for (let i = 0; i < 180; i++) { a.stepTick(); back = Math.min(back, a.snapshot().ratesRadps[0] / DEG); }
+      expect(peak).toBeGreaterThan(270);
+      expect(peak).toBeLessThan(325);
+      expect(back).toBeGreaterThan(-10);
     }
   });
 

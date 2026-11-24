@@ -27,6 +27,7 @@ export interface FlcsSensors {
   /** Body rates p, q, r (rad/s). */
   readonly ratesRadps: readonly [number, number, number];
   readonly dynamicPressurePa: number;
+  readonly trueAirspeedMps: number;
   readonly pitchRad: number;
   readonly rollRad: number;
 }
@@ -45,35 +46,54 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 /** Project-designed gains (see file header). */
 export const F16_FLCS_GAINS = Object.freeze({
   referenceDynamicPressurePa: 20_000,
-  pitchProportionalDegPerG: 1.0,
-  pitchIntegralDegPerGs: 2.5,
+  pitchProportionalDegPerG: 1.5,
+  pitchIntegralDegPerGs: 4,
+  /** The integral gain is scheduled with (q_ref/q)^this: weaker than the proportional path's 1/q. */
+  pitchIntegralScheduleExponent: 0.5,
   pitchRateDampingDegPerRadps: 22,
   /** Pilot g-command prefilter time constant (s). */
   commandPrefilterS: 0.3,
-  /** Stabilator nose-down per degree of alpha above the limiter onset, and per rad/s of pitch rate there. */
-  alphaLimiterDegPerDeg: 1.5,
-  alphaLimiterRateDegPerRadps: 20,
-  /** Degrees of alpha excess over which the g loop hands over to the limiter. */
-  alphaLimiterBlendDeg: 3,
-  /** The g-loop integrator freezes this many degrees before the limiter onset. */
-  integratorFreezeMarginDeg: 3,
-  /** Look-ahead (s) applied to pitch rate in the AoA limiter. */
-  alphaLimiterLeadS: 0.6,
+  /** AoA feedback into the g-error path: g per degree of (predicted) alpha above the onset. */
+  alphaFeedbackGPerDeg: 0.8,
+  alphaFeedbackOnsetDeg: 17,
+  /** Direct nose-down stabilator per degree of predicted alpha above the AoA limit (backstop). */
+  alphaBackstopDegPerDeg: 3,
+  /** Look-ahead (s) applied to the alpha rate in the AoA limiter. */
+  alphaLimiterLeadS: 0.3,
+  /** Over-g protection: nose-down stabilator per g of load factor (predicted ahead) above the limit (not q-scheduled). */
+  overGDegPerG: 4,
+  /** Look-ahead (s) on the load-factor rate for over-g protection. */
+  overGLeadS: 0.15,
   rollProportionalDegPerRadps: 6,
+  /**
+   * Roll feedforward: flaperon degrees per rad/s of commanded roll rate at 1 m/s true airspeed
+   * (divided by TAS). Steady roll rate per degree of roll control is Clδ·2V/(b·|Clp|); with the
+   * TP-1538 tables (Clδ ≈ 0.0025/deg combined roll control, Clp ≈ −0.35 at low α) that is
+   * ≈ 0.0016·V rad/s per degree, so δ ≈ 640/V per rad/s. Removes the steady error of a
+   * proportional-only roll loop at high speed.
+   */
+  rollFeedforwardDegMpsPerRadps: 560,
   /** Integral on roll-rate error, so small aerodynamic asymmetries do not cause a steady roll drift. */
   rollIntegralDegPerRad: 12,
   yawRateDampingDegPerRadps: 25,
-  sideslipDegPerDeg: 2.0,
-  alphaLimiterOnsetMarginDeg: 3,
-  /** AoA/g limiter: full g available up to this alpha, falling linearly to 1 g at the alpha limit. */
-  gLimiterFadeStartDeg: 15,
-  /** Roll-rate authority: full up to this alpha, fading to `rollFadeMinFraction` at the alpha limit. */
-  rollFadeStartDeg: 15,
-  rollFadeMinFraction: 0.25,
+  sideslipDegPerDeg: 4,
+  /**
+   * Roll-rate command limiting, NASA TP-1538 (1979) "control system B" (pp. 18–19): the maximum
+   * commandable roll rate (308°/s) is reduced by 0.0115 °/s per N/m² of dynamic pressure below
+   * 10,500 N/m² (≈250 KIAS), by 4 °/s per degree of alpha above 15°, and by 4 °/s per degree of
+   * nose-down stabilator beyond 5°, to no less than 80 °/s. Prevents inertia-coupling departures.
+   */
+  rollLimitQBreakPa: 10_500,
+  rollLimitPerPaDegS: 0.0115,
+  rollLimitAlphaOnsetDeg: 15,
+  rollLimitPerAlphaDegS: 4,
+  rollLimitStabOnsetDeg: 5,
+  rollLimitPerStabDegS: 4,
+  rollLimitMinDegS: 80,
   /** Aileron–rudder interconnect: rudder deg per (aileron deg × alpha rad). */
-  ariGain: 1.5,
+  ariGain: 2.5,
   /** Stability-axis roll: rudder per rad/s of yaw-rate error from r = p·tanα (rolls about the velocity vector). */
-  stabilityAxisRollDegPerRadps: 40,
+  stabilityAxisRollDegPerRadps: 70,
   /** Yaw-damper washout time constant (s): steady turn rate is not opposed. */
   yawDamperWashoutS: 1.0,
   /** Pedal authority fades between these alphas. */
@@ -84,15 +104,24 @@ export const F16_FLCS_GAINS = Object.freeze({
 });
 
 export class F16FlightControls {
-  private pitchIntegral = 0;
+  /** Integrated g error, held directly as stabilator degrees (so q-scheduling cannot change it). */
+  private pitchIntegralDeg = 0;
   private filteredNzCmd = 1;
   private rollIntegral = 0;
+  private lastNz = 1;
+  private lastElevatorDeg = 0;
+  private lastAlpha = Number.NaN;
+  private alphaRate = 0;
   private yawRateLowPass = 0;
 
   public reset(): void {
-    this.pitchIntegral = 0;
+    this.pitchIntegralDeg = 0;
     this.filteredNzCmd = 1;
     this.rollIntegral = 0;
+    this.lastNz = 1;
+    this.lastElevatorDeg = 0;
+    this.lastAlpha = Number.NaN;
+    this.alphaRate = 0;
     this.yawRateLowPass = 0;
   }
 
@@ -106,41 +135,52 @@ export class F16FlightControls {
     const stick = clamp(pilot.pitch, -1, 1);
     let nzCmd = stick >= 0 ? neutral + stick * (lim.maxPositiveG.value - neutral) : neutral + stick * (neutral - lim.maxNegativeG.value);
     nzCmd = clamp(nzCmd, lim.maxNegativeG.value, lim.maxPositiveG.value);
-    // AoA/g limiter: available g falls from max at the fade start to 1 g at the alpha limit.
-    const alphaNow = s.alphaRad * DEG;
-    const fade = clamp((alphaNow - g.gLimiterFadeStartDeg) / (lim.alphaLimitDeg.value - g.gLimiterFadeStartDeg), 0, 1);
-    nzCmd = Math.min(nzCmd, lim.maxPositiveG.value - (lim.maxPositiveG.value - 1) * fade);
     this.filteredNzCmd += (nzCmd - this.filteredNzCmd) * (1 - Math.exp(-dt / g.commandPrefilterS));
 
-    // AoA limiter: above the onset, alpha and pitch rate drive the stabilator nose-down directly,
-    // and the g-loop integrator is frozen so it cannot fight the limiter.
-    const onset = lim.alphaLimitDeg.value - g.alphaLimiterOnsetMarginDeg;
-    // Lead: act on alpha predicted a short time ahead from pitch rate, so momentum cannot carry past the limit.
-    const excess = (s.alphaRad + g.alphaLimiterLeadS * Math.max(0, q)) * DEG - onset;
-    const alphaLimiting = excess > 0;
-    const limiterDeg = alphaLimiting ? g.alphaLimiterDegPerDeg * excess + g.alphaLimiterRateDegPerRadps * Math.max(0, q) : 0;
+    // AoA limiting (F-16 structure): above an onset, alpha — predicted a short time ahead from the
+    // filtered alpha rate — is fed back INTO the g-error path, so a single integrator settles where
+    // nz command − nz = K·(α − onset). Full g is available at moderate alpha, and the available
+    // g falls as alpha rises; nothing winds up against a separate limiter. Alpha rate, not pitch
+    // rate, is used for the lead: in a steady turn q is large but alpha is constant.
+    if (Number.isNaN(this.lastAlpha)) this.lastAlpha = s.alphaRad;
+    const rawRate = dt > 0 ? (s.alphaRad - this.lastAlpha) / dt : 0;
+    this.lastAlpha = s.alphaRad;
+    this.alphaRate += (rawRate - this.alphaRate) * (1 - Math.exp(-dt / 0.05));
+    const alphaPred = (s.alphaRad + g.alphaLimiterLeadS * Math.max(0, this.alphaRate)) * DEG;
+    const alphaFeedbackG = g.alphaFeedbackGPerDeg * Math.max(0, alphaPred - g.alphaFeedbackOnsetDeg);
+    // Hard backstop at the AoA limit itself (direct nose-down, not through the integrator).
+    const backstopDeg = g.alphaBackstopDegPerDeg * Math.max(0, alphaPred - lim.alphaLimitDeg.value);
+    const alphaLimiting = alphaFeedbackG > 0.5 || backstopDeg > 0;
 
-    const error = this.filteredNzCmd - s.nzG;
+    const error = this.filteredNzCmd - s.nzG - alphaFeedbackG;
+    // Over-g protection: load factor predicted a short time ahead beyond the structural limit
+    // drives the stabilator nose-down, so a stored integrator cannot carry the jet past 9 g.
+    const nzRate = dt > 0 ? (s.nzG - this.lastNz) / dt : 0;
+    this.lastNz = s.nzG;
+    const overG = Math.max(0, s.nzG + g.overGLeadS * nzRate - lim.maxPositiveG.value);
     const elevLimit = F16_ACTUATORS.elevatorLimitDeg.value;
-    // The g loop fades out over the first few degrees of excess so the limiter always wins.
-    const gLoopWeight = alphaLimiting ? clamp(1 - excess / g.alphaLimiterBlendDeg, 0, 1) : 1;
-    const gLoop = -(g.pitchProportionalDegPerG * error + g.pitchIntegralDegPerGs * this.pitchIntegral) * gLoopWeight;
-    const unsaturated = (gLoop + g.pitchRateDampingDegPerRadps * q + limiterDeg) * schedule;
-    // Anti-windup: freeze the integrator near the alpha limit or when saturated against the error,
-    // and bleed it off while limiting so releasing the limiter cannot dump a stored nose-up command.
-    if (alphaLimiting) {
-      this.pitchIntegral *= Math.exp(-dt / 0.5);
-    } else if (excess < -g.integratorFreezeMarginDeg && (Math.abs(unsaturated) < elevLimit || Math.sign(unsaturated) !== -Math.sign(error))) {
-      this.pitchIntegral = clamp(this.pitchIntegral + error * dt, -10, 10);
+    const unsaturated = (-g.pitchProportionalDegPerG * error + g.pitchRateDampingDegPerRadps * q) * schedule + g.overGDegPerG * overG + backstopDeg + this.pitchIntegralDeg;
+    // Integrator in stabilator degrees, limited to the stabilator travel. Anti-windup: it does not
+    // integrate further into saturation, and it bleeds off while the backstop or over-g act.
+    if (backstopDeg > 0 || overG > 0) {
+      this.pitchIntegralDeg *= Math.exp(-dt / 0.3);
+    } else if (Math.abs(unsaturated) < elevLimit || Math.sign(unsaturated) !== -Math.sign(error)) {
+      this.pitchIntegralDeg = clamp(this.pitchIntegralDeg - g.pitchIntegralDegPerGs * error * Math.pow(schedule, g.pitchIntegralScheduleExponent) * dt, -elevLimit, elevLimit);
     }
     const elevatorDeg = clamp(unsaturated, -elevLimit, elevLimit);
+    this.lastElevatorDeg = elevatorDeg;
 
     // Roll: roll-rate command. Source convention: negative aileron rolls right.
-    const rollFade = 1 - (1 - g.rollFadeMinFraction) * clamp((s.alphaRad * DEG - g.rollFadeStartDeg) / (lim.alphaLimitDeg.value - g.rollFadeStartDeg), 0, 1);
-    const pCmd = clamp(pilot.roll, -1, 1) * rollFade * lim.maxRollRateDegS.value / DEG;
+    // TP-1538 roll-rate limiting (q, alpha and nose-down stabilator; positive elevator = nose down).
+    const pMaxDegS = Math.max(g.rollLimitMinDegS, lim.maxRollRateDegS.value
+      - g.rollLimitPerPaDegS * Math.max(0, g.rollLimitQBreakPa - s.dynamicPressurePa)
+      - g.rollLimitPerAlphaDegS * Math.max(0, s.alphaRad * DEG - g.rollLimitAlphaOnsetDeg)
+      - g.rollLimitPerStabDegS * Math.max(0, this.lastElevatorDeg - g.rollLimitStabOnsetDeg));
+    const pCmd = clamp(pilot.roll, -1, 1) * pMaxDegS / DEG;
     const ailLimit = F16_ACTUATORS.aileronLimitDeg.value;
     const rollError = pCmd - p;
-    const ailUnsat = -(g.rollProportionalDegPerRadps * rollError + g.rollIntegralDegPerRad * this.rollIntegral) * schedule;
+    const feedforward = (g.rollFeedforwardDegMpsPerRadps / Math.max(50, s.trueAirspeedMps)) * pCmd;
+    const ailUnsat = -feedforward - (g.rollProportionalDegPerRadps * rollError + g.rollIntegralDegPerRad * this.rollIntegral) * schedule;
     // The integrator only trims out small steady asymmetries (stick centred AND nearly steady); during
     // a roll or its stop it bleeds off, so it cannot wind up and roll the jet back on release.
     if (Math.abs(pilot.roll) < 0.05 && Math.abs(p) < 5 / DEG && Math.abs(ailUnsat) < ailLimit) this.rollIntegral = clamp(this.rollIntegral + rollError * dt, -0.5, 0.5);

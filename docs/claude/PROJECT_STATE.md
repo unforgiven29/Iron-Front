@@ -106,7 +106,14 @@ Build and test narrow, replaceable services in this order:
    - The F110 inlet is an exact normal-shock pitot inlet, with installation and Reynolds losses (estimated). A compressor-exit temperature limit is derived from two published speed points.
    - Fuel-driven mass (USAF 8,936 kg empty + fuel) and speedbrake (estimated drag).
    - Fly-by-wire features documented for the F-16: AoA/g limiter, roll-rate fade with AoA, ARI, stability-axis roll, washout yaw damper and pedal fade (gains estimated).
-   - Shared steady-state performance calculator. Validated: max level speed ≈M1.26 at sea level (published ≈1.2) and M1.89 at 40,000 ft (published max sustained 1.89); ceiling above 50,000 ft. Open discrepancy: sea-level climb ≈68,000 ft/min vs a commonly quoted ≈50,000.
+   - Shared steady-state performance calculator. Validated: max level speed ≈M1.26 at sea level (published ≈1.2) and M1.89 at 40,000 ft (published max sustained 1.89); ceiling above 50,000 ft. Sea-level climb ≈68,000 ft/min sits inside the published 50,000 (generic/early F-16) to 72,000 ft/min (quoted for Block 50/52) range; neither figure states a weight.
+9. **Done, partly estimated:** F-16 handling pass against NASA TP-1538 (primary, from NTRS).
+   - TP-1538 confirms that the dataset's roll control is flaperons with differential tail at 4:1 (fig. 13 matches the "aileron" tables within reading accuracy), so roll power was already correct.
+   - FLCS pitch law restructured to the documented F-16 form: g command with alpha (rate-led) fed into the same integrated error, a hard alpha backstop at the limit, and over-g protection. The integrator is stored in stabilator degrees, which removed a 6.3 g cap supersonic.
+   - Roll: TAS-scheduled feedforward (282–311°/s at 300–500 KCAS, was 173–201) and the TP-1538 "control system B" roll-rate limiting (q, alpha, nose-down stabilator; minimum 80°/s). 308°/s is now attributed to TP-1538.
+   - Supersonic aerodynamic-centre shift now applies at every alpha. Fading it with attached flow had created an artificial pitch-up above ≈15° supersonic.
+   - Control power changes with Mach (estimated: scaled by the wing's lift-curve-slope ratio).
+   - Remaining estimated: transonic aero, control power vs Mach, engine component maps, all FLCS gains. M 1.6 at 40,000 ft reaches ≈7.5 g in 5 s with the stabilator near full travel.
 4. **Done:** app routes. `/` is the full-screen F-16 game with a start/pause menu (`game/src/app/GameScreen.ts`, `F16Session.ts`). `/#debug` is the developer tools page (foundation status, runtime monitor, debug flyer).
 3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 
