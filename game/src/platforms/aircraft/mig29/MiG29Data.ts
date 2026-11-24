@@ -18,6 +18,8 @@ export interface Parameter<T = number> {
   readonly note?: string;
 }
 
+/** Primary source: German Air Force flight manual, Section 1 (MiG-29G / 9.12-family export airframe). */
+export const GAF_TO = "GAF T.O. 1F-MIG29-1, Section 1 (MiG-29G, 9.12 family); applicability to product 9.13 not verified";
 const FAMILY = "Published MiG-29 family figures (e.g. U.S. Army WEG / reference works); product 9.13 applicability not verified";
 const EST = "project estimate";
 const P = (value: number, unit: string, status: ParameterStatus, source: string, note?: string): Parameter => ({ value, unit, status, source, ...(note ? { note } : {}) });
@@ -32,8 +34,8 @@ export const MIG29_GEOMETRY = Object.freeze({
 });
 
 export const MIG29_MASS = Object.freeze({
-  emptyMassKg: P(11000, "kg", "secondary-reported", FAMILY, "Family-level empty mass; pilot, gun ammunition and stores not added"),
-  internalFuelKg: P(4300 * 0.785, "kg", "derived", "U.S. Army WEG 4,300 L internal fuel × 0.785 kg/L (jet fuel)", "Family-level volume; 9.13 spine tank not verified"),
+  emptyMassKg: P(11001, "kg", "primary-published", GAF_TO, "Operating weight including pilot (MiG-29G); the 9.13 spine tank is not included"),
+  internalFuelKg: P(14454 - 11001, "kg", "derived", GAF_TO, "Operating weight with full internal fuel (14,454 kg) minus operating weight"),
   /** Radii of gyration (Roskam's non-dimensional estimates for twin-engine fighters). */
   rollGyrationRadius: P(0.25, "fraction of span", "estimated", "Roskam, Airplane Design Part V, fighter class"),
   pitchGyrationRadius: P(0.36, "fraction of length", "estimated", "Roskam, fighter class"),
@@ -52,7 +54,8 @@ export const MIG29_AERO = Object.freeze({
   staticMarginSupersonic: P(0.20, "MAC fraction", "estimated", "Aerodynamic-centre shift to ≈half chord supersonic (textbook)"),
   stabilatorPowerPerRad: P(-0.65, "Cm per rad", "estimated", "Tail volume × tail lift slope estimate"),
   pitchDampingPerRad: P(-5.0, "Cmq (per rad, c/2V)", "estimated", EST),
-  rollPowerPerDeg: P(0.0016, "Cl per deg (ailerons + differential stabilators)", "estimated", EST),
+  rollPowerPerDeg: P(0.0014, "Cl per deg of equivalent aileron", "estimated", EST),
+  differentialStabilatorRollPerDeg: P(0.0018, "Cl per deg of differential taileron", "estimated", EST),
   rollDampingPerRad: P(-0.30, "Clp (per rad, b/2V)", "estimated", EST),
   yawStabilityPerRad: P(0.12, "Cnβ per rad", "estimated", EST, "Twin vertical tails"),
   dihedralEffectPerRad: P(-0.10, "Clβ per rad", "estimated", EST),
@@ -67,8 +70,9 @@ export const MIG29_AERO = Object.freeze({
 /** RD-33 (each of two). Family-level ratings only; the series and maps are not established for 9.13. */
 const RD33 = "Published RD-33 family figures (Klimov; reference works); series/applicability to 9.13 not verified";
 export const MIG29_ENGINE = Object.freeze({
-  militaryThrustN: P(49_400, "N", "secondary-reported", RD33, "5,040 kgf dry, sea-level static, uninstalled"),
-  maxAfterburnerThrustN: P(81_400, "N", "secondary-reported", RD33, "8,300 kgf, sea-level static, uninstalled"),
+  militaryThrustN: P(5040 * 9.80665, "N", "primary-published", GAF_TO, "5,040 kp MIL, standard day sea-level static, normal power mode (NPM); 4,680 kp in low power mode"),
+  maxAfterburnerThrustN: P(8300 * 9.80665, "N", "primary-published", GAF_TO, "8,300 kp max AB, standard day SL static, NPM; min AB 5,600 kp; 7,520 kp in low power mode"),
+  idleThrustN: P(180 * 9.80665, "N", "primary-published", GAF_TO, "180 kp idle, SL static"),
   airflowKgS: P(76, "kg/s", "secondary-reported", RD33),
   bypassRatio: P(0.49, "-", "secondary-reported", RD33),
   overallPressureRatio: P(21, "-", "secondary-reported", RD33),
@@ -81,27 +85,45 @@ export const MIG29_ENGINE = Object.freeze({
   afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST)
 });
 
-/** Controls: mechanical linkage with SAU augmentation (GAF T.O. 1F-MIG29-1 describes SAU and electro-hydraulic actuation). */
-const GAF = "GAF T.O. 1F-MIG29-1 (system description; 9.13 applicability and all numbers unverified)";
+/** Controls: mechanical linkage, feel-control unit and SAU, from the GAF flight manual where stated. */
 export const MIG29_CONTROLS = Object.freeze({
-  stabilatorLimitDeg: P(25, "deg", "estimated", EST),
-  aileronLimitDeg: P(25, "deg", "estimated", EST),
-  rudderLimitDeg: P(25, "deg", "estimated", EST),
+  /** Tailerons: 35° trailing-edge up (nose up) / 15° down; package convention elevator + = nose down. */
+  stabilatorNoseUpDeg: P(35, "deg", "primary-published", GAF_TO, "Full authority (feel-unit rod extended)"),
+  stabilatorNoseDownDeg: P(15, "deg", "primary-published", GAF_TO),
+  /** Feel-control unit (ARU) authority reduction: minimum 17°45' up / 5°45' down near the ground at 470–650 KTAS. */
+  stabilatorMinNoseUpDeg: P(17.75, "deg", "primary-published", GAF_TO, "Rod fully retracted"),
+  stabilatorMinNoseDownDeg: P(5.75, "deg", "primary-published", GAF_TO, "Rod fully retracted"),
+  feelUnitRetractStartKtas: P(215, "KTAS", "primary-published", GAF_TO, "Below 3,000 ft the rod position depends on speed only"),
+  feelUnitRetractedKtas: P(470, "KTAS", "primary-published", GAF_TO),
+  feelUnitExtendStartKtas: P(650, "KTAS", "primary-published", GAF_TO),
+  feelUnitExtendedKtas: P(810, "KTAS", "primary-published", GAF_TO),
+  feelUnitLowAltitudeFt: P(3000, "ft", "primary-published", GAF_TO, "Above this, retraction is smaller"),
+  feelUnitFullAuthorityFt: P(30000, "ft", "primary-published", GAF_TO, "Always fully extended (full authority) above this"),
+  differentialStabilatorDeg: P(5, "deg", "primary-published", GAF_TO, "±5° differential taileron for roll; disabled when the LEF are extended"),
+  aileronUpDeg: P(25, "deg", "primary-published", GAF_TO, "Neutral is 5° up"),
+  aileronDownDeg: P(15, "deg", "primary-published", GAF_TO),
+  aileronLimitDeg: P(20, "deg", "derived", GAF_TO, "Equivalent antisymmetric travel (25 up + 15 down)/2 used by the roll model"),
+  aileronReductionAlphaDeg: P(18, "deg", "primary-published", GAF_TO, "Aileron authority reduced above this AoA; reduction law not published (estimated linear to 50 % at 26°)"),
+  rudderLimitDeg: P(25, "deg", "primary-published", GAF_TO),
   stabilatorRateDegS: P(45, "deg/s", "estimated", EST),
   aileronRateDegS: P(80, "deg/s", "estimated", EST),
   rudderRateDegS: P(80, "deg/s", "estimated", EST),
-  lefMaxDeg: P(20, "deg", "estimated", EST, "Automatic leading-edge flaps"),
-  lefAlphaOnsetDeg: P(8, "deg", "estimated", EST),
-  pitchGearingDegAtLowQ: P(25, "deg stabilator per full stick", "estimated", GAF, "Mechanical gearing reduced with dynamic pressure (artificial feel / gearing mechanism)"),
-  pitchDamperDegPerDegS: P(0.25, "deg per deg/s", "estimated", GAF, "SAU pitch-rate damper"),
-  rollDamperDegPerDegS: P(0.05, "deg per deg/s", "estimated", GAF, "SAU roll damper"),
-  yawDamperDegPerDegS: P(0.6, "deg per deg/s", "estimated", GAF, "SAU yaw damper"),
-  aoaLimiterOnsetDeg: P(24, "deg", "estimated", EST, "Stick-pusher-type AoA limiting (the MiG-29 has an AoA/g limiting system; values not verified)"),
+  lefMaxDeg: P(20, "deg", "estimated", EST, "LEF deflection angle not given in Section 1; LEF are locked fully in or fully out"),
+  lefExtendAlphaDeg: P(8.7, "deg", "primary-published", GAF_TO, "Extend at ≥8.7° AoA below the Mach-sensor switch point"),
+  lefRetractAlphaDeg: P(7, "deg", "primary-published", GAF_TO),
+  lefMachLimit: P(0.8, "Mach", "primary-published", GAF_TO, "Exact switch point depends on the installed Mach sensor"),
+  maxAlphaLefInDeg: P(15, "deg", "primary-published", GAF_TO, "AoA limiter: maximum AoA with LEF retracted"),
+  maxAlphaLefOutDeg: P(26, "deg", "primary-published", GAF_TO, "AoA limiter: maximum AoA with LEF extended"),
+  kickerGainDegPerDeg: P(3, "deg taileron per deg over the limit", "estimated", EST, "Pitch kicker pushes stick and tailerons nose down; pilot override force (17 kp) not modelled"),
+  pitchTrimAuthority: P(0.8, "fraction of authority", "primary-published", GAF_TO, "Trim authority: pitch 80 %, roll 60 %, yaw 60 %"),
+  pitchDamperDegPerDegS: P(0.25, "deg per deg/s", "estimated", GAF_TO, "SAU damper mode exists; gain estimated"),
+  rollDamperDegPerDegS: P(0.05, "deg per deg/s", "estimated", GAF_TO, "SAU damper mode exists; gain estimated"),
+  yawDamperDegPerDegS: P(0.6, "deg per deg/s", "estimated", GAF_TO, "SAU damper mode exists; gain estimated"),
   autoTrimRateDegS: P(1.0, "deg/s", "estimated", EST, "Stands in for the pilot's trim button")
 });
 
 export const MIG29_HYDRAULICS = Object.freeze({
-  nominalPressurePa: P(21e6, "Pa", "secondary-reported", GAF, "Two systems, main and booster, ≈210 kgf/cm²"),
+  nominalPressurePa: P(21e6, "Pa", "primary-published", GAF_TO, "Main and boost systems, pumps operate between 190 and 220 kp/cm² (mid-band); relief 240; low warning 100"),
   pumpRatedFlowM3s: P(1.6e-3, "m³/s", "estimated", EST, "One pump per system, on separate engines"),
   displacementM3PerDeg: P(1.4e-5, "m³/deg", "estimated", EST),
   hingeLoadFractionAtReference: P(0.5, "-", "estimated", EST),

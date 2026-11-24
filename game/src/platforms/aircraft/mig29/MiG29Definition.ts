@@ -30,7 +30,7 @@ export const MIG29_MANIFEST: ModuleManifest = {
   lifecycle: { initialization: "scenario-load", updateDomain: "fixed-tick", deterministic: true, supportsSaveState: false },
   provenance: {
     maintainer: "Iron-Front",
-    source: "Family-level published geometry and RD-33 ratings; textbook-method aerodynamics; GAF T.O. 1F-MIG29-1 system descriptions",
+    source: "GAF T.O. 1F-MIG29-1 Section 1 (weights, RD-33 ratings, control travel, feel unit, LEF and AoA limiter); family-level geometry; textbook-method aerodynamics",
     notes: "Bounded, clearly labelled approximation (docs/platform-reference-program/aircraft/MiG-29-product-9-13.md). Not a validated product 9.13 model."
   }
 };
@@ -44,11 +44,21 @@ function inertia(massKg: number): [[number, number, number], [number, number, nu
   return [[ixx, 0, 0], [0, iyy, 0], [0, 0, izz]];
 }
 
-/** Automatic leading-edge flaps: deploy with alpha above the onset, retract above Mach 0.85 (estimated). */
-function lefSchedule(): ScheduledDevices {
+/**
+ * Manoeuvring LEF (GAF T.O. 1F-MIG29-1): hydraulically locked fully IN or OUT. Extend at AoA ≥ 8.7°
+ * below M0.8, retract at AoA ≤ 7° or above M0.8. Gear/flap-linked extension is not modelled (the
+ * device schedule has no gear-position input yet).
+ */
+export function lefSchedule(): ScheduledDevices {
+  let out = false;
   return {
-    reset: () => {},
-    step: (s) => ({ lef: s.mach > 0.85 ? 0 : Math.max(0, Math.min(K.lefMaxDeg.value, (s.alphaRad * 180 / Math.PI - K.lefAlphaOnsetDeg.value) * 2)) })
+    reset: () => { out = false; },
+    step: (s) => {
+      const alpha = s.alphaRad * 180 / Math.PI;
+      if (s.mach >= K.lefMachLimit.value || alpha <= K.lefRetractAlphaDeg.value) out = false;
+      else if (alpha >= K.lefExtendAlphaDeg.value) out = true;
+      return { lef: out ? K.lefMaxDeg.value : 0 };
+    }
   };
 }
 
@@ -57,11 +67,12 @@ export function createMiG29Definition(): AircraftDefinition {
   return {
     manifest: MIG29_MANIFEST,
     displayName: "MiG-29 (provisional)",
-    dataNote: "PROVISIONAL: family-level published geometry and RD-33 ratings, textbook-method aerodynamics and estimated control laws. No verified MiG-29 9.13 data is public; this proves the modular systems, not MiG-29 fidelity.",
+    dataNote: "PROVISIONAL: weights, RD-33 ratings, control travel, feel-unit schedule, LEF and AoA-limiter logic from the GAF MiG-29G flight manual (9.13 applicability unverified); aerodynamic coefficients are still textbook estimates.",
     mass: { emptyMassKg: M.emptyMassKg.value, inertiaKgM2: inertia(referenceMass), referenceMassKg: referenceMass, cgFractionMac: M.cgFractionMac.value, internalFuelKg: M.internalFuelKg.value },
     surfaces: [
-      { id: "elevator", limitDeg: K.stabilatorLimitDeg.value, rateDegS: K.stabilatorRateDegS.value, bandwidthRadS: 20 },
+      { id: "elevator", limitDeg: K.stabilatorNoseDownDeg.value, minDeg: -K.stabilatorNoseUpDeg.value, rateDegS: K.stabilatorRateDegS.value, bandwidthRadS: 20 },
       { id: "aileron", limitDeg: K.aileronLimitDeg.value, rateDegS: K.aileronRateDegS.value, bandwidthRadS: 20 },
+      { id: "differentialStabilator", limitDeg: K.differentialStabilatorDeg.value, rateDegS: K.stabilatorRateDegS.value, bandwidthRadS: 20 },
       { id: "rudder", limitDeg: K.rudderLimitDeg.value, rateDegS: K.rudderRateDegS.value, bandwidthRadS: 20 },
       { id: "lef", limitDeg: K.lefMaxDeg.value, minDeg: 0, rateDegS: 15, bandwidthRadS: 5 },
       { id: "speedbrake", limitDeg: 60, minDeg: 0, rateDegS: 30, bandwidthRadS: 10 }
