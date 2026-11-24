@@ -60,6 +60,8 @@ export interface FlightSensors {
   readonly trueAirspeedMps: number;
   readonly pitchRad: number;
   readonly rollRad: number;
+  /** Electrical bus states from the package's electrical installation (absent without one). */
+  readonly electricalBuses?: Readonly<Record<string, { readonly powered: boolean; readonly shed: boolean }>>;
 }
 
 export interface FcsOutput {
@@ -144,6 +146,8 @@ export interface MassProperties {
 /** Mutable aircraft state a package's switches may change, through these setters only. */
 export interface AircraftControlContext {
   setCgFractionMac(value: number): void;
+  /** Electrical sources failed or switched off (generator switches, test failures). */
+  setElectricalSourcesOff(ids: readonly string[]): void;
   /** Select an engine's control mode (e.g. a primary/secondary engine-control switch). */
   setEngineControlMode(engineId: string, mode: FadecMode): void;
   /** Shut off (or restore) fuel to one engine — engine-out tests on multi-engine aircraft. */
@@ -168,6 +172,18 @@ export interface AircraftSystems {
   readonly fcs: FlightControlSystem;
   readonly devices?: ScheduledDevices;
   readonly switches: readonly SwitchBinding[];
+  /**
+   * Package-defined mechanical drives (e.g. an airframe accessory gearbox driven by whichever engine
+   * is faster, or a fuel-driven emergency pump). Returns speed fractions by drive id; hydraulic pumps
+   * and generators may name these ids instead of an engine id.
+   */
+  readonly accessoryDrives?: (ctx: DriveContext) => Readonly<Record<string, number>>;
+}
+
+export interface DriveContext {
+  engineSpeed(engineId: string): number;
+  hydraulicPressurePa(circuitId: string): number;
+  readonly emergencyUnitRunning: boolean;
 }
 
 export interface AircraftDefinition {
@@ -187,6 +203,10 @@ export interface AircraftDefinition {
    * mass, CG (as a MAC-fraction shift from `mass.cgFractionMac`, the zero-fuel CG) and inertia
    * follow the tank contents; without it, fuel is a single quantity at the CG.
    */
+  /** Optional electrical installation (shared bus-power network, package-specific topology). */
+  readonly electrical?: import("../../../systems/electrical/ElectricalNetwork.js").ElectricalInstallation;
+  /** Package coupling between its systems each step (e.g. start the EPU when generators are lost). */
+  readonly systemsCoupling?: (s: { readonly electrical?: import("../../../systems/electrical/ElectricalNetwork.js").ElectricalSnapshot; readonly hydraulics?: import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicSnapshot }) => { readonly startEmergencyUnit?: boolean };
   readonly createFuelSystem?: () => import("../../../systems/fuel/FuelTanks.js").FuelSystemModel;
   readonly cockpit: CockpitLayout;
   /** Aircraft-specific cautions and warnings built from the snapshot (e.g. hydraulic pressure lights). */

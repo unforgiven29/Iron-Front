@@ -16,6 +16,7 @@ import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
 import type { FuelSystemModel, TankState } from "../../../systems/fuel/FuelTanks.js";
+import { ElectricalNetwork, type ElectricalSnapshot } from "../../../systems/electrical/ElectricalNetwork.js";
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
@@ -64,6 +65,8 @@ export interface AircraftSnapshot {
   readonly massKg: number;
   /** Landing gear state (absent when the aircraft has none). */
   readonly gear?: GearStepResult & { readonly handleDown: boolean };
+  /** Electrical network state (absent when the aircraft has none). */
+  readonly electrical?: ElectricalSnapshot;
   /** Hydraulic network state (absent when the aircraft has none). */
   readonly hydraulics?: HydraulicSnapshot;
   readonly fcsMode: string;
@@ -97,6 +100,8 @@ export class FixedWingAircraft {
   private readonly systems: AircraftSystems;
   private readonly actuators: ReadonlyMap<string, SurfaceActuator>;
   private readonly hydraulics: HydraulicNetwork | undefined;
+  private readonly electrical: ElectricalNetwork | undefined;
+  private drives: Readonly<Record<string, number>> = {};
   private readonly surfaceLimits: ReadonlyMap<string, number>;
   private readonly gear: LandingGear | undefined;
   private gearHandleDown = true;
@@ -130,12 +135,14 @@ export class FixedWingAircraft {
     if (this.fuelSystem && !(definition.mass.macM && definition.mass.macM > 0)) throw new Error(`${definition.manifest.id}: a fuel system needs mass.macM`);
     this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS, s.minDeg)]));
     this.hydraulics = definition.hydraulics ? new HydraulicNetwork(definition.hydraulics) : undefined;
+    this.electrical = definition.electrical ? new ElectricalNetwork(definition.electrical) : undefined;
     this.gear = definition.landingGear ? new LandingGear(definition.landingGear) : undefined;
     this.surfaceLimits = new Map(definition.surfaces.map((s) => [s.id, Math.max(Math.abs(s.limitDeg), Math.abs(s.minDeg ?? s.limitDeg))]));
     const context = {
       setGearHandle: (down: boolean) => { this.gearHandleDown = down; },
       setEngineFuelCutoff: (engineId: string, cutoff: boolean) => { if (cutoff) this.fuelCutoff.add(engineId); else this.fuelCutoff.delete(engineId); },
       setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
+      setElectricalSourcesOff: (ids: readonly string[]) => { this.electrical?.setSourcesOff(ids); },
       setCgFractionMac: (v: number) => { this.cgBaseFractionMac = v; this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
     };
@@ -171,6 +178,8 @@ export class FixedWingAircraft {
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
     this.hydraulics?.reset(true);
+    this.electrical?.reset();
+    this.drives = {};
     this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
     this.gear?.reset(this.gearHandleDown);
     this.gearCrash = undefined;
@@ -270,7 +279,8 @@ export class FixedWingAircraft {
     const sensors: FlightSensors = {
       nzG: this.nz, nyG: this.ny, weightOnWheels: this.gear?.state.weightOnWheels ?? false, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
-      pitchRad: att.pitch, rollRad: att.roll
+      pitchRad: att.pitch, rollRad: att.roll,
+      ...(this.electrical ? { electricalBuses: Object.fromEntries(this.electrical.snapshot.buses.map((b) => [b.id, { powered: b.powered, shed: b.shed }])) } : {})
     };
 
     const fcs = this.systems.fcs.step(this.pilot, sensors, this.surfacePositions(), dt);
@@ -312,7 +322,18 @@ export class FixedWingAircraft {
     } else {
       this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
     }
-    this.hydraulics?.step(dt, (engineId) => this.engineCoreSpeed(engineId), this.surfaceRates);
+    // Package-defined accessory drives (gearboxes, emergency pumps) resolve before engine ids.
+    const hyd = this.hydraulics?.snapshot();
+    this.drives = this.systems.accessoryDrives?.({
+      engineSpeed: (id) => this.engineCoreSpeed(id),
+      hydraulicPressurePa: (id) => this.hydraulics?.pressurePa(id) ?? 0,
+      emergencyUnitRunning: hyd?.emergencyUnit?.state === "running"
+    }) ?? {};
+    const drive = (id: string) => this.drives[id] ?? this.engineCoreSpeed(id);
+    this.hydraulics?.step(dt, drive, this.surfaceRates);
+    const elec = this.electrical?.step(dt, drive);
+    const coupling = this.definition.systemsCoupling?.({ ...(elec ? { electrical: elec } : {}), ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}) });
+    if (coupling?.startEmergencyUnit) this.hydraulics?.commandEmergencyStart();
     // Mass properties change only between integration steps.
     this.body.setMassProperties(this.massProperties());
 
@@ -389,6 +410,7 @@ export class FixedWingAircraft {
       massKg: this.body.massProperties.massKg,
       ...(this.gear ? { gear: { ...this.gear.state, handleDown: this.gearHandleDown } } : {}),
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
+      ...(this.electrical ? { electrical: this.electrical.snapshot } : {}),
       fcsMode: this.fcsMode,
       annunciations: this.annunciations,
       cgFractionMac: this.cgFractionMac,

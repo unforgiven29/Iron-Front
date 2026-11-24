@@ -9,6 +9,7 @@ import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW_SPEED_REFERENCE } from "./F16Compressibility.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
+import { f16AccessoryDrives, f16SystemsCoupling, F16_ELECTRICAL_INSTALLATION } from "./F16Electrical.js";
 import { f16FuelSystem, f16TankSpecs } from "./F16FuelSystem.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
@@ -164,6 +165,8 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     landingGear: F16_LANDING_GEAR,
     annunciate: f16Annunciations,
     createFuelSystem: () => f16FuelSystem(),
+    electrical: F16_ELECTRICAL_INSTALLATION,
+    systemsCoupling: f16SystemsCoupling,
     cockpit: F16_COCKPIT_LAYOUT,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createSystems: () => {
@@ -196,6 +199,11 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; }
         },
         {
+          key: "j",
+          definition: { id: F16_SWITCHES.electricalFault, ownerId: "f16.electrical", label: "ELEC FAULT (TEST)", positions: ["NORMAL", "MAIN GEN FAIL", "MAIN+STBY GEN FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven generators. Not a real F-16 control." },
+          onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "MAIN GEN FAIL" ? ["gen.main"] : ["gen.main", "gen.standby"]); return { accepted: true }; }
+        },
+        {
           key: "h",
           definition: { id: F16_SWITCHES.hydraulicFault, ownerId: "f16.hydraulics", label: "HYD FAULT (TEST)", positions: Object.keys(F16_TEST_HYDRAULIC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven hydraulic pumps. Not a real F-16 control." },
           onChange: (to, ctx) => { ctx.setHydraulicFaults(F16_TEST_HYDRAULIC_FAULTS[to as keyof typeof F16_TEST_HYDRAULIC_FAULTS].map((pumpId) => ({ kind: "pump-failed" as const, pumpId }))); return { accepted: true }; }
@@ -205,10 +213,17 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
       const trackingFcs: FlightControlSystem = {
         reset: () => fcs.reset(),
         mode: () => fcs.mode(),
-        step: (pilot, sensors, surfaces, dt) => { lastElevator = surfaces["elevator"] ?? 0; return fcs.step(pilot, sensors, surfaces, dt); }
+        step: (pilot, sensors, surfaces, dt) => {
+          lastElevator = surfaces["elevator"] ?? 0;
+          // Without FLCS power the computers stop commanding: surfaces hold where they are.
+          if (sensors.electricalBuses?.["flcs"]?.powered === false) {
+            return { mode: fcs.mode(), annunciations: ["FLCS POWER LOST"], commands: { ...surfaces } };
+          }
+          return fcs.step(pilot, sensors, surfaces, dt);
+        }
       };
       const devices = f16Devices(model);
-      return { aero: f16Aero(model), fcs: trackingFcs, switches, ...(devices ? { devices } : {}) };
+      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), ...(devices ? { devices } : {}) };
     }
   };
 }
@@ -275,6 +290,9 @@ function f16Annunciations(s: AircraftSnapshot): { text: string; level: "caution"
   if (g && g.extension > 0 && g.extension < 1) out.push({ text: "GEAR IN TRANSIT", level: "caution" });
   if (g && !g.handleDown && g.extension <= 0 && s.ground.kind === "airborne" && s.ground.aglM < 300 && s.verticalSpeedMps < -2 && s.equivalentAirspeedMps < 95) out.push({ text: "GEAR UP — LANDING", level: "warning" });
   const epu = s.hydraulics?.emergencyUnit;
+  const online = (id: string) => s.electrical?.sources.find((x) => x.id === id)?.online ?? true;
+  if (!online("gen.main")) out.push({ text: "ELEC SYS", level: "caution" });
+  if (s.electrical?.buses.find((b) => b.id === "flcs")?.sourceId === "battery.flcs") out.push({ text: "FLCS PMG", level: "caution" });
   if (epu && epu.state !== "off") out.push({ text: epu.state === "depleted" ? "EPU FUEL DEPLETED" : "EPU RUN", level: epu.state === "depleted" ? "warning" : "caution" });
   return out;
 }
