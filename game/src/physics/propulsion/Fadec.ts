@@ -29,6 +29,7 @@
  * on the fan operating line other than the area limiter, idle nozzle opening, fault detection and automatic transfer to backup,
  * relight/airstart, fuel-system pressures.
  */
+import { lookup1D, type Table1D } from "../aerodynamics/Tables.js";
 import type { ThroatCommand } from "./components/Nozzle.js";
 import { solveCycle, type Ambient, type CycleResult, type TurbofanDesign } from "./MixedFlowTurbofan.js";
 
@@ -39,10 +40,17 @@ export interface FadecSchedule {
   readonly afterburnerDetentThrottle: number;
   /** Physical spool speed (fraction of design) at idle, sea level. */
   readonly idleSpeed: number;
+  /**
+   * Optional throttle map from engine data: dry throttle fraction (0 = idle, 1 = MIL) → CORRECTED
+   * spool speed. Without it the map is linear in physical speed from idle to max.
+   */
+  readonly dryThrottleCorrectedSpeed?: Table1D;
   /** Physical spool speed at maximum dry power (MIL). */
   readonly maxPhysicalSpeed: number;
   /** Corrected-speed limit (fraction of design); protects the fan on cold, fast days. */
   readonly maxCorrectedSpeed: number;
+  /** Optional: maximum corrected speed as a function of engine-face temperature ratio θ (a "T2 lapse" schedule). */
+  readonly maxCorrectedSpeedByTheta?: Table1D;
   /** Acceleration and deceleration schedules: max change of speed demand, fraction per second. */
   readonly accelRatePerS: number;
   readonly decelRatePerS: number;
@@ -131,12 +139,20 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   const maxPhys = mode === "backup" ? s.backup.maxPhysicalSpeed : s.maxPhysicalSpeed;
   // Throttle map: linear idle → max over the dry range.
   const dry = Math.min(1, t / s.afterburnerDetentThrottle);
-  let speed = s.idleSpeed + (maxPhys - s.idleSpeed) * dry;
+  const theta0 = thetaOf(ambient);
+  let speed: number;
+  if (s.dryThrottleCorrectedSpeed) {
+    const wanted = lookup1D(s.dryThrottleCorrectedSpeed, dry).value * Math.sqrt(theta0);
+    speed = Math.min(maxPhys, wanted);
+    if (wanted > maxPhys + 1e-9) limits.push("max-speed");
+  } else {
+    speed = s.idleSpeed + (maxPhys - s.idleSpeed) * dry;
+  }
   if (mode === "backup" && speed >= maxPhys - 1e-9 && s.maxPhysicalSpeed > maxPhys) limits.push("max-speed");
 
   // Corrected-speed limit.
   const theta = thetaOf(ambient);
-  const correctedCap = s.maxCorrectedSpeed * Math.sqrt(theta);
+  const correctedCap = (s.maxCorrectedSpeedByTheta ? Math.min(s.maxCorrectedSpeed, lookup1D(s.maxCorrectedSpeedByTheta, theta).value) : s.maxCorrectedSpeed) * Math.sqrt(theta);
   if (speed > correctedCap) { speed = correctedCap; limits.push("corrected-speed"); }
 
   let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;

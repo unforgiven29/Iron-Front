@@ -173,8 +173,8 @@ function engPage(s: AircraftSnapshot) {
     title: "ENG",
     lines: [
       `THR  ${(s.throttle * 100).toFixed(0).padStart(3)} %`,
-      `RPM  ${(e.spoolSpeed * 100).toFixed(0).padStart(3)} %`,
-      `TIT  ${e.turbineInletTemperatureK.toFixed(0)} K`,
+      `RPM  ${(e.spoolSpeed * 100).toFixed(0).padStart(3)} %  N1 ${((e.n1Rpm ?? 0) / 1000).toFixed(1)}k`,
+      `EGT  ${(e.exhaustGasTemperatureK ?? e.turbineInletTemperatureK).toFixed(0)} K${e.outsideDeck ? "  (EXTRAP)" : ""}`,
       `THRUST ${(e.netThrustN / 1000).toFixed(1)} kN`,
       `       ${((e.netThrustN / max) * 100).toFixed(0)}% of max`,
       `A/B  ${e.afterburnerLit ? "ON" : "OFF"}  NOZ ${Number.isFinite(e.nozzle.position) ? (e.nozzle.position * 100).toFixed(0).padStart(3) + "%" : " — "}`,

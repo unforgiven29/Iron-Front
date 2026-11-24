@@ -121,7 +121,16 @@ Build and test narrow, replaceable services in this order:
 11. **Done, geometry estimated:** engine inlet and nozzle as components (`physics/propulsion/components/`).
    - Variable convergent–divergent nozzle: throat (choked/subsonic), linked exit area, isentropic expansion, momentum + pressure thrust, separation approximation. Cycle back-pressure matching raises turbine temperature when a held throat is too small.
    - FADEC commands the throat and gains a TIT limiter (derived: calibrated MIL TIT + 30 K). F-16 SEC now holds the nozzle closed; the thrust loss (≈92 % of MIL at sea level) emerges from back-pressure + TIT limit instead of a fixed cap.
-   - F110 nozzle areas are sized from the calibrated cycle (closed = 0.9 × SLS MIL need, open = 1.3 × SLS max-AB need; A9/A8 1.1–1.3, Cfg 0.98; all estimated). Top speed is unchanged within 0.02 Mach (SL M1.27, 40,000 ft M1.87).
+   - (Superseded by item 12 for the F110.) F110 nozzle areas were sized from the calibrated cycle (closed = 0.9 × SLS MIL need, open = 1.3 × SLS max-AB need; A9/A8 1.1–1.3, Cfg 0.98; all estimated). Top speed is unchanged within 0.02 Mach (SL M1.27, 40,000 ft M1.87).
+12. **Done, partly derived:** data-driven F110-GE-129 engine.
+   - Source: NASA TM-104326 (1996), GE F110-GE-129 cycle-deck outputs with measured engine-face conditions (ground run idle→MIL and 19 flight points), transcribed in `F110DeckData.ts`.
+   - New shared component `physics/propulsion/components/GasGeneratorDeck.ts`: dry gas generator from corrected-parameter tables against corrected fan speed N1c (the parameter that collapses ground and flight data; core speed does not because of variable geometry).
+   - Tables built from the ground run only; the 19 flight points are held out. Validation (`F110Deck.test.ts`): gross thrust mean error < 2.5 %, worst 5.4 %; nozzle flow < 3.5 %; fuel flow < 6 %.
+   - Nozzle exit/throat ratio vs NPR and thrust coefficient (0.96 → 0.978) from the same report; closed throat = MIL position (data), so SEC keeps MIL thrust.
+   - FADEC: throttle map, idle N1 and the MIL limit from the deck. MIL is a corrected-N1 'T2 lapse': ≈1.006 up to θ1 1.05, then −0.35 per unit θ1 (deck to θ1 1.13; linear extrapolation beyond, supersonic). The tuned 1020 K compressor-exit limit was removed.
+   - Engine calibration now targets UNINSTALLED ratings (test-stand values); before, the installed thrust was calibrated to them, overstating the engine by the installation loss (≈5 %).
+   - Afterburner: thermodynamic, max temperature calibrated to 29,000 lbf uninstalled (no AB data).
+   - Max level speed: sea level M1.25 (published ≈1.2, +4 %), 40,000 ft M1.81 (published 1.89 sustained, −4 %). Remaining uncertainty: the MIL lapse beyond θ1 1.13 is extrapolated; installation loss and afterburner are estimated. Sea-level best climb ≈65,800 ft/min.
 4. **Done:** app routes. `/` is the full-screen F-16 game with a start/pause menu (`game/src/app/GameScreen.ts`, `F16Session.ts`). `/#debug` is the developer tools page (foundation status, runtime monitor, debug flyer).
 3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 

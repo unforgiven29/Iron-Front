@@ -105,6 +105,8 @@ export function idealNozzle(thrustCoefficient: number): NozzleModel {
   };
 }
 
+import { lookup1D, type Table1D } from "../../aerodynamics/Tables.js";
+
 export interface VariableCdNozzleSpec {
   /** Throat area at the closed (minimum) and fully open positions, m². */
   readonly minThroatAreaM2: number;
@@ -114,6 +116,10 @@ export interface VariableCdNozzleSpec {
   readonly exitAreaRatioOpen: number;
   /** Gross thrust coefficient Cfg (friction, divergence, leakage). */
   readonly thrustCoefficient: number;
+  /** Optional: exit/throat area ratio as a function of nozzle pressure ratio pt/p0 (replaces the linked closed/open ratios). */
+  readonly exitAreaRatioByPressureRatio?: Table1D;
+  /** Optional: thrust coefficient as a function of nozzle pressure ratio (replaces the constant). */
+  readonly thrustCoefficientByPressureRatio?: Table1D;
 }
 
 /** Variable-area convergent–divergent nozzle with linked exit area (e.g. afterburning fighter engines). */
@@ -126,7 +132,9 @@ export function variableConvergentDivergentNozzle(spec: VariableCdNozzleSpec): N
       const required = requiredThroatArea(flow);
       const a8 = command.kind === "auto" ? Math.min(aMax, Math.max(aMin, required)) : aMin + (aMax - aMin) * Math.min(1, Math.max(0, command.position));
       const position = (a8 - aMin) / (aMax - aMin);
-      const ratio = spec.exitAreaRatioClosed + (spec.exitAreaRatioOpen - spec.exitAreaRatioClosed) * position;
+      const npr = pt / p0;
+      const ratio = spec.exitAreaRatioByPressureRatio ? lookup1D(spec.exitAreaRatioByPressureRatio, npr).value : spec.exitAreaRatioClosed + (spec.exitAreaRatioOpen - spec.exitAreaRatioClosed) * position;
+      const cfg = spec.thrustCoefficientByPressureRatio ? lookup1D(spec.thrustCoefficientByPressureRatio, npr).value : spec.thrustCoefficient;
       const a9 = a8 * ratio;
       const choked = pt / p0 > criticalPressureRatio(g);
       const R = gasR(flow.cpJkgK, g);
@@ -147,8 +155,8 @@ export function variableConvergentDivergentNozzle(spec: VariableCdNozzleSpec): N
           pressure = (p9 - p0) * a9;
         }
       }
-      const momentumThrustN = spec.thrustCoefficient * flow.massFlowKgS * v9;
-      const pressureThrustN = spec.thrustCoefficient * pressure;
+      const momentumThrustN = cfg * flow.massFlowKgS * v9;
+      const pressureThrustN = cfg * pressure;
       return {
         grossThrustN: momentumThrustN + pressureThrustN, momentumThrustN, pressureThrustN,
         throatAreaM2: a8, exitAreaM2: a9, requiredThroatAreaM2: required, position, exitPressurePa: p9, exitMach: m9, choked,
