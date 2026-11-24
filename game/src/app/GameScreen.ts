@@ -8,9 +8,9 @@ import { el, startAircraftSession, type AircraftSessionHandle } from "./Aircraft
 export function mountGameScreen(root: HTMLElement): void {
   document.body.classList.add("game-mode");
   const catalog = loadAircraftCatalog();
-  const aircraftId = catalog.ids[0];
-  if (!aircraftId) throw new Error(`No aircraft could be loaded: ${catalog.problems.join("; ")}`);
-  const definition = catalog.definition(aircraftId);
+  const firstId = catalog.ids[0];
+  if (!firstId) throw new Error(`No aircraft could be loaded: ${catalog.problems.join("; ")}`);
+  let definition = catalog.definition(firstId);
   const screen = el("main", "game-screen");
   const frame = el("div", "game-frame");
   frame.tabIndex = 0;
@@ -22,6 +22,14 @@ export function mountGameScreen(root: HTMLElement): void {
   const card = el("div", "game-menu-card");
   const title = el("h1", "game-title", "IRON-FRONT");
   const subtitle = el("p", "game-subtitle", definition.displayName);
+  // Aircraft selection: every package the module system loaded.
+  const picker = el("select", "game-select");
+  picker.setAttribute("aria-label", "Aircraft");
+  for (const id of catalog.ids) {
+    const opt = el("option", undefined, catalog.definition(id).displayName);
+    opt.value = id;
+    picker.append(opt);
+  }
   const status = el("p", "game-status", "");
   const fly = el("button", "game-button primary", "Fly");
   fly.type = "button";
@@ -32,18 +40,28 @@ export function mountGameScreen(root: HTMLElement): void {
   restart.type = "button";
   restart.hidden = true;
   const controls = el("div", "game-controls");
-  for (const [k, v] of [
-    ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw"], ["Shift / Ctrl", "Throttle"],
-    ["F", "Fly-by-wire NORM / DIRECT (test)"], ["B", "Speedbrake"], ["N", "Engine control PRI / SEC"], ["G", "Landing gear"], ["Space", "Wheel brakes"], ["H", "Hydraulic fault (test)"], ["C", "CG test setting"], ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
-  ] as const) {
-    const row = el("div", "game-control-row");
-    row.append(el("kbd", undefined, k), el("span", undefined, v));
-    controls.append(row);
-  }
   const note = el("p", "game-note", definition.dataNote);
+  // Controls: common flight keys plus the selected aircraft's own switch keys (from its package).
+  const renderControls = () => {
+    controls.replaceChildren();
+    const switchRows = definition.createSystems().switches.filter((s) => s.key).map((s) => [s.key!.toUpperCase(), s.definition.label] as const);
+    for (const [k, v] of [
+      ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw / nose-wheel steering"], ["Shift / Ctrl", "Throttle"], ["Space", "Wheel brakes"],
+      ...switchRows,
+      ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
+    ] as const) {
+      const row = el("div", "game-control-row");
+      row.append(el("kbd", undefined, k), el("span", undefined, v));
+      controls.append(row);
+    }
+    subtitle.textContent = definition.displayName;
+    note.textContent = definition.dataNote;
+  };
+  renderControls();
+  picker.addEventListener("change", () => { definition = catalog.definition(picker.value); renderControls(); });
   const debug = el("a", "game-link", "Developer tools →");
   debug.href = "#debug";
-  card.append(title, subtitle, status, fly, airStart, restart, controls, note, debug);
+  card.append(title, subtitle, picker, status, fly, airStart, restart, controls, note, debug);
   menu.append(card);
   screen.append(frame, menu);
   root.append(screen);
@@ -53,6 +71,7 @@ export function mountGameScreen(root: HTMLElement): void {
     menu.hidden = false;
     fly.textContent = paused ? "Resume" : "Fly";
     airStart.hidden = paused;
+    picker.hidden = paused;
     restart.hidden = !paused;
     status.textContent = paused ? "Paused" : "";
     fly.focus();

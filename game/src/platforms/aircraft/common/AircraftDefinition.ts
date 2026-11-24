@@ -144,6 +144,8 @@ export interface AircraftControlContext {
   setCgFractionMac(value: number): void;
   /** Select an engine's control mode (e.g. a primary/secondary engine-control switch). */
   setEngineControlMode(engineId: string, mode: FadecMode): void;
+  /** Shut off (or restore) fuel to one engine — engine-out tests on multi-engine aircraft. */
+  setEngineFuelCutoff(engineId: string, cutoff: boolean): void;
   /** Landing-gear handle. */
   setGearHandle(down: boolean): void;
   /** Inject hydraulic faults (test/training switches). */

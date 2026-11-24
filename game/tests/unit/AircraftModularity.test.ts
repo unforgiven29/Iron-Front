@@ -74,7 +74,7 @@ describe("aircraft modularity", () => {
   it("the game loads aircraft through the module system", () => {
     const catalog = loadAircraftCatalog();
     expect(catalog.problems).toEqual([]);
-    expect(catalog.ids).toEqual(["aircraft.f16c-block50"]);
+    expect(catalog.ids).toEqual(["aircraft.f16c-block50", "aircraft.mig29"]);
     expect(catalog.definition("aircraft.f16c-block50").displayName).toBe("F-16C Block 50");
   });
 });
