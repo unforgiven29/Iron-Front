@@ -20,6 +20,7 @@ import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
 import { f16HydraulicLoads, F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
 import { F16_LANDING_GEAR } from "./F16LandingGear.js";
 import { f16Monitor } from "./F16Monitor.js";
+import { f110Control, F110_TEST_FAULTS } from "./F110Control.js";
 import { F16_SWITCHES, F16_TEST_CG, F16_TEST_HYDRAULIC_FAULTS } from "./F16Switches.js";
 
 export const F16_MANIFEST: ModuleManifest = {
@@ -228,7 +229,8 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         {
           key: "n",
           definition: { id: F16_SWITCHES.engineControl, ownerId: "f16.engine.control", label: "ENG CONT", positions: ["PRI", "SEC"], defaultPosition: "PRI", provenance: "F-16 engine control switch: PRI = digital electronic control, SEC = hydromechanical secondary control (guarded switch in the real cockpit)" },
-          onChange: (to, ctx) => { ctx.setEngineControlMode("f110", to === "SEC" ? "backup" : "primary"); return { accepted: true }; }
+          // Read each tick by the DEC/MEC logic (F110Control.ts), which owns the mode.
+          onChange: () => ({ accepted: true })
         },
         {
           key: "g",
@@ -242,6 +244,16 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         },
         {
           definition: { id: F16_SWITCHES.fuelMaster, ownerId: "f16.fuel", label: "FUEL MASTER", positions: ["MASTER", "OFF"], defaultPosition: "MASTER", provenance: "T.O. GR1F-16CJ-1 fig 1-23: guarded; drives the main fuel shutoff valve (24 s travel)" },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          key: "m",
+          definition: { id: F16_SWITCHES.engineFault, ownerId: "f16.engine.control", label: "ENG FAULT (TEST)", positions: Object.keys(F110_TEST_FAULTS), defaultPosition: "NONE", provenance: "Simulation test switch: injects engine-control failures. Not a real F-16 control." },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          key: "y",
+          definition: { id: F16_SWITCHES.faultAck, ownerId: "f16.caution", label: "F-ACK", positions: ["OFF", "ACK"], defaultPosition: "OFF", provenance: "T.O. GR1F-16CJ-1: F-ACK button acknowledges the fault (ENGINE FAULT off; PFLs stay listed). Momentary button modelled as a toggle: each press acknowledges" },
           onChange: () => ({ accepted: true })
         },
         {
@@ -283,7 +295,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         }
       };
       const devices = f16Devices(model);
-      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), monitor: f16Monitor(), hydraulicLoads: f16HydraulicLoads(), ...(devices ? { devices } : {}) };
+      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), monitor: f16Monitor(), engineControl: f110Control(), hydraulicLoads: f16HydraulicLoads(), ...(devices ? { devices } : {}) };
     }
   };
 }

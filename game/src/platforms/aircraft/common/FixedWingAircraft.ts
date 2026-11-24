@@ -21,7 +21,7 @@ import { ElectricalNetwork, type ElectricalSnapshot } from "../../../systems/ele
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
-import type { AircraftDefinition, AircraftSystems, FlightSensors, MonitorOutput, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
+import type { AircraftDefinition, AircraftSystems, EngineControlOutput, FlightSensors, MonitorOutput, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
 import { SurfaceActuator } from "./SurfaceActuator.js";
 
 export type GroundStatus =
@@ -82,6 +82,8 @@ export interface AircraftSnapshot {
   readonly lights: readonly { readonly text: string; readonly level: "caution" | "warning" }[];
   /** Numeric indications from the package's systems monitor (SI units). */
   readonly indications: Readonly<Record<string, number>>;
+  /** Fault-list entries from the package's engine control (pilot fault list). */
+  readonly faultList: readonly string[];
   readonly cgFractionMac: number;
   /** Buffet intensity 0..1 from the aero model (0 when the model has none). */
   readonly buffet: number;
@@ -134,6 +136,7 @@ export class FixedWingAircraft {
   private nz = 1;
   private buffet = 0;
   private monitorOut: MonitorOutput = { indications: {}, lights: [] };
+  private engineControlOut: EngineControlOutput = { commands: {}, indications: {}, lights: [], faultList: [] };
   private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
@@ -202,6 +205,9 @@ export class FixedWingAircraft {
     this.inlets = {};
     this.systems.intakes?.reset();
     this.systems.monitor?.reset();
+    this.systems.engineControl?.reset();
+    this.engineControlOut = { commands: {}, indications: {}, lights: [], faultList: [] };
+    for (const e of this.engines) e.control.setOverrides({});
     this.monitorOut = { indications: {}, lights: [] };
     this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
     this.gear?.reset(this.gearHandleDown);
@@ -358,6 +364,20 @@ export class FixedWingAircraft {
     const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
     const flows: Record<string, number> = {}, speeds: Record<string, number> = {};
+    if (this.systems.engineControl) {
+      const fc = this.fuelSystem?.components?.(), el = this.electrical?.snapshot;
+      this.engineControlOut = this.systems.engineControl.step({
+        sensors, pilot: this.pilot, switches: this.controls.snapshot(),
+        engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
+        ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
+        ...(el ? { electrical: el } : {}),
+        ...(fc ? { fuelComponents: fc } : {})
+      }, dt);
+      for (const e of this.engines) {
+        const c = this.engineControlOut.commands[e.id];
+        if (c) { e.control.setMode(c.mode); e.control.setOverrides(c.overrides); }
+      }
+    }
     for (const e of this.engines) {
       const ambient = ambientFor(e.id);
       const fuel = (this.fuelSystem ? this.fuelSystem.engineFuelAvailable(e.id) : this.fuelKg > 0) && !this.fuelCutoff.has(e.id);
@@ -502,8 +522,9 @@ export class FixedWingAircraft {
       fcsMode: this.fcsMode,
       fcsTelemetry: this.fcsTelemetry,
       annunciations: this.annunciations,
-      lights: this.monitorOut.lights,
-      indications: this.monitorOut.indications,
+      lights: [...this.engineControlOut.lights, ...this.monitorOut.lights],
+      indications: { ...this.engineControlOut.indications, ...this.monitorOut.indications },
+      faultList: this.engineControlOut.faultList,
       cgFractionMac: this.cgFractionMac,
       buffet: this.buffet,
       outsideAeroEnvelope: this.air.outside,

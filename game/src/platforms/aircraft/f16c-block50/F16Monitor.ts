@@ -106,7 +106,7 @@ export function f16Monitor(): { step(ctx: MonitorContext, dt: number): MonitorOu
       const lights: { text: string; level: "caution" | "warning" }[] = [];
       const warn = (on: boolean, text: string, busId: string) => { if (on && bus(busId)) lights.push({ text, level: "warning" }); };
       const caution = (on: boolean, text: string, busId = "dc.battery2") => { if (on && bus(busId)) lights.push({ text, level: "caution" }); };
-      warn(!!e && (n < M.engineSubIdle || ftitHighS >= M.ftitWarnDelayS), "ENGINE", "dc.battery1");
+      warn(!!e && (n < M.engineSubIdle || ftitHighS >= M.ftitWarnDelayS || ctx.switches["f16.test.engine-fault"] === "ALTERNATOR"), "ENGINE", "dc.battery1");
       warn(hyd("A") / PSI < M.hydWarnPsi || hyd("B") / PSI < M.hydWarnPsi || oilLight, "HYD/OIL PRESS", "dc.battery1");
       caution(tankKg("fwdReservoir") < 400 * LB, "FWD FUEL LOW", "dc.emergency1");
       caution(tankKg("aftReservoir") < 250 * LB, "AFT FUEL LOW", "dc.emergency1");
@@ -118,7 +118,8 @@ export function f16Monitor(): { step(ctx: MonitorContext, dt: number): MonitorOu
       return {
         lights,
         indications: {
-          rpmPercent: bus("dc.battery1") ? n * 100 : 0,
+          // RPM signal comes from the engine alternator (zero if it fails).
+          rpmPercent: bus("dc.battery1") && ctx.switches["f16.test.engine-fault"] !== "ALTERNATOR" ? n * 100 : 0,
           ftitC: bus("dc.battery1") ? Math.max(200, ftitC) : 200,
           nozzlePercent: bus("ac.emergency2") && e ? (Number.isFinite(e.nozzle.position) ? e.nozzle.position : 0) * 100 : 0,
           oilPsi: bus("ac.emergency2") ? Math.min(100, oilPsi) : 0,

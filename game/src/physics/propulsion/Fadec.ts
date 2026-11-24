@@ -35,6 +35,21 @@ import { solveCycle, type Ambient, type CycleResult, type TurbofanDesign } from 
 
 export type FadecMode = "primary" | "backup";
 
+/**
+ * Authority changes a package's own engine-control logic can apply on top of the schedule (degraded
+ * or hybrid modes, envelope floors). Platform-neutral: the package decides when and why.
+ */
+export interface FadecOverrides {
+  /** Scale on the maximum physical speed (e.g. a degraded mode that limits fan speed). Default 1. */
+  readonly maxSpeedScale?: number;
+  /** Minimum physical speed the control holds (e.g. a supersonic idle lock-up), fraction of design. */
+  readonly minSpeed?: number;
+  /** False: the turbine-temperature limiter is not provided in this mode. Default true. */
+  readonly temperatureLimiting?: boolean;
+  /** True: afterburner fuel and ignition inhibited. */
+  readonly afterburnerInhibited?: boolean;
+}
+
 export interface FadecSchedule {
   /** Throttle position (0..1) of the dry-power / afterburner detent. */
   readonly afterburnerDetentThrottle: number;
@@ -99,7 +114,7 @@ export interface FadecSensors {
   readonly fuelAvailable: boolean;
 }
 
-export type FadecLimit = "nozzle-area" | "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope" | "low-pressure-acceleration";
+export type FadecLimit = "nozzle-area" | "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope" | "low-pressure-acceleration" | "min-speed-floor";
 
 export interface FadecOutput {
   readonly mode: FadecMode;
@@ -148,10 +163,10 @@ function lowestSpeed(design: TurbofanDesign, ambient: Ambient, lo: number, hi: n
  * Steady-state scheduling (no rate limits): the speed and afterburner fraction the FADEC settles
  * at for a throttle position. Pure; used by the controller and by steady performance tools.
  */
-export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mode: FadecMode, throttle: number, ambient: Ambient): { speed: number; afterburner: number; throat: ThroatCommand; limits: FadecLimit[] } {
+export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mode: FadecMode, throttle: number, ambient: Ambient, o: FadecOverrides = {}): { speed: number; afterburner: number; throat: ThroatCommand; limits: FadecLimit[] } {
   const limits: FadecLimit[] = [];
   const t = Math.max(0, Math.min(1, throttle));
-  const maxPhys = mode === "backup" ? s.backup.maxPhysicalSpeed : s.maxPhysicalSpeed;
+  const maxPhys = (mode === "backup" ? s.backup.maxPhysicalSpeed : s.maxPhysicalSpeed) * (o.maxSpeedScale ?? 1);
   // Throttle map: linear idle → max over the dry range.
   const dry = Math.min(1, t / s.afterburnerDetentThrottle);
   const theta0 = thetaOf(ambient);
@@ -163,7 +178,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   } else {
     speed = s.idleSpeed + (maxPhys - s.idleSpeed) * dry;
   }
-  if (mode === "backup" && speed >= maxPhys - 1e-9 && s.maxPhysicalSpeed > maxPhys) limits.push("max-speed");
+  if (speed >= maxPhys - 1e-9 && s.maxPhysicalSpeed > maxPhys) limits.push("max-speed");
 
   // Corrected-speed limit.
   const theta = thetaOf(ambient);
@@ -171,7 +186,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   if (speed > correctedCap) { speed = correctedCap; limits.push("corrected-speed"); }
 
   let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
-  if (abRequest > 0 && mode === "backup" && s.backup.afterburnerInhibited) { abRequest = 0; limits.push("afterburner-inhibited"); }
+  if (abRequest > 0 && ((mode === "backup" && s.backup.afterburnerInhibited) || o.afterburnerInhibited)) { abRequest = 0; limits.push("afterburner-inhibited"); }
 
   const dryFraction = Math.min(1, Math.max(0, t / s.afterburnerDetentThrottle));
   const minPosition = s.dryNozzleMinPosition && abRequest === 0 ? lookup1D(s.dryNozzleMinPosition, dryFraction).value : 0;
@@ -185,7 +200,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
     const n = highestSpeed(design, ambient, abRequest, throat, lo, speed, (c) => c.compressorExitTemperatureK <= lim);
     if (n < speed - 1e-9) { speed = n; limits.push("compressor-exit-temperature"); }
   }
-  if (s.maxTurbineInletTemperatureK !== undefined) {
+  if (s.maxTurbineInletTemperatureK !== undefined && o.temperatureLimiting !== false) {
     const lim = s.maxTurbineInletTemperatureK;
     const n = highestSpeed(design, ambient, abRequest, throat, lo, speed, (c) => c.turbineInletTemperatureK <= lim);
     if (n < speed - 1e-9) { speed = n; limits.push("turbine-inlet-temperature"); }
@@ -197,6 +212,8 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
     const floor = lowestSpeed(design, ambient, s.idleSpeed * 0.5, maxPhys, (c) => c.compressorExitPressurePa >= min);
     if (floor > speed + 1e-9) { speed = Math.min(floor, maxPhys); limits.push("min-burner-pressure"); }
   }
+  // Package floor (e.g. supersonic idle lock-up).
+  if (o.minSpeed !== undefined && o.minSpeed > speed + 1e-9) { speed = Math.min(o.minSpeed, maxPhys); limits.push("min-speed-floor"); }
   // Afterburner light-off envelope: core at max and enough burner pressure.
   let afterburner = abRequest;
   if (afterburner > 0 && s.afterburnerMinBurnerPressurePa !== undefined) {
@@ -209,6 +226,7 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
 /** Stateful FADEC: steady scheduling plus acceleration/deceleration and afterburner sequencing. */
 export class Fadec {
   private mode: FadecMode = "primary";
+  private overrides: FadecOverrides = {};
   private demand: number;
   private ab = 0;
   private abTimer = 0;
@@ -234,6 +252,13 @@ export class Fadec {
     this.mode = mode;
   }
 
+  /** Apply a package's authority overrides (see FadecOverrides); {} restores the plain schedule. */
+  public setOverrides(o: FadecOverrides): void {
+    const same = JSON.stringify(o) === JSON.stringify(this.overrides);
+    this.overrides = { ...o };
+    if (!same) this.cache = undefined;
+  }
+
   /** Initial rotor speed for a start state (steady, dry). */
   public get initialSpeed(): number {
     return this.demand;
@@ -253,7 +278,7 @@ export class Fadec {
       c.age += dt;
       return c.result;
     }
-    const result = scheduleSteadyState(this.design, this.schedule, this.mode, throttle, ambient);
+    const result = scheduleSteadyState(this.design, this.schedule, this.mode, throttle, ambient, this.overrides);
     this.cache = { key, mode: this.mode, result, age: 0 };
     return result;
   }
