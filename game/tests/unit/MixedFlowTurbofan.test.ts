@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { standardAtmosphere } from "../../src/physics/environment/Atmosphere.js";
 import { Fadec, scheduleSteadyState } from "../../src/physics/propulsion/Fadec.js";
+import { chokedThroatArea, supersonicMachForAreaRatio, variableConvergentDivergentNozzle } from "../../src/physics/propulsion/components/Nozzle.js";
 import { inletRecovery, MixedFlowTurbofan, solveCycle } from "../../src/physics/propulsion/MixedFlowTurbofan.js";
 import { F16_ENGINE } from "../../src/platforms/aircraft/f16c-block50/F16Data.js";
 import { F110_CONTROL, F110_DESIGN } from "../../src/platforms/aircraft/f16c-block50/F110Engine.js";
@@ -66,7 +67,7 @@ describe("FADEC (shared engine control) with the F110 schedule", () => {
     let out = fadec.output, s = engine.state;
     for (let i = 0; i < Math.round(seconds / 0.02); i++) {
       out = fadec.step(throttle, { ambient: amb, spoolSpeed: s.spoolSpeed, fuelAvailable: true }, 0.02);
-      s = engine.step({ speed: out.speedDemand, afterburner: out.afterburnerDemand }, amb, true, 0.02);
+      s = engine.step({ speed: out.speedDemand, afterburner: out.afterburnerDemand, throat: out.throat }, amb, true, 0.02);
     }
     return { out, s };
   };
@@ -103,7 +104,7 @@ describe("FADEC (shared engine control) with the F110 schedule", () => {
     expect(op.speed).toBeGreaterThan(F110_CONTROL.idleSpeed);
   });
 
-  it("SEC (backup) caps speed, slows acceleration and inhibits the afterburner", () => {
+  it("SEC (backup) closes the nozzle, which costs thrust through back-pressure and the turbine limit, and inhibits the afterburner", () => {
     const sl = at(0, 0);
     const { f, e } = make(0.5, sl);
     f.setMode("backup");
@@ -111,8 +112,49 @@ describe("FADEC (shared engine control) with the F110 schedule", () => {
     expect(r.out.mode).toBe("backup");
     expect(r.s.afterburnerLit).toBe(false);
     expect(r.out.activeLimits).toContain("afterburner-inhibited");
-    expect(r.s.spoolSpeed).toBeLessThanOrEqual(F110_CONTROL.backup.maxPhysicalSpeed + 1e-6);
+    expect(r.out.throat).toEqual({ kind: "position", position: 0 });
+    expect(r.out.activeLimits).toContain("nozzle-area");
+    expect(r.out.activeLimits).toContain("turbine-inlet-temperature");
     expect(r.s.netThrustN).toBeLessThan(F16_ENGINE.militaryThrustN.value);
     expect(r.s.netThrustN).toBeGreaterThan(0.75 * F16_ENGINE.militaryThrustN.value);
+  });
+});
+
+describe("Nozzle component (variable convergent–divergent)", () => {
+  const nozzle = variableConvergentDivergentNozzle({ minThroatAreaM2: 0.2, maxThroatAreaM2: 0.6, exitAreaRatioClosed: 1.1, exitAreaRatioOpen: 1.3, thrustCoefficient: 1 });
+  const flow = (ambientPressurePa: number) => ({ massFlowKgS: 100, totalPressurePa: 300_000, totalTemperatureK: 900, gamma: 1.35, cpJkgK: 1100, ambientPressurePa });
+
+  it("uses the isentropic area–Mach relation and the choked-flow throat area", () => {
+    expect(supersonicMachForAreaRatio(1.6875, 1.4)).toBeCloseTo(2.0, 3); // standard table value
+    const R = 1100 * 0.35 / 1.35;
+    const g = 1.35, gamma = Math.sqrt(g) * (2 / (g + 1)) ** ((g + 1) / (2 * (g - 1)));
+    expect(chokedThroatArea(flow(101325))).toBeCloseTo(100 * Math.sqrt(R * 900) / (300_000 * gamma), 9);
+  });
+
+  it("makes pressure thrust: positive under-expanded at altitude, and the same flow gives more total thrust there", () => {
+    const sl = nozzle.evaluate(flow(101325), { kind: "auto" });
+    const alt = nozzle.evaluate(flow(20_000), { kind: "auto" });
+    expect(alt.exitPressurePa).toBeGreaterThan(20_000);
+    expect(alt.pressureThrustN).toBeGreaterThan(0);
+    expect(alt.grossThrustN).toBeGreaterThan(sl.grossThrustN);
+    expect(sl.momentumThrustN + sl.pressureThrustN).toBeCloseTo(sl.grossThrustN, 6);
+  });
+
+  it("opens the throat to pass the flow in auto, and reports when a held throat is too small", () => {
+    const auto = nozzle.evaluate(flow(101325), { kind: "auto" });
+    expect(auto.throatAreaM2).toBeCloseTo(auto.requiredThroatAreaM2, 9);
+    expect(auto.throatAreaRatio).toBeCloseTo(1, 9);
+    const closed = nozzle.evaluate(flow(101325), { kind: "position", position: 0 });
+    expect(closed.throatAreaM2).toBe(0.2);
+    expect(closed.throatAreaRatio).toBeGreaterThan(1);
+  });
+
+  it("a held-closed throat makes the cycle run its turbine hotter (back-pressure matching)", () => {
+    const sl = at(0, 0);
+    const open = solveCycle(F110_DESIGN, sl, 0.95, 0);
+    const closed = solveCycle(F110_DESIGN, sl, 0.95, 0, { throat: { kind: "position", position: 0 } });
+    expect(closed.backPressureLimited).toBe(true);
+    expect(closed.turbineInletTemperatureK).toBeGreaterThan(open.turbineInletTemperatureK);
+    expect(closed.nozzle.throatAreaRatio).toBeLessThanOrEqual(1 + 1e-6);
   });
 });

@@ -118,6 +118,10 @@ Build and test narrow, replaceable services in this order:
    - Shared `Fadec` (physics/propulsion) between throttle and engine: throttle map, model-based T3 / TIT / corrected-speed / minimum-burner-pressure limiters, acceleration and deceleration schedules, afterburner sequencing and light-off envelope, primary/backup modes. `MixedFlowTurbofan` is now only the plant (cycle + rotor lag).
    - F-16 `F110Engine.ts` holds the F110 design and FADEC schedule; ENG CONT switch (N key) selects PRI/SEC; ENG MFD page shows mode, speed demand and active limiters; HUD caution in backup.
    - F-16 FLCS split into `flcs/PitchChannel.ts`, `RollChannel.ts`, `YawChannel.ts` (same behaviour, all tests unchanged).
+11. **Done, geometry estimated:** engine inlet and nozzle as components (`physics/propulsion/components/`).
+   - Variable convergent–divergent nozzle: throat (choked/subsonic), linked exit area, isentropic expansion, momentum + pressure thrust, separation approximation. Cycle back-pressure matching raises turbine temperature when a held throat is too small.
+   - FADEC commands the throat and gains a TIT limiter (derived: calibrated MIL TIT + 30 K). F-16 SEC now holds the nozzle closed; the thrust loss (≈92 % of MIL at sea level) emerges from back-pressure + TIT limit instead of a fixed cap.
+   - F110 nozzle areas are sized from the calibrated cycle (closed = 0.9 × SLS MIL need, open = 1.3 × SLS max-AB need; A9/A8 1.1–1.3, Cfg 0.98; all estimated). Top speed is unchanged within 0.02 Mach (SL M1.27, 40,000 ft M1.87).
 4. **Done:** app routes. `/` is the full-screen F-16 game with a start/pause menu (`game/src/app/GameScreen.ts`, `F16Session.ts`). `/#debug` is the developer tools page (foundation status, runtime monitor, debug flyer).
 3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 

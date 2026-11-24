@@ -214,7 +214,7 @@ export class FixedWingAircraft {
     for (const e of this.engines) {
       const fuel = this.fuelKg > 0;
       const cmd = e.control.step(this.throttle, { ambient, spoolSpeed: e.core.state.spoolSpeed, fuelAvailable: fuel }, dt);
-      const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand }, ambient, fuel, dt);
+      const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand, throat: cmd.throat }, ambient, fuel, dt);
       totalFlow += s.fuelFlowKgS;
       const a = e.install.thrustAxisBody;
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
