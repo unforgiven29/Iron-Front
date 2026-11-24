@@ -8,6 +8,7 @@
  * speed, best climb rate and ceiling.
  */
 import { standardAtmosphere } from "../../../physics/environment/Atmosphere.js";
+import { scheduleSteadyState } from "../../../physics/propulsion/Fadec.js";
 import { solveCycle } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import type { AircraftDefinition } from "./AircraftDefinition.js";
 
@@ -39,7 +40,10 @@ export function levelFlightPoint(def: AircraftDefinition, options: PerformanceOp
   const aero = def.createSystems().aero;
   const theta = (atm.temperatureK * (1 + 0.2 * mach * mach)) / 288.15;
   const thrustN = def.engines.reduce((sum, e) => {
-    const c = solveCycle(e.design, { temperatureK: atm.temperatureK, pressurePa: atm.pressurePa, mach }, Math.min(1.05, 1 / Math.sqrt(theta)), afterburner ? 1 : 0);
+    const ambient = { temperatureK: atm.temperatureK, pressurePa: atm.pressurePa, mach };
+    // The engine runs where its FADEC settles for full throttle (all limiters applied).
+    const op = scheduleSteadyState(e.design, e.control, "primary", afterburner ? 1 : e.control.afterburnerDetentThrottle, ambient);
+    const c = solveCycle(e.design, ambient, op.speed / Math.sqrt(theta), op.afterburner);
     return sum + Math.max(0, c.netThrustN) * e.thrustAxisBody[0];
   }, 0);
   const forces = (alpha: number, trim: number) => {

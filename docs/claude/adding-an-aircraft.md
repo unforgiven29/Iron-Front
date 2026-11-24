@@ -10,7 +10,7 @@ aircraft.
 |---|---|
 | `FixedWingAircraft`: the runtime loop (sense → controls → actuators → devices → engines → aero → physics) | Mass, inertia, CG, fuel load |
 | Rigid-body 6-DoF physics, atmosphere and wind, terrain, collision | The list of control surfaces with limits, rates and bandwidth |
-| Gas-path turbofan engine model (`MixedFlowTurbofan`) | Engine count, design data, position and thrust direction |
+| Gas-path turbofan plant (`MixedFlowTurbofan`) and engine control (`Fadec`) | Engine count, design data, FADEC schedule and limits, position and thrust direction |
 | Table lookup (`lookup1D/2D/ND`), surface actuators | **Its own aerodynamic model and data** |
 | Switch registry, cockpit renderer, HUD | **Its own flight-control system** (fly-by-wire, mechanical, dampers...) |
 | Module system (manifest validation, resolution, composition) | Automatic devices (slats, LEF...), switches, cockpit layout, MFD pages, manifest |
@@ -32,7 +32,12 @@ own way.
    - `fcs: FlightControlSystem`: turns pilot inputs plus sensors into surface commands by id.
    - `devices` (optional): automatically scheduled surfaces such as the F-16's leading-edge flaps.
    - `engines`: one entry per engine, with `design` (a `TurbofanDesign`, calibrated to your
-     engine's published thrust with `calibrate()`), position and thrust axis.
+     engine's published thrust with `calibrate()`), `control` (a `FadecSchedule`: throttle map,
+     limits, acceleration schedule, afterburner sequencing, backup mode), position and thrust
+     axis. The F-16 keeps both in `f16c-block50/F110Engine.ts`. A switch can change an engine's
+     control mode with `ctx.setEngineControlMode(engineId, "primary" | "backup")`.
+   - Keep the flight-control system readable by splitting it per axis, as the F-16 does in
+     `f16c-block50/flcs/` (`PitchChannel`, `RollChannel`, `YawChannel`, wired by `F16FlightControls`).
    - `switches`: switch definitions with their owner logic and optional keyboard keys.
    - `cockpit`: a `CockpitLayout`; `mfdPages`: functions that build MFD text from the snapshot.
    - `manifest`: id, version, `provides: platform.aircraft.definition`.

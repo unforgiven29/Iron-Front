@@ -9,7 +9,8 @@ import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness } from "./F16Compressibility.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
-import { f16Aerodynamics, F110_DESIGN, f16InertiaTensor } from "./F16FlightModel.js";
+import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
+import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
 import { F16_SWITCHES, F16_TEST_CG } from "./F16Switches.js";
 
@@ -115,7 +116,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
   return {
     manifest: F16_MANIFEST,
     displayName: "F-16C Block 50",
-    dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6; NASA TP-3355 supersonic corrections, transonic estimated), F110 gas-path engine calibrated to published thrust, project-designed fly-by-wire.",
+    dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6; NASA TP-3355 supersonic corrections, transonic estimated), F110 gas-path engine calibrated to published thrust with a FADEC (PRI/SEC), project-designed fly-by-wire.",
     mass: { emptyMassKg: F16_MASS.emptyMassKg.value, inertiaKgM2: f16InertiaTensor(), referenceMassKg: F16_MASS.massKg.value, cgFractionMac: F16_MASS.cgFractionMac.value, internalFuelKg: F16_ENGINE.internalFuelKg.value },
     surfaces: [
       { id: "elevator", limitDeg: a.elevatorLimitDeg.value, rateDegS: a.elevatorRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
@@ -124,7 +125,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
       { id: "speedbrake", limitDeg: F16_SPEEDBRAKE.maxDeflectionDeg.value, rateDegS: F16_SPEEDBRAKE.rateDegS.value, bandwidthRadS: 10 }
     ],
     // Thrust along body x through the CG: engine offset/cant not sourced.
-    engines: [{ id: "f110", design: F110_DESIGN, afterburnerDetentThrottle: F16_ENGINE.afterburnerDetentThrottle.value, positionBodyM: [0, 0, 0], thrustAxisBody: [1, 0, 0] }],
+    engines: [{ id: "f110", design: F110_DESIGN, control: F110_CONTROL, positionBodyM: [0, 0, 0], thrustAxisBody: [1, 0, 0] }],
     cockpit: F16_COCKPIT_LAYOUT,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createSystems: () => {
@@ -145,6 +146,11 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           key: "c",
           definition: { id: F16_SWITCHES.testCg, ownerId: "f16.mass", label: "CG (TEST)", positions: Object.keys(F16_TEST_CG), defaultPosition: "NOMINAL", provenance: "Simulation test setting. Moves the CG used by the aero CG-offset terms; mass and inertia are unchanged." },
           onChange: (to, ctx) => { ctx.setCgFractionMac(F16_TEST_CG[to as keyof typeof F16_TEST_CG]); return { accepted: true }; }
+        },
+        {
+          key: "n",
+          definition: { id: F16_SWITCHES.engineControl, ownerId: "f16.engine.control", label: "ENG CONT", positions: ["PRI", "SEC"], defaultPosition: "PRI", provenance: "F-16 engine control switch: PRI = digital electronic control, SEC = hydromechanical secondary control (guarded switch in the real cockpit)" },
+          onChange: (to, ctx) => { ctx.setEngineControlMode("f110", to === "SEC" ? "backup" : "primary"); return { accepted: true }; }
         }
       ];
       // Track the achieved stabilator so DIRECT can capture it as trim.
@@ -172,12 +178,18 @@ function engPage(s: AircraftSnapshot) {
       `THRUST ${(e.netThrustN / 1000).toFixed(1)} kN`,
       `       ${((e.netThrustN / max) * 100).toFixed(0)}% of max`,
       `A/B  ${e.afterburnerLit ? "ON" : "OFF"}`,
+      `CONT ${e.control.mode === "backup" ? "SEC" : "PRI"}  N DMD ${(e.control.speedDemand * 100).toFixed(0)}%`,
+      `LIM  ${e.control.activeLimits.filter((l) => l !== "acceleration" && l !== "deceleration").map(limitLabel).join(" ") || "—"}`,
       `FF   ${(e.fuelFlowKgS * 3600).toFixed(0)} kg/h`,
       `FUEL ${s.fuelKg.toFixed(0)} kg`,
       `GW   ${s.massKg.toFixed(0)} kg`,
       "F110 CYCLE: CALIBRATED"
     ]
   };
+}
+
+function limitLabel(l: string): string {
+  return ({ "max-speed": "NMAX", "corrected-speed": "NCOR", "compressor-exit-temperature": "T3", "turbine-inlet-temperature": "TIT", "min-burner-pressure": "PB MIN", "afterburner-inhibited": "AB INH", "afterburner-envelope": "AB ENV" } as Record<string, string>)[l] ?? l;
 }
 
 function flcsPage(s: AircraftSnapshot) {

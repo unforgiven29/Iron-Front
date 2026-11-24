@@ -3,7 +3,7 @@ import { loadAircraftCatalog } from "../../src/app/AircraftCatalog.js";
 import { uniformWind } from "../../src/physics/environment/Atmosphere.js";
 import type { AircraftDefinition } from "../../src/platforms/aircraft/common/AircraftDefinition.js";
 import { FixedWingAircraft } from "../../src/platforms/aircraft/common/FixedWingAircraft.js";
-import { F110_DESIGN } from "../../src/platforms/aircraft/f16c-block50/F16FlightModel.js";
+import { F110_CONTROL, F110_DESIGN } from "../../src/platforms/aircraft/f16c-block50/F110Engine.js";
 import { generateSyntheticTile, TerrainSurface } from "../../src/world/terrain/Terrain.js";
 
 function terrain() {
@@ -29,8 +29,8 @@ function testTwin(): AircraftDefinition {
       { id: "rudders", limitDeg: 25, rateDegS: 60, bandwidthRadS: 15 }
     ],
     engines: [
-      { id: "left", design: F110_DESIGN, afterburnerDetentThrottle: 0.8, positionBodyM: [-5, -0.6, 0], thrustAxisBody: [1, 0, 0] },
-      { id: "right", design: F110_DESIGN, afterburnerDetentThrottle: 0.8, positionBodyM: [-5, 0.6, 0], thrustAxisBody: [1, 0, 0] }
+      { id: "left", design: F110_DESIGN, control: F110_CONTROL, positionBodyM: [-5, -0.6, 0], thrustAxisBody: [1, 0, 0] },
+      { id: "right", design: F110_DESIGN, control: F110_CONTROL, positionBodyM: [-5, 0.6, 0], thrustAxisBody: [1, 0, 0] }
     ],
     cockpit: { aircraftId: "test-twin", provenance: "none", eyeFromCgM: [5, 0, -1], fieldOfViewDeg: 60, parts: [] },
     createSystems: () => ({

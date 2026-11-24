@@ -16,6 +16,7 @@ import type { SwitchDefinition } from "../../../core/controls/ControlRegistry.js
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { Vector3 } from "../../../core/coordinates/CoordinateFrames.js";
 import type { Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
+import type { FadecMode, FadecSchedule } from "../../../physics/propulsion/Fadec.js";
 import type { Ambient, TurbofanDesign } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import type { CockpitLayout } from "../../../rendering/three/CockpitLayout.js";
 
@@ -101,8 +102,10 @@ export interface AeroModel {
 
 export interface EngineInstallation {
   readonly id: string;
+  /** Gas-path and rotor parameters (the plant). */
   readonly design: TurbofanDesign;
-  readonly afterburnerDetentThrottle: number;
+  /** Engine-control schedules and limits (the FADEC). The throttle goes to the FADEC, never straight to the engine. */
+  readonly control: FadecSchedule;
   /** Thrust application point relative to the CG, body FRD, metres. */
   readonly positionBodyM: Vector3;
   /** Unit thrust direction, body FRD. */
@@ -123,6 +126,8 @@ export interface MassProperties {
 /** Mutable aircraft state a package's switches may change, through these setters only. */
 export interface AircraftControlContext {
   setCgFractionMac(value: number): void;
+  /** Select an engine's control mode (e.g. a primary/secondary engine-control switch). */
+  setEngineControlMode(engineId: string, mode: FadecMode): void;
 }
 
 export interface SwitchBinding {

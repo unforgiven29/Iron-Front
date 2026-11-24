@@ -3,7 +3,8 @@
  * body, atmosphere/wind, terrain, turbofan cycle, actuators, switch registry and scheduler.
  * It contains no aircraft-specific code or values: those come from the definition.
  *
- * Per tick (integration phase): sense → FCS → actuators → scheduled devices → engines → aero →
+ * Per tick (integration phase): sense → FCS → actuators → scheduled devices → engine controls
+ * (FADEC) → engines → aero →
  * rigid body. Ground contact is checked in commit-events, and the snapshot is published last.
  * Presentation reads `snapshot()` and writes only pilot inputs, throttle and switch requests.
  */
@@ -11,6 +12,7 @@ import type { Quaternion, Vector3 } from "../../../core/coordinates/CoordinateFr
 import { ControlRegistry } from "../../../core/controls/ControlRegistry.js";
 import { SimulationScheduler } from "../../../core/simulation/SimulationScheduler.js";
 import { localAirflow, sampleEnvironment, standardAtmosphere, type EnvironmentConfig } from "../../../physics/environment/Atmosphere.js";
+import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
@@ -24,6 +26,8 @@ export type GroundStatus =
 
 export interface EngineSnapshot extends TurbofanState {
   readonly id: string;
+  /** What the engine control is doing: mode, demand and active limiters. */
+  readonly control: FadecOutput;
 }
 
 export interface AircraftSnapshot {
@@ -78,7 +82,7 @@ export class FixedWingAircraft {
   public readonly controls = new ControlRegistry();
   private readonly systems: AircraftSystems;
   private readonly actuators: ReadonlyMap<string, SurfaceActuator>;
-  private engines: { id: string; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
+  private engines: { id: string; control: Fadec; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
   private body!: RigidBody;
   private fuelKg = 0;
   private cgFractionMac: number;
@@ -97,7 +101,10 @@ export class FixedWingAircraft {
     this.systems = definition.createSystems();
     this.cgFractionMac = definition.mass.cgFractionMac;
     this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS)]));
-    const context = { setCgFractionMac: (v: number) => { this.cgFractionMac = v; } };
+    const context = {
+      setCgFractionMac: (v: number) => { this.cgFractionMac = v; },
+      setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
+    };
     for (const sw of this.systems.switches) {
       this.controls.defineSwitch(sw.definition, ({ to }) => sw.onChange(to, context));
     }
@@ -120,7 +127,12 @@ export class FixedWingAircraft {
       this.massProperties(),
       { positionEnuM: start.positionEnuM, velocityEnuMps: rotateVector(q, [start.speedMps, 0, 0]), bodyToWorld: q, angularVelocityBodyRadps: [0, 0, 0] }
     );
-    this.engines = this.definition.engines.map((install) => ({ id: install.id, install, core: new MixedFlowTurbofan(install.design, install.afterburnerDetentThrottle, start.throttle) }));
+    const startAtm = standardAtmosphere(this.env.originAltitudeMslM + start.positionEnuM[2]);
+    const startAmbient = { temperatureK: startAtm.temperatureK + this.env.temperatureOffsetK, pressurePa: startAtm.pressurePa, mach: start.speedMps / startAtm.speedOfSoundMps };
+    this.engines = this.definition.engines.map((install) => {
+      const control = new Fadec(install.design, install.control, start.throttle, startAmbient);
+      return { id: install.id, install, control, core: new MixedFlowTurbofan(install.design, control.initialSpeed) };
+    });
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
     this.systems.fcs.reset();
@@ -200,7 +212,9 @@ export class FixedWingAircraft {
     const forces = [];
     let totalFlow = 0;
     for (const e of this.engines) {
-      const s = e.core.step(this.throttle, ambient, this.fuelKg > 0, dt);
+      const fuel = this.fuelKg > 0;
+      const cmd = e.control.step(this.throttle, { ambient, spoolSpeed: e.core.state.spoolSpeed, fuelAvailable: fuel }, dt);
+      const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand }, ambient, fuel, dt);
       totalFlow += s.fuelFlowKgS;
       const a = e.install.thrustAxisBody;
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
@@ -258,7 +272,7 @@ export class FixedWingAircraft {
       pilot: this.pilot,
       throttle: this.throttle,
       surfaces: Object.freeze(this.surfacePositions()),
-      engines: this.engines.map((e) => ({ ...e.core.state, id: e.id })),
+      engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
       fuelKg: this.fuelKg,
       massKg: this.body.massProperties.massKg,
       fcsMode: this.fcsMode,
