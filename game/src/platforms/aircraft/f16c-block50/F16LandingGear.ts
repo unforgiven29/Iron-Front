@@ -19,7 +19,8 @@ export const F16_LANDING_GEAR: LandingGearSpec = {
     main("right", G.wheelTrackM.value / 2)
   ],
   transitTimeS: G.transitTimeS.value,
-  gearCircuitId: "B", brakeCircuitId: "B", steeringCircuitId: "B",
+  // Fig 1-33: gear behind the LG isolation valve, brakes on the brake/JFS accumulator branch, NWS on B.
+  gearCircuitId: "B.lg", brakeCircuitId: "B.brakes", steeringCircuitId: "B",
   maxSinkRateMps: G.maxSinkRateMps.value,
   restCgHeightM: z - 0.11,
   // Estimated airframe strike points: nose, ventral exhaust/tail (≈14.5° tail-strike pitch, struts extended —

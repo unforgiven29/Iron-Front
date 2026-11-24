@@ -21,11 +21,11 @@
  *    ≈55 % airborne. SEC: high-energy ignition continuously on, IGVs fixed fully closed.
  *  - VSV reset: after a throttle snap to IDLE the compressor VSVs are reset slightly closed for
  *    2 minutes (idle rpm 2–3 % higher meanwhile).
- *  - Brake/JFS accumulators (2): charged by hydraulic system B when the engine turns at ≥12 % rpm,
+ *  - Brake/JFS accumulators (2): read from the hydraulic network (F16Hydraulics.ts); charged by system B,
  *    recharge in 40 s (hot) to 60 s (cold).
  * ESTIMATED: the IGV schedule (no GE 129 schedule in the manual: closed below 60 % corrected fan
  * speed, fully open by 90 %), oil pressure falling at low g (the manual allows zero oil pressure
- * for up to 1 min below +1 g), the brake/JFS accumulator gas law and brake usage, the snap-to-idle
+ * for up to 1 min below +1 g), the snap-to-idle
  * detection rate, oil-hot level in K.
  */
 import type { MonitorContext, MonitorOutput } from "../common/AircraftDefinition.js";
@@ -35,16 +35,16 @@ const PSI = 6894.757;
 export const F16_MONITOR = Object.freeze({
   engineSubIdle: 0.60, ftitWarnC: 1100, ftitWarnDelayS: 2, hydWarnPsi: 1000, oilWarnPsi: 10, oilClearPsi: 20, oilWarnDelayS: 30,
   oilHotK: (300 - 32) * 5 / 9 + 273.15, ignitionOn: 0.10, ignitionOff: 0.59, relightDecelPerS: 0.05, lowEnergyBelow: 0.55,
-  vsvResetS: 120, accumulatorChargeMinRpm: 0.12, accumulatorRechargeS: 50,
+  vsvResetS: 120,
   // ESTIMATED
-  igvClosedBelow: 0.60, igvOpenAbove: 0.90, accumulatorPrechargePsi: 1000, accumulatorFullPsi: 3000, brakeUsePerSecond: 0.02
+  igvClosedBelow: 0.60, igvOpenAbove: 0.90, accumulatorPrechargePsi: 1000, accumulatorFullPsi: 3000
 });
 const M = F16_MONITOR;
 
 export function f16Monitor(): { step(ctx: MonitorContext, dt: number): MonitorOutput; reset(): void } {
   let ftitHighS = 0, oilLowS = 0, oilLight = false, vsvResetS = 0, lastN = 0, lastThrottleHigh = false;
-  let accumulator = 1, starting = false;
-  const reset = () => { ftitHighS = 0; oilLowS = 0; oilLight = false; vsvResetS = 0; lastN = 0; lastThrottleHigh = false; accumulator = 1; starting = false; };
+  let starting = false;
+  const reset = () => { ftitHighS = 0; oilLowS = 0; oilLight = false; vsvResetS = 0; lastN = 0; lastThrottleHigh = false; starting = false; };
   return {
     reset,
     step: (ctx, dt) => {
@@ -83,12 +83,10 @@ export function f16Monitor(): { step(ctx: MonitorContext, dt: number): MonitorOu
       // IGVs (fraction closed; SEC = fixed fully closed).
       const fan = e?.fanSpeed ?? n;
       const igvClosed = sec ? 1 : Math.max(0, Math.min(1, (M.igvOpenAbove - fan) / (M.igvOpenAbove - M.igvClosedBelow)));
-      // Brake/JFS accumulators (fraction of charge between precharge and full).
-      const bPsi = hyd("B") / PSI;
-      const bandPsi = M.accumulatorFullPsi - M.accumulatorPrechargePsi;
-      const accPsi = M.accumulatorPrechargePsi + accumulator * bandPsi;
-      if (n >= M.accumulatorChargeMinRpm && bPsi > accPsi) accumulator = Math.min(1, accumulator + Math.min((bPsi - accPsi) / bandPsi, dt / M.accumulatorRechargeS));
-      else if (bPsi < accPsi) accumulator = Math.max(0, accumulator - (ctx.pilot.brakes ?? 0) * M.brakeUsePerSecond * dt);
+      // Brake/JFS accumulators: the hydraulic network's check-valve branch on system B.
+      const branchPa = (id: string) => ctx.hydraulics?.branches?.find((b) => b.id === id)?.pressurePa ?? 0;
+      const accPsi = branchPa("B.brakes") / PSI;
+      const accumulator = Math.max(0, Math.min(1, (accPsi - M.accumulatorPrechargePsi) / (M.accumulatorFullPsi - M.accumulatorPrechargePsi)));
       lastN = n;
 
       // ELEC panel.
@@ -126,6 +124,7 @@ export function f16Monitor(): { step(ctx: MonitorContext, dt: number): MonitorOu
           oilPsi: bus("ac.emergency2") ? Math.min(100, oilPsi) : 0,
           fuelFlowPph: bus("ac.emergency1") && e ? e.fuelFlowKgS * 3600 / LB : 0,
           hydAPsi: bus("ac.emergency2") ? hyd("A") / PSI : 0,
+          flcsAccAPsi: branchPa("A.flcs") / PSI, flcsAccBPsi: branchPa("B.flcs") / PSI, lgBranchPsi: branchPa("B.lg") / PSI, dragChuteAccPsi: branchPa("B.dragchute") / PSI,
           hydBPsi: bus("ac.emergency2") ? hyd("B") / PSI : 0,
           igvClosedFraction: igvClosed, vsvResetS, highEnergyIgnition: highEnergy ? 1 : 0, lowEnergyIgnition: lowEnergy ? 1 : 0,
           oilLowTimerS: oilLowS, ftitHighTimerS: ftitHighS,

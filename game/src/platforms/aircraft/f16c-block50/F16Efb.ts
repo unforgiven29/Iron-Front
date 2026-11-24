@@ -5,7 +5,6 @@
  */
 import { box, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
-import { F16_HYDRAULICS } from "./F16Data.js";
 
 type Snap = AircraftSnapshot;
 const LB = 0.45359237;
@@ -143,23 +142,40 @@ function electricsPage(s: Snap): string {
 function hydraulicsPage(s: Snap): string {
   const h = s.hydraulics;
   if (!h) return svg(600, 200, text(20, 40, "No hydraulic model"));
-  const nom = F16_HYDRAULICS.nominalPressurePa.value;
-  const circ = (x: number, id: string, name: string) => {
-    const c = h.circuits.find((k) => k.id === id)!, f = c.pressurePa / nom;
-    return `${box(x, 40, 230, 110, name, [`${(c.pressurePa / 6894.76).toFixed(0)} psi`, `pump ${(c.pumpFlowM3s * 15850).toFixed(1)} gpm`, `demand ${(c.demandFlowM3s * 15850).toFixed(1)} gpm`, `FLCS acc ${(c.accumulatorFluidM3 * 1000).toFixed(2)} L`], f < 0.33 ? "warn" : "on", "#d9b3ff")}
-      ${hbar(x + 10, 170, 210, "PRESSURE (0–4000 psi)", c.pressurePa / (4000 * 6894.76), `${(c.pressurePa / 6894.76).toFixed(0)}`, f < 0.33 ? COLORS.warn : f < 0.9 ? COLORS.caution : COLORS.ok)}`;
+  const P = (pa: number) => pa / 6894.757;
+  const circ = (id: string) => h.circuits.find((c) => c.id === id);
+  const br = (id: string) => h.branches?.find((b) => b.id === id);
+  const flow = (id: string) => h.consumers?.find((c) => c.id === id)?.flowM3s ?? 0;
+  const gpm = (m3s: number) => m3s / 6.309e-5;
+  const epu = h.emergencyUnit, engPump = (s.indications["rpmPercent"] ?? 0) > 12;
+  const col = (psiV: number) => (psiV < 1000 ? COLORS.warn : psiV < 2500 ? COLORS.caution : COLORS.ok);
+  const system = (x: number, id: "A" | "B") => {
+    const c = circ(id);
+    if (!c) return "";
+    const p = P(c.pressurePa), flcs = br(`${id}.flcs`);
+    const users = id === "A"
+      ? [["LEF · RUD · H-TAILS · FLPRN", "via FLCS acc"], ["SPEEDBRAKES", `${num(Math.abs(s.surfaces["speedbrake"] ?? 0))}°`], ["FFP", `${num(gpm(flow("ffp")), 1)} gpm`]]
+      : [["LEF · RUD · H-TAILS · FLPRN", "via FLCS acc"], ["LG (isolation valve)", br("B.lg")?.open ? `OPEN ${num(gpm(flow("gear")), 1)} gpm` : "closed"], ["NWS", `${num(gpm(flow("nws")), 1)} gpm`], ["GUN · AR SYSTEM", `${num(gpm(flow("gun") + flow("airRefuel")), 1)} gpm`], ["BRAKES · JFS (accumulators)", `${num(gpm(flow("brakes") + flow("jfs")), 2)} gpm`], ["DRAG CHUTE (accumulator)", `${num(P(br("B.dragchute")?.pressurePa ?? 0))} psi`]];
+    return `
+      <rect x="${x}" y="8" width="286" height="760" rx="6" fill="${COLORS.panel}" stroke="#44474c"/>
+      ${text(x + 10, 30, `SYSTEM ${id}`, { size: 15, weight: 700, color: "#d9b3ff" })}${text(x + 276, 30, `${num(p)} psi`, { size: 15, weight: 700, anchor: "end", color: col(p) })}
+      ${hbar(x + 10, 52, 266, "HYD PRESS (0–4000 psi)", p / 4000, `${num(p)}`, col(p))}
+      ${pump(x + 30, 100, engPump && c.pumpFlowM3s >= 0)}${text(x + 46, 96, "ENGINE-DRIVEN PUMP (ADG)", { size: 10 })}${text(x + 46, 110, `${num(gpm(c.pumpFlowM3s), 1)} gpm delivered`, { size: 10, color: COLORS.dim })}
+      ${id === "A" ? `${pump(x + 30, 136, epu?.state === "running")}${text(x + 46, 132, `EPU PUMP · ${epu ? epu.state.toUpperCase() : "—"}`, { size: 10, color: epu && epu.state !== "off" ? COLORS.caution : COLORS.text })}${text(x + 46, 146, epu && epu.state !== "off" ? `${num(epu.remainingS)} s hydrazine` : "auto: both < 1000 psi / both gens", { size: 10, color: COLORS.dim })}` : ""}
+      ${hbar(x + 10, 176, 266, "RESERVOIR", c.reservoirFraction ?? 1, c.reservoirM3 !== undefined ? `${num(c.reservoirM3 * 1000, 2)} L` : "—", (c.reservoirFraction ?? 1) < 0.2 ? COLORS.warn : COLORS.ok)}
+      ${hbar(x + 10, 210, 266, "FLUID TEMP", ((c.temperatureK ?? 288) - 233) / 160, `${num((c.temperatureK ?? 288) - 273.15)} °C`, (c.temperatureK ?? 0) > 380 ? COLORS.warn : (c.temperatureK ?? 0) > 360 ? COLORS.caution : COLORS.ok)}
+      ${box(x + 10, 238, 266, 46, "FUEL/OIL HEAT EXCHANGER", [c.coolerBypassed ? "THERMAL BYPASS (cold)" : `cooling ${num((c.coolerHeatW ?? 0) / 1000, 1)} kW`], c.coolerBypassed ? "off" : "on", "#d9b3ff")}
+      ${box(x + 10, 296, 266, 58, "FLCS ACCUMULATOR (check valve)", [`${num(P(flcs?.pressurePa ?? 0))} psi · ${num((flcs?.accumulatorFluidM3 ?? 0) * 1000, 2)} L`, `refill ${num(gpm(flcs?.chargeFlowM3s ?? 0), 1)} gpm`], P(flcs?.pressurePa ?? 0) < 1000 ? "warn" : "on", "#d9b3ff")}
+      ${pipe([[x + 143, 284], [x + 143, 296]], { flow: (flcs?.chargeFlowM3s ?? 0) > 1e-7, color: COLORS.hyd, fluid: "#e9d5ff" })}
+      ${text(x + 10, 376, "USERS", { size: 11, color: COLORS.dim })}
+      ${users.map(([n, v], i) => `<rect x="${x + 10}" y="${384 + i * 34}" width="266" height="28" rx="3" fill="#1c1d1f" stroke="#44474c"/>${text(x + 18, 402 + i * 34, n!, { size: 10 })}${text(x + 268, 402 + i * 34, v!, { size: 10, anchor: "end", color: COLORS.dim })}`).join("")}
+      ${id === "B" ? `${hbar(x + 10, 610, 266, "BRAKE/JFS ACCUMULATORS (2)", s.indications["brakeJfsAccumulatorCharge"] ?? 0, `${num(P(br("B.brakes")?.pressurePa ?? 0))} psi`, (s.indications["brakeJfsAccumulatorCharge"] ?? 0) < 0.3 ? COLORS.caution : COLORS.ok)}
+        ${text(x + 10, 650, `recharge ${num(gpm(br("B.brakes")?.chargeFlowM3s ?? 0), 2)} gpm (40–60 s full)`, { size: 10, color: COLORS.dim })}` : ""}
+      ${text(x + 10, 700, `demand ${num(gpm(c.demandFlowM3s), 1)} gpm`, { size: 11 })}
+      ${text(x + 10, 718, `HYD/OIL PRESS ${p < 1000 ? "ON" : "off"} (< 1000 psi)`, { size: 11, color: p < 1000 ? COLORS.warn : COLORS.dim })}`;
   };
-  const e = s.engines[0], epu = h.emergencyUnit;
-  const engPump = (e?.spoolSpeed ?? 0) > 0.3;
-  return svg(600, 520, `
-    ${circ(20, "A", "SYSTEM A")}${circ(350, "B", "SYSTEM B")}${pump(135, 220, engPump)}${pump(465, 220, engPump)}
-    ${pipe([[135, 229], [135, 270], [300, 270]], { flow: engPump, color: COLORS.hyd, fluid: "#e9d5ff" })}${pipe([[465, 229], [465, 270], [300, 270]], { flow: engPump, color: COLORS.hyd, fluid: "#e9d5ff" })}
-    ${box(200, 270, 200, 90, "FLIGHT CONTROLS", ["stabilators · flaperons", "rudder · LEF", "A + B (one chamber each)"], "on", "#d9b3ff")}
-    ${box(20, 270, 160, 74, "EPU PUMP → A", [epu ? epu.state.toUpperCase() : "—", epu ? `${epu.remainingS.toFixed(0)} s fuel` : ""], epu && epu.state === "running" ? "shed" : "off", "#d9b3ff")}
-    ${box(420, 270, 160, 90, "UTILITIES (B)", ["LG · brakes · NWS", "gun · AR door/latch", "brake/JFS accumulators"], "on", "#d9b3ff")}
-    ${box(20, 360, 160, 74, "SYS A ONLY", ["speedbrakes", "fuel flow proportioner"], "on", "#d9b3ff")}
-    ${hbar(420, 380, 160, "BRAKE/JFS ACC", (s.indications["brakeJfsAccumulatorCharge"] ?? 0), `${num(s.indications["brakeJfsAccumulatorPsi"] ?? 0)} psi`, (s.indications["brakeJfsAccumulatorCharge"] ?? 0) < 0.3 ? COLORS.caution : COLORS.ok)}
-    ${["3,000 psi systems A and B on the ADG; HYD/OIL PRESS below 1,000 psi.", "Both feed the FLCS and LEFs (reduced rate on one system).", "EPU pump → A on dual low pressure or loss of both generators.", "B charges the brake/JFS accumulators above 12 % rpm (40–60 s)."].map((l, i) => text(20, 452 + i * 15, l, { size: 10, color: COLORS.dim })).join("")}`);
+  return svg(600, 830, `${system(8, "A")}${system(306, "B")}
+    ${["Fig 1-33: pump → filter → users; FLCS accumulators behind check valves;", "return via the fuel/oil heat exchanger (thermal bypass).", "B charges the brake/JFS accumulators through the dump & relief manifold; LG behind the isolation valve.", "Component sizes, flows, reservoir contents and thermal values estimated."].map((l, i) => text(12, 784 + i * 12, l, { size: 9, color: COLORS.dim })).join("")}`);
 }
 
 /** Rolling history for the FLCS strip charts (UI state only). */
