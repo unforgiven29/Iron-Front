@@ -93,10 +93,54 @@ function hydraulicsPage(s: Snap): string {
     ${text(20, 400, "Pumps on the engine accessory drive gearbox; EPU auto-starts on dual low pressure or loss of both generators.", { size: 10, color: COLORS.dim })}`);
 }
 
+/** Rolling history for the FLCS strip charts (UI state only). */
+const history: { tick: number; nzCmd: number; nz: number; pCmd: number; p: number }[] = [];
+
+function chart(x: number, y: number, w: number, h: number, title: string, a: number[], b: number[], lo: number, hi: number, unit: string): string {
+  const px = (i: number, n: number) => x + (w * i) / Math.max(1, n - 1);
+  const py = (v: number) => y + h - (h * (Math.max(lo, Math.min(hi, v)) - lo)) / (hi - lo);
+  const line = (v: number[], color: string, dash = "") => v.length > 1 ? `<polyline points="${v.map((q, i) => `${px(i, v.length).toFixed(1)},${py(q).toFixed(1)}`).join(" ")}" fill="none" stroke="${color}" stroke-width="2"${dash ? ` stroke-dasharray="${dash}"` : ""}/>` : "";
+  const zero = lo < 0 && hi > 0 ? `<line x1="${x}" x2="${x + w}" y1="${py(0)}" y2="${py(0)}" stroke="#555" stroke-dasharray="2 3"/>` : "";
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#1c1d1f" stroke="#44474c"/>${zero}${line(a, "#f5a524", "5 3")}${line(b, "#7fd4ff")}
+    ${text(x + 6, y + 14, title, { size: 10, color: COLORS.dim })}${text(x + w - 6, y + 14, `cmd — dashed · actual — solid (${unit})`, { size: 9, anchor: "end", color: COLORS.dim })}
+    ${text(x - 4, y + 10, `${hi}`, { size: 9, anchor: "end", color: COLORS.dim })}${text(x - 4, y + h, `${lo}`, { size: 9, anchor: "end", color: COLORS.dim })}`;
+}
+
+function flcsPage(s: Snap): string {
+  const t = s.fcsTelemetry, v = (k: string) => t[k] ?? Number.NaN;
+  if (Object.keys(t).length === 0) return svg(600, 200, text(20, 40, `FLCS ${s.fcsMode}: no control-law telemetry in this mode`));
+  if (!history.length || history[history.length - 1]!.tick !== s.tick) history.push({ tick: s.tick, nzCmd: v("nzCommandG"), nz: v("nzG"), pCmd: v("rollRateCommandDegS"), p: v("rollRateDegS") });
+  while (history.length > 100) history.shift();
+  const surf = (id: string) => s.surfaces[id] ?? 0;
+  const arrow = (x1: number, x2: number, y: number) => `<line x1="${x1}" y1="${y}" x2="${x2 - 6}" y2="${y}" stroke="#d9d9d9" stroke-width="1.5"/><path d="M${x2 - 6},${y - 4} L${x2},${y} L${x2 - 6},${y + 4} Z" fill="#d9d9d9"/>`;
+  const row = (y: number, axis: string, stick: string, cmd: string, meas: string, law: string, lim: string, limState: "on" | "warn" | "shed", surfCmd: string, surfAct: string) => `
+    ${text(12, y + 30, axis, { size: 12, weight: 700, color: "#7fd4ff" })}
+    ${box(60, y, 82, 52, "STICK", [stick])}${arrow(142, 156, y + 26)}
+    ${box(156, y, 100, 52, "COMMAND", [cmd])}${arrow(256, 270, y + 26)}
+    <circle cx="284" cy="${y + 26}" r="12" fill="#1c1d1f" stroke="#d9d9d9"/>${text(284, y + 31, "Σ", { anchor: "middle", size: 13 })}${text(284, y + 66, meas, { anchor: "middle", size: 10, color: COLORS.dim })}
+    ${arrow(296, 310, y + 26)}${box(310, y, 120, 52, law, [lim], limState)}${arrow(430, 444, y + 26)}
+    ${box(444, y, 140, 52, "SURFACE", [surfCmd, surfAct])}`;
+  const limitingRoll = v("rollRateLimitDegS") < 307.9;
+  const hist = (k: "nzCmd" | "nz" | "pCmd" | "p") => history.map((h) => h[k]);
+  return svg(600, 640, `
+    ${text(12, 22, `FLCS ${s.fcsMode} · q̄ ${num(v("dynamicPressureKPa"), 1)} kPa · α ${num(v("alphaDeg"), 1)}° · β ${num(v("betaDeg"), 1)}°`, { size: 12 })}
+    ${v("spinPrevention") ? text(588, 22, "SPIN PREVENTION", { size: 12, anchor: "end", color: COLORS.warn, weight: 700 }) : ""}
+    ${row(40, "PITCH", `${num(v("stickPitch") * 100)} %`, `${num(v("nzCommandG"), 2)} g`, `nz ${num(v("nzG"), 2)} g · q ${num(v("pitchRateDegS"), 1)}°/s`, "g / AoA LIMIT",
+      v("alphaLimiting") ? `AOA LIMITING (α ${num(v("alphaDeg"), 1)}°)` : "within limits", v("alphaLimiting") ? "warn" : "on", `cmd ${num(v("stabCmdDeg"), 1)}°`, `stab ${num(surf("elevator"), 1)}°`)}
+    ${row(140, "ROLL", `${num(v("stickRoll") * 100)} %`, `${num(v("rollRateCommandDegS"), 0)}°/s`, `p ${num(v("rollRateDegS"), 0)}°/s`, "ROLL LIMITER",
+      `max ${num(v("rollRateLimitDegS"), 0)}°/s`, limitingRoll ? "shed" : "on", `cmd ${num(v("flaperonCmdDeg"), 1)}°`, `flprn ${num(surf("aileron"), 1)}°`)}
+    ${row(240, "YAW", `${num(v("pedals") * 100)} %`, "β · r FB", `r ${num(v("yawRateDegS"), 1)}°/s · ny ${num(v("nyG"), 2)} g`, "ARI + DAMPER",
+      "ARI active", "on", `cmd ${num(v("rudderCmdDeg"), 1)}°`, `rud ${num(surf("rudder"), 1)}°`)}
+    ${chart(40, 350, 540, 120, "Nz (g)", hist("nzCmd"), hist("nz"), -2, 9, "g")}
+    ${chart(40, 490, 540, 120, "Roll rate (°/s)", hist("pCmd"), hist("p"), -320, 320, "°/s")}
+    ${text(12, 632, "Control laws: NASA TP-1538 (F-16 simulator FLCS), not the production Block 50 OFP.", { size: 9, color: COLORS.dim })}`);
+}
+
 export const F16_EFB = {
   title: "F-16C EFB",
   pages: [
     { id: "engine", title: "Engine", render: (s: Snap) => enginePage(s) },
+    { id: "flcs", title: "FLCS", render: (s: Snap) => flcsPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap, p: Snap | undefined) => fuelPage(s, p) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
     { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) }

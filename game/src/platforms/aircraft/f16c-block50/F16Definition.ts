@@ -13,7 +13,7 @@ import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW
 import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { f16AccessoryDrives, f16SystemsCoupling, F16_ELECTRICAL_INSTALLATION } from "./F16Electrical.js";
 import { f16FuelSystem, f16TankSpecs } from "./F16FuelSystem.js";
-import { F16FlightControls } from "./F16FlightControls.js";
+import { F16FlightControls, ROLL_GAINS } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
@@ -145,10 +145,22 @@ function f16Fcs(): FlightControlSystem & { setMode(mode: "NORM" | "DIRECT", curr
           commands: { elevator: directTrimDeg - pilot.pitch * a.elevatorLimitDeg.value, aileron: -pilot.roll * a.aileronLimitDeg.value, rudder: -pilot.yaw * a.rudderLimitDeg.value, speedbrake: speedbrakeOut ? F16_SPEEDBRAKE.maxDeflectionDeg.value : 0 }
         };
       }
+      // Display telemetry (UI only): what the control laws are commanding and why.
+      const D = 180 / Math.PI, alphaDeg = sensors.alphaRad * D, q = sensors.dynamicPressurePa, stab = Math.abs(out.commands.elevatorDeg);
+      const G = ROLL_GAINS;
+      const rollLimit = alphaDeg > G.spinPreventionAlphaDeg ? 0 : Math.max(G.rollLimitMinDegS, 308 - Math.max(0, G.rollLimitQBreakPa - q) * G.rollLimitPerPaDegS - Math.max(0, alphaDeg - G.rollLimitAlphaOnsetDeg) * G.rollLimitPerAlphaDegS - Math.max(0, stab - G.rollLimitStabOnsetDeg) * G.rollLimitPerStabDegS);
       return {
         mode,
         annunciations: out.alphaLimiting ? ["AOA LIMIT"] : [],
-        commands: { elevator: out.commands.elevatorDeg, aileron: out.commands.aileronDeg, rudder: out.commands.rudderDeg, speedbrake: speedbrakeOut ? F16_SPEEDBRAKE.maxDeflectionDeg.value : 0 }
+        commands: { elevator: out.commands.elevatorDeg, aileron: out.commands.aileronDeg, rudder: out.commands.rudderDeg, speedbrake: speedbrakeOut ? F16_SPEEDBRAKE.maxDeflectionDeg.value : 0 },
+        telemetry: {
+          stickPitch: pilot.pitch, stickRoll: pilot.roll, pedals: pilot.yaw,
+          nzCommandG: out.nzCommandG, nzG: sensors.nzG, alphaDeg, betaDeg: sensors.betaRad * D, alphaLimiting: out.alphaLimiting ? 1 : 0,
+          rollRateCommandDegS: out.rollRateCommandRadps * D, rollRateDegS: sensors.ratesRadps[0] * D, rollRateLimitDegS: rollLimit,
+          pitchRateDegS: sensors.ratesRadps[1] * D, yawRateDegS: sensors.ratesRadps[2] * D, nyG: sensors.nyG,
+          dynamicPressureKPa: q / 1000, stabCmdDeg: out.commands.elevatorDeg, flaperonCmdDeg: out.commands.aileronDeg, rudderCmdDeg: out.commands.rudderDeg,
+          spinPrevention: alphaDeg > G.spinPreventionAlphaDeg ? 1 : 0
+        }
       };
     }
   };

@@ -70,6 +70,12 @@ export interface FadecSchedule {
   readonly afterburnerLightDuringAcceleration?: boolean;
   /** Afterburner fraction rate, 1/s (zone sequencing, simplified to a rate). */
   readonly afterburnerRatePerS: number;
+  /**
+   * Optional dry-range nozzle schedule: dry throttle fraction (0 idle … 1 MIL) → minimum throat
+   * position (0 closed … 1 open), e.g. an engine whose nozzle opens fully at idle. Above MIL the
+   * throat follows the flow.
+   */
+  readonly dryNozzleMinPosition?: Table1D;
   /** Degraded/backup mode behaviour. */
   readonly backup: {
     readonly maxPhysicalSpeed: number;
@@ -161,7 +167,9 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
   if (abRequest > 0 && mode === "backup" && s.backup.afterburnerInhibited) { abRequest = 0; limits.push("afterburner-inhibited"); }
 
-  const throat: ThroatCommand = mode === "backup" && s.backup.nozzleClosed ? { kind: "position", position: 0 } : { kind: "auto" };
+  const dryFraction = Math.min(1, Math.max(0, t / s.afterburnerDetentThrottle));
+  const minPosition = s.dryNozzleMinPosition && abRequest === 0 ? lookup1D(s.dryNozzleMinPosition, dryFraction).value : 0;
+  const throat: ThroatCommand = mode === "backup" && s.backup.nozzleClosed ? { kind: "position", position: 0 } : minPosition > 0 ? { kind: "auto", minPosition } : { kind: "auto" };
   // Model-based limiters (evaluated with the afterburner and nozzle setting the FADEC will run).
   const lo = Math.min(speed, s.idleSpeed * 0.8);
   // A throat too small for the flow is handled by the cycle (back-pressure raises turbine

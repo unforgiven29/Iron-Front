@@ -70,6 +70,8 @@ export interface AircraftSnapshot {
   /** Hydraulic network state (absent when the aircraft has none). */
   readonly hydraulics?: HydraulicSnapshot;
   readonly fcsMode: string;
+  /** Flight-control internals reported by the package's FCS (empty if none). */
+  readonly fcsTelemetry: Readonly<Record<string, number>>;
   readonly annunciations: readonly string[];
   readonly cgFractionMac: number;
   /** Buffet intensity 0..1 from the aero model (0 when the model has none). */
@@ -124,6 +126,7 @@ export class FixedWingAircraft {
   private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
+  private fcsTelemetry: Readonly<Record<string, number>> = {};
   private annunciations: readonly string[] = [];
   private faults: string[] = [];
   private ground: GroundStatus = { kind: "terrain-unknown", reason: "not sampled" };
@@ -303,6 +306,7 @@ export class FixedWingAircraft {
       this.surfaceRates[id] = (actuator.positionDeg - before) / dt;
     }
     this.fcsMode = fcs.mode;
+    this.fcsTelemetry = fcs.telemetry ?? {};
     this.annunciations = [...fcs.annunciations, ...(this.fuelSystem?.annunciations() ?? [])];
 
     const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber,
@@ -417,6 +421,7 @@ export class FixedWingAircraft {
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
       ...(this.electrical ? { electrical: this.electrical.snapshot } : {}),
       fcsMode: this.fcsMode,
+      fcsTelemetry: this.fcsTelemetry,
       annunciations: this.annunciations,
       cgFractionMac: this.cgFractionMac,
       buffet: this.buffet,

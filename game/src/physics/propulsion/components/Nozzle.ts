@@ -28,7 +28,8 @@ export interface NozzleFlow {
 }
 
 /** How the throat is commanded: follow the engine's flow ("auto") or held at a position (0 = closed, 1 = fully open). */
-export type ThroatCommand = { readonly kind: "auto" } | { readonly kind: "position"; readonly position: number };
+/** "auto": open to what the flow needs, but not below `minPosition` (e.g. a nozzle scheduled open at idle). */
+export type ThroatCommand = { readonly kind: "auto"; readonly minPosition?: number } | { readonly kind: "position"; readonly position: number };
 
 export interface NozzleResult {
   readonly grossThrustN: number;
@@ -130,7 +131,7 @@ export function variableConvergentDivergentNozzle(spec: VariableCdNozzleSpec): N
     evaluate: (flow, command) => {
       const g = flow.gamma, p0 = flow.ambientPressurePa, pt = flow.totalPressurePa;
       const required = requiredThroatArea(flow);
-      const a8 = command.kind === "auto" ? Math.min(aMax, Math.max(aMin, required)) : aMin + (aMax - aMin) * Math.min(1, Math.max(0, command.position));
+      const a8 = command.kind === "auto" ? Math.min(aMax, Math.max(aMin + (aMax - aMin) * Math.min(1, Math.max(0, command.minPosition ?? 0)), required)) : aMin + (aMax - aMin) * Math.min(1, Math.max(0, command.position));
       const position = (a8 - aMin) / (aMax - aMin);
       const npr = pt / p0;
       const ratio = spec.exitAreaRatioByPressureRatio ? lookup1D(spec.exitAreaRatioByPressureRatio, npr).value : spec.exitAreaRatioClosed + (spec.exitAreaRatioOpen - spec.exitAreaRatioClosed) * position;

@@ -54,12 +54,12 @@ export const MIG29_MASS = Object.freeze({
 export const MIG29_LIFT_SLOPE_MACH_FACTOR: { m: number; f: number }[] = [{ m: 0.85, f: 1 }, { m: 0.98, f: 1.613 }, { m: 1.17, f: 1.028 }, { m: 1.7, f: 0.844 }];
 
 export const MIG29_AERO = Object.freeze({
-  zeroLiftDragSubsonic: P(0.022, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Fitted jointly with e and the drag-rise peak; Raymer estimate was 0.021"),
+  zeroLiftDragSubsonic: P(0.026, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Fitted jointly with e and the drag-rise peak; Raymer estimate was 0.021"),
   zeroLiftDragPeak: P(0.055, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer typical value was 0.046"),
   zeroLiftDragM2: P(0.040, "-", "estimated", EST),
-  oswaldEfficiency: P(0.60, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Effective value absorbing trim drag and high-alpha losses; Raymer estimate was 0.80"),
+  oswaldEfficiency: P(0.65, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Effective value absorbing trim drag and high-alpha losses; Raymer estimate was 0.80"),
   highLiftDragBreakCl: P(0.9, "CL", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form (separation above the break CL)"),
-  highLiftDragFactor: P(0.3, "ΔCD per (CL − CLbreak)²", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form"),
+  highLiftDragFactor: P(0.5, "ΔCD per (CL − CLbreak)²", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form"),
   zeroLiftAlphaDeg: P(0, "deg", "derived", "GAF fig. A8-13 7 g curves: a non-zero offset worsened the fit at every altitude", "Body AoA at zero lift (camber/incidence)"),
   /** Unsteady separation (Goman–Khrabrov) and vortex breakdown: ESTIMATED from the literature range (no MiG-29 identification published). */
   separationLagChords: P(12, "c/V", "estimated", "Goman & Khrabrov 1994; fighter identifications report τ1 ≈ 10–30 c/V", "Relaxation time of the separation state"),
@@ -100,7 +100,8 @@ export const MIG29_ENGINE = Object.freeze({
   fanPressureRatio: P(3.1, "-", "estimated", EST),
   lateralOffsetM: P(0.56, "m from centreline", "estimated", EST, "Engine thrust lines; produce asymmetric thrust when one engine is out"),
   installationLossFraction: P(0.05, "-", "estimated", EST),
-  idleSpeed: P(0.7103, "fraction", "derived", GAF_TO, "Calibrated so sea-level-static idle thrust is the published 180 kp on this cycle"),
+  idleSpeed: P(0.663, "fraction", "primary-published", GAF_TO, "Fig. 1-4 'Function of the NH speed controller': ground idle ≈66 % NH at CIT 15 °C (NH taken as the cycle's physical speed fraction)"),
+  flowSpeedExponent: P(2.96, "-", "derived", GAF_TO, "Generic-map part-speed airflow exponent fitted so the published 66 % NH ground idle gives the published 180 kp idle thrust (open nozzle)"),
   accelRatePerS: P(0.08, "fraction/s", "derived", GAF_TO, "Gives IDLE → MAX AB in ≈5 s in flight; the manual gives 3–7 s"),
   decelRatePerS: P(0.12, "fraction/s", "estimated", EST),
   afterburnerMinSpeedFraction: P(0.74, "fraction of max speed", "primary-published", GAF_TO, "AB will not ignite below 72–76 % RPM during a throttle burst (mid value; NH % taken as the cycle's physical speed fraction)"),
@@ -109,6 +110,10 @@ export const MIG29_ENGINE = Object.freeze({
   limitedPowerMaxAfterburnerThrustN: P(7520 * 9.80665, "N", "primary-published", GAF_TO, "LPM max AB 7,520 kp"),
   intakeRampOpenKias: P(108, "KIAS", "primary-published", GAF_TO, "Forward ramp retracts to fully open at ≈108 KIAS on takeoff; extends (closes the duct) below 108 KIAS after landing"),
   louverModeRecovery: P(0.93, "pt2/pt0", "estimated", EST, "Total-pressure recovery when breathing through the upper wing-root louvers (ramps closed); not published"),
+  nozzleThrustCoefficient: P(0.97, "Cfg", "estimated", EST, "Variable C-D nozzle gross thrust coefficient"),
+  nozzleClosedThroatFractionOfMil: P(1.0, "-", "estimated", EST, "Minimum primary area ≈ what sea-level MIL flow needs"),
+  nozzleOpenThroatFractionOfMaxAb: P(1.08, "-", "estimated", EST, "Maximum primary area: margin over sea-level max-AB need"),
+  nozzleMaxExitAreaRatio: P(1.8, "A9/A8", "estimated", EST, "Mechanical limit of the secondary (divergent) nozzle"),
   afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST)
 });
 
