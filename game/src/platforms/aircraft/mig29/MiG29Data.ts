@@ -91,9 +91,13 @@ export const MIG29_ENGINE = Object.freeze({
   fanPressureRatio: P(3.1, "-", "estimated", EST),
   lateralOffsetM: P(0.56, "m from centreline", "estimated", EST, "Engine thrust lines; produce asymmetric thrust when one engine is out"),
   installationLossFraction: P(0.05, "-", "estimated", EST),
-  idleSpeed: P(0.70, "fraction", "estimated", EST),
-  accelRatePerS: P(0.08, "fraction/s", "estimated", EST),
+  idleSpeed: P(0.7103, "fraction", "derived", GAF_TO, "Calibrated so sea-level-static idle thrust is the published 180 kp on this cycle"),
+  accelRatePerS: P(0.08, "fraction/s", "derived", GAF_TO, "Gives IDLE → MAX AB in ≈5 s in flight; the manual gives 3–7 s"),
   decelRatePerS: P(0.12, "fraction/s", "estimated", EST),
+  afterburnerMinSpeedFraction: P(0.74, "fraction of max speed", "primary-published", GAF_TO, "AB will not ignite below 72–76 % RPM during a throttle burst (mid value; NH % taken as the cycle's physical speed fraction)"),
+  afterburnerLightDelayS: P(2.5, "s", "primary-published", GAF_TO, "Time for ignition of AB is 2 to 3 sec"),
+  limitedPowerMilitaryThrustN: P(4680 * 9.80665, "N", "primary-published", GAF_TO, "LPM: ECU limits max EGT ≈20 °C lower; MIL 4,680 kp"),
+  limitedPowerMaxAfterburnerThrustN: P(7520 * 9.80665, "N", "primary-published", GAF_TO, "LPM max AB 7,520 kp"),
   afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST)
 });
 

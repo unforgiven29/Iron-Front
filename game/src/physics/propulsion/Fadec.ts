@@ -65,6 +65,9 @@ export interface FadecSchedule {
   /** Afterburner: minimum burner pressure for light-off, Pa (optional light-off envelope). */
   readonly afterburnerMinBurnerPressurePa?: number;
   readonly afterburnerLightDelayS: number;
+  /** If true, the light-off sequence may start during an acceleration once the speed gate is met
+   * (otherwise it waits until the speed demand has reached its target). */
+  readonly afterburnerLightDuringAcceleration?: boolean;
   /** Afterburner fraction rate, 1/s (zone sequencing, simplified to a rate). */
   readonly afterburnerRatePerS: number;
   /** Degraded/backup mode behaviour. */
@@ -261,7 +264,7 @@ export class Fadec {
     else this.demand = target.speed;
 
     // Afterburner sequencing: light only with the core near its scheduled maximum, after a delay.
-    const coreReady = sensors.spoolSpeed >= s.afterburnerMinSpeedFraction * target.speed && this.demand >= target.speed - 1e-6;
+    const coreReady = sensors.spoolSpeed >= s.afterburnerMinSpeedFraction * target.speed && (s.afterburnerLightDuringAcceleration === true || this.demand >= target.speed - 1e-6);
     if (target.afterburner > 0 && coreReady) this.abTimer += dt; else this.abTimer = 0;
     const abTarget = this.abTimer >= s.afterburnerLightDelayS ? target.afterburner : 0;
     const rate = s.afterburnerRatePerS * dt;
