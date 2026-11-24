@@ -9,6 +9,7 @@ import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW_SPEED_REFERENCE } from "./F16Compressibility.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
+import { f16FuelSystem, f16TankSpecs } from "./F16FuelSystem.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
@@ -139,6 +140,8 @@ function f16Devices(model: F16AeroModelId): ScheduledDevices | undefined {
   };
 }
 
+const F16_FUEL_CAPACITY_KG = f16TankSpecs().reduce((s, t) => s + t.capacityKg, 0);
+
 export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}): AircraftDefinition {
   const model = options.aeroModel ?? "hifi";
   const a = F16_ACTUATORS;
@@ -146,7 +149,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     manifest: F16_MANIFEST,
     displayName: "F-16C Block 50",
     dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6; NASA TP-3355 supersonic corrections, transonic estimated), F110 gas-path engine calibrated to published thrust with a FADEC (PRI/SEC), project-designed fly-by-wire.",
-    mass: { emptyMassKg: F16_MASS.emptyMassKg.value, inertiaKgM2: f16InertiaTensor(), referenceMassKg: F16_MASS.massKg.value, cgFractionMac: F16_MASS.cgFractionMac.value, internalFuelKg: F16_ENGINE.internalFuelKg.value },
+    mass: { emptyMassKg: F16_MASS.emptyMassKg.value, inertiaKgM2: f16InertiaTensor(), referenceMassKg: F16_MASS.massKg.value, cgFractionMac: F16_MASS.zeroFuelCgFractionMac.value, internalFuelKg: F16_FUEL_CAPACITY_KG, macM: F16_GEOMETRY.meanChordM.value },
     surfaces: [
       { id: "elevator", limitDeg: a.elevatorLimitDeg.value, rateDegS: a.elevatorRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
       { id: "aileron", limitDeg: a.aileronLimitDeg.value, rateDegS: a.aileronRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
@@ -160,6 +163,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     hydraulics: F16_HYDRAULIC_INSTALLATION,
     landingGear: F16_LANDING_GEAR,
     annunciate: f16Annunciations,
+    createFuelSystem: () => f16FuelSystem(),
     cockpit: F16_COCKPIT_LAYOUT,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createSystems: () => {

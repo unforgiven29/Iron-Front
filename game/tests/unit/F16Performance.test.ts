@@ -85,11 +85,12 @@ describe("F-16 weight, speedbrake and FLCS behaviour", () => {
 
   it("weighs empty mass + fuel and gets lighter as fuel burns", () => {
     const a = jet();
-    expect(a.snapshot().massKg).toBeCloseTo(F16_MASS.emptyMassKg.value + 3175, 3);
+    const full = createF16Definition().mass.internalFuelKg; // tank-model total (F16FuelSystem)
+    expect(a.snapshot().massKg).toBeCloseTo(F16_MASS.emptyMassKg.value + full, 3);
     a.setThrottle(1);
     const s = fly(a, 10);
     expect(s.massKg).toBeCloseTo(F16_MASS.emptyMassKg.value + s.fuelKg, 6);
-    expect(s.massKg).toBeLessThan(F16_MASS.emptyMassKg.value + 3175);
+    expect(s.massKg).toBeLessThan(F16_MASS.emptyMassKg.value + full);
   });
 
   it("speedbrake extends at a finite rate and adds drag", () => {

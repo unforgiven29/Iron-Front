@@ -40,6 +40,7 @@ export const F16_MASS = Object.freeze({
   izzKgM2: { value: 63100 * SLUG_FT2, unit: "kg·m²", status: "secondary-reported", source: SL, note: SL_NOTE } as Parameter,
   ixzKgM2: { value: 982 * SLUG_FT2, unit: "kg·m²", status: "secondary-reported", source: SL, note: "Product of inertia Jxz (body FRD); tensor entry is -Jxz" } as Parameter,
   emptyMassKg: { value: 8936, unit: "kg", status: "primary-published", source: "USAF F-16 fact sheet ('weight without fuel', 19,700 lb)", note: "Family-level figure; pilot, gun ammunition and stores are not added. Total mass = this + fuel." } as Parameter,
+  zeroFuelCgFractionMac: { value: 0.368, unit: "MAC fraction", status: "estimated", source: "project estimate", note: "Chosen so full internal fuel (F16FuelSystem tank centroids) puts the CG at the 0.35 MAC reference" } as Parameter,
   cgFractionMac: { value: 0.35, unit: "MAC fraction", status: "secondary-reported", source: SL, note: "Nominal CG used for the published trim checks" } as Parameter,
   engineAngularMomentum: { value: Number.NaN, unit: "kg·m²/s", status: "unknown", source: "none", note: "F110-GE-129 rotor angular momentum not publicly available; gyroscopic engine coupling not modelled" } as Parameter
 });

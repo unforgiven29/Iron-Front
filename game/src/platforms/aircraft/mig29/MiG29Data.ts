@@ -40,7 +40,9 @@ export const MIG29_MASS = Object.freeze({
   rollGyrationRadius: P(0.25, "fraction of span", "estimated", "Roskam, Airplane Design Part V, fighter class"),
   pitchGyrationRadius: P(0.36, "fraction of length", "estimated", "Roskam, fighter class"),
   yawGyrationRadius: P(0.44, "fraction of (span+length)/2", "estimated", "Roskam, fighter class"),
-  cgFractionMac: P(0.25, "MAC fraction", "estimated", EST, "Moment reference of this aero model")
+  cgFractionMac: P(0.293, "MAC fraction", "estimated", EST, "Zero-fuel CG, chosen so the CG is ≈25.5 % MAC at the GAF chart weight (13,000 kg, ≈2,000 kg fuel); fuel in the tanks moves the actual CG (MiG29FuelSystem)"),
+  /** CG at which the static margins below apply: the GAF appendix charts are drawn for CG 25.5 % MAC. */
+  aeroReferenceCgFractionMac: P(0.255, "MAC fraction", "primary-published", GAF_TO, "Fig. A8-13 'CG = 25.5 % MAC'; the fitted lift/drag data refer to this CG")
 });
 
 /** Aerodynamic model constants (component method; see MiG29Aerodynamics.ts). */
