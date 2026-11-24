@@ -77,3 +77,50 @@ describe("MiG-29 package: a second, structurally different aircraft on the share
     expect(a.snapshot().ground.kind).toBe("airborne");
   });
 });
+
+describe("MiG-29 control laws from the GAF T.O. 1F-MIG29-1 (MiG-29G; 9.13 applicability unverified)", () => {
+  it("feel-control unit: full 35°/15° taileron at low speed and above 30,000 ft, 17°45'/5°45' at 470–650 KTAS near the ground", async () => {
+    const { stabilatorAuthority } = await import("../../src/platforms/aircraft/mig29/MiG29ControlSystem.js");
+    expect(stabilatorAuthority(200, 0)).toEqual([35, 15]);
+    expect(stabilatorAuthority(550, 1000)).toEqual([17.75, 5.75]);
+    expect(stabilatorAuthority(900, 1000)).toEqual([35, 15]);
+    expect(stabilatorAuthority(550, 35000)).toEqual([35, 15]);
+    const [midUp] = stabilatorAuthority(340, 0);
+    expect(midUp).toBeLessThan(35);
+    expect(midUp).toBeGreaterThan(17.75);
+  });
+
+  it("LEF lock out at AoA ≥ 8.7° below M0.8 and retract at ≤ 7° or above M0.8 (hysteresis)", async () => {
+    const { lefSchedule } = await import("../../src/platforms/aircraft/mig29/MiG29Definition.js");
+    const lef = lefSchedule();
+    const at = (alphaDeg: number, mach = 0.5) => lef.step({ nzG: 1, nyG: 0, weightOnWheels: false, alphaRad: alphaDeg / D, betaRad: 0, ratesRadps: [0, 0, 0], dynamicPressurePa: 2e4, staticPressurePa: 8e4, mach, trueAirspeedMps: 170, pitchRad: 0, rollRad: 0 }, 1 / 120)["lef"];
+    expect(at(8.5)).toBe(0);
+    expect(at(9)).toBeGreaterThan(0);
+    expect(at(7.5)).toBeGreaterThan(0); // hysteresis band
+    expect(at(6.9)).toBe(0);
+    expect(at(10, 0.85)).toBe(0);
+  });
+
+  it("AoA limiter caps a full aft stick near 15° with LEF in, and differential tailerons drop out when the LEF are out", async () => {
+    const { mig29ControlSystem } = await import("../../src/platforms/aircraft/mig29/MiG29ControlSystem.js");
+    const fcs = mig29ControlSystem();
+    const sensors = (alphaDeg: number) => ({ nzG: 1, nyG: 0, weightOnWheels: false, alphaRad: alphaDeg / D, betaRad: 0, ratesRadps: [0, 0, 0] as const, dynamicPressurePa: 2e4, staticPressurePa: 8e4, mach: 0.3, trueAirspeedMps: 100, pitchRad: 0, rollRad: 0 }); // ≈194 KTAS: below the feel-unit band
+    const lefIn = fcs.step({ pitch: 0, roll: 1, yaw: 0 }, sensors(5), { lef: 0 }, 1 / 120);
+    const lefOut = fcs.step({ pitch: 0, roll: 1, yaw: 0 }, sensors(5), { lef: 20 }, 1 / 120);
+    expect(lefIn.commands["differentialStabilator"]).toBe(5);
+    expect(lefOut.commands["differentialStabilator"]).toBe(0);
+    const over = fcs.step({ pitch: 1, roll: 0, yaw: 0 }, sensors(18), { lef: 0 }, 1 / 120);
+    const under = fcs.step({ pitch: 1, roll: 0, yaw: 0 }, sensors(12), { lef: 0 }, 1 / 120);
+    expect(over.annunciations).toContain("AOA LIMIT");
+    expect(over.commands["elevator"]!).toBeGreaterThan(under.commands["elevator"]!);
+    expect(under.commands["elevator"]).toBe(-35);
+  });
+
+  it("uses the manual's weights and RD-33 ratings", async () => {
+    const { MIG29_MASS, MIG29_ENGINE } = await import("../../src/platforms/aircraft/mig29/MiG29Data.js");
+    expect(MIG29_MASS.emptyMassKg.value).toBe(11001);
+    expect(MIG29_MASS.internalFuelKg.value).toBe(3453);
+    expect(MIG29_ENGINE.militaryThrustN.value / 9.80665).toBeCloseTo(5040, 6);
+    expect(MIG29_ENGINE.maxAfterburnerThrustN.value / 9.80665).toBeCloseTo(8300, 6);
+  });
+});

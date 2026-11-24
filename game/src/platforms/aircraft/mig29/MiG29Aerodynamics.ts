@@ -83,7 +83,7 @@ export function mig29Aerodynamics(): AeroModel {
       const cm = -staticMargin(M) * cl + A.stabilatorPowerPerRad.value * elev * eta + A.pitchDampingPerRad.value * q * c2v - 0.05 * sep;
       const cnb = A.yawStabilityPerRad.value * (1 - 0.8 * smooth((Math.abs(a) / DEG - 20) / 15));
       const cy = A.sideForcePerRad.value * b + 0.003 * -rud * eta;
-      const cRoll = A.dihedralEffectPerRad.value * b + A.rollDampingPerRad.value * p * b2v + 0.1 * r * b2v + A.rollPowerPerDeg.value * ail * eta * (1 - 0.5 * smooth((Math.abs(a) / DEG - 15) / 15));
+      const cRoll = A.dihedralEffectPerRad.value * b + A.rollDampingPerRad.value * p * b2v + 0.1 * r * b2v + (A.rollPowerPerDeg.value * ail + A.differentialStabilatorRollPerDeg.value * (s["differentialStabilator"] ?? 0)) * eta * (1 - 0.5 * smooth((Math.abs(a) / DEG - 15) / 15));
       const cn = cnb * b + A.yawDampingPerRad.value * r * b2v - 0.05 * p * b2v + A.rudderPowerPerDeg.value * rud * eta - 0.0001 * ail;
 
       const qS = input.dynamicPressurePa * S;

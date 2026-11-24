@@ -17,6 +17,10 @@ Additional public source routes:
 
 Keep product 9.12, 9.13, 9.13S, 9.13B, 9.13SE, export fits and later modernization packages separate. Do not use a generic “Fulcrum” source as evidence of this exact aircraft.
 
+### GAF T.O. 1F-MIG29-1 values in use (implementation note)
+
+The game package (`game/src/platforms/aircraft/mig29/MiG29Data.ts`) now takes weights, RD-33 static ratings, control-surface travel, the feel-control unit schedule, LEF logic and AoA-limiter thresholds from GAF T.O. 1F-MIG29-1 Section 1. These describe the Luftwaffe MiG-29G (9.12-family) configuration: each value is tagged with that source and "product 9.13 applicability not verified". They remain source-configuration values, not validated 9.13 truth.
+
 ## 1. Airframe and independent flight model
 
 The MiG-29 gets a separate aircraft-specific model from the F-16. The shared layer supplies common rigid-body integration, numerical methods, frame transforms and reusable aerodynamic mathematics only. The MiG-29 owns its own aerodynamic geometry, LERX/root-flow model, lifting surface stations, coefficient data, mass properties, twin-engine installation, control response, stability/trim and validated envelope.

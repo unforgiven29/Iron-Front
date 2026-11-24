@@ -22,7 +22,7 @@ export const MIG29_HYDRAULIC_INSTALLATION: HydraulicInstallation = {
     { id: "acc.main", circuitId: "main", gasVolumeM3: 0.0012, prechargePa: 0.35 * H.nominalPressurePa.value },
     { id: "acc.booster", circuitId: "booster", gasVolumeM3: 0.0012, prechargePa: 0.35 * H.nominalPressurePa.value }
   ],
-  actuators: { elevator: dual, aileron: dual, rudder: dual, lef: mainOnly, speedbrake: mainOnly }
+  actuators: { elevator: dual, aileron: dual, differentialStabilator: dual, rudder: dual, lef: mainOnly, speedbrake: mainOnly }
 };
 
 const mainX = -G.wheelbaseM.value * G.noseLoadFraction.value, z = G.contactBelowCgM.value;
@@ -31,10 +31,10 @@ const main = (id: string, y: number): WheelSpec => ({ id, contactPointBodyM: [ma
 
 export const MIG29_LANDING_GEAR: LandingGearSpec = {
   wheels: [
-    { id: "nose", contactPointBodyM: [mainX + G.wheelbaseM.value, 0, z], strokeM: 0.25, springNPerM: G.noseSpringNPerM.value, damperNsPerM: G.noseDamperNsPerM.value, ...tyre, steering: { maxAngleDeg: 30, rateDegS: 30 } },
+    { id: "nose", contactPointBodyM: [mainX + G.wheelbaseM.value, 0, z], strokeM: 0.25, springNPerM: G.noseSpringNPerM.value, damperNsPerM: G.noseDamperNsPerM.value, ...tyre, steering: { maxAngleDeg: 31, rateDegS: 30 } /* GAF T.O.: high (taxi) mode 31°, low mode 8° not modelled */ },
     main("left", -G.wheelTrackM.value / 2), main("right", G.wheelTrackM.value / 2)
   ],
-  transitTimeS: 6, gearCircuitId: "main", brakeCircuitId: "main", steeringCircuitId: "main",
+  transitTimeS: 8, // GAF T.O.: extension 7–8 s, retraction 9–10 s (single transit time) gearCircuitId: "main", brakeCircuitId: "main", steeringCircuitId: "main",
   maxSinkRateMps: G.maxSinkRateMps.value, restCgHeightM: z - 0.11,
   // Estimated strike points: nose, tail (≈13° tail-strike pitch), wingtips, belly.
   airframePointsBodyM: [[8.5, 0, 0.7], [-8, 0, 0.1], [0, -5.6, 1.1], [0, 5.6, 1.1], [0, 0, 1.3]]
