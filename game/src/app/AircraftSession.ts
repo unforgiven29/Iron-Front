@@ -3,6 +3,7 @@
  * Three.js cockpit view, keyboard input and the frame loop. Nothing here is aircraft-specific:
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
+import { mountDataPanel } from "./DataPanel.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
 import { createTestRange } from "./TestRange.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
@@ -54,6 +55,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
   };
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
+  const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   let paused = false;
   const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
 
@@ -67,6 +69,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (e.repeat) return;
     if (paused) return;
     if (k === "r") { restart(); return; }
+    if (panel.onKey(k)) return;
     const bound = jet.switchKeys.find((b) => b.key === k);
     if (bound) { jet.controls.cycle(bound.switchId, "keyboard"); return; }
     if (k === "v") { view.resetLook(); return; }
@@ -95,6 +98,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     jet.setThrottle(throttle);
     if (!paused) jet.advanceFrame(dt);
     view.render();
+    panel.update();
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);
