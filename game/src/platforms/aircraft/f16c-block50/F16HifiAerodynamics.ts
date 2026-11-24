@@ -95,14 +95,17 @@ export function f16HifiAerodynamics(input: HifiAeroInput): AeroOutput {
 }
 
 /**
- * LEF schedule used with this dataset (NASA TP-1538 / Stevens & Lewis):
- * δLEF = 1.38·(2s+7.25)/(s+7.25)·α − 9.05·q̄/Ps + 1.45 deg, limited to 0…25°, driven through a
- * rate-limited actuator. The lead-lag filter is integrated exactly per step.
+ * LEF schedule used with this dataset (NASA TP-1538 appendix A / Stevens & Lewis):
+ * δLEF = 1.38·(2s+7.25)/(s+7.25)·α − 9.05·q̄/Ps + 1.45 deg, limited to 0…25°. `command()` gives
+ * the scheduled command for a hydraulic actuator (TP-1538: 0.136 s lag, 25°/s, 25° max);
+ * `step()` additionally runs a simple built-in actuator (used where no actuator model is fitted).
+ * The lead-lag filter is integrated exactly per step.
  */
 export class LefSchedule {
   private filterState = 0; // first-order state of the lead-lag on alpha (deg)
   private position = 0;
   private initialised = false;
+  private filterInit = false;
   public static readonly rateLimitDegS = 25;
   public static readonly bandwidthRadS = 7.3;
 
@@ -112,16 +115,22 @@ export class LefSchedule {
 
   public reset(): void {
     this.initialised = false;
+    this.filterInit = false;
     this.position = 0;
     this.filterState = 0;
   }
 
-  public step(alphaRad: number, dynamicPressurePa: number, staticPressurePa: number, dt: number): number {
+  /** Scheduled LEF command (deg), advancing the lead–lag filter by dt. */
+  public command(alphaRad: number, dynamicPressurePa: number, staticPressurePa: number, dt: number): number {
     const alphaDeg = alphaRad * RAD;
     // (2s+7.25)/(s+7.25)·α = 2α − x, with ẋ = 7.25·(α − x).
-    if (!this.initialised) this.filterState = alphaDeg;
+    if (Number.isNaN(this.filterState) || !this.filterInit) { this.filterState = alphaDeg; this.filterInit = true; }
     this.filterState += (alphaDeg - this.filterState) * (1 - Math.exp(-7.25 * dt));
-    const command = Math.max(0, Math.min(25, 1.38 * (2 * alphaDeg - this.filterState) - (9.05 * dynamicPressurePa) / staticPressurePa + 1.45));
+    return Math.max(0, Math.min(25, 1.38 * (2 * alphaDeg - this.filterState) - (9.05 * dynamicPressurePa) / staticPressurePa + 1.45));
+  }
+
+  public step(alphaRad: number, dynamicPressurePa: number, staticPressurePa: number, dt: number): number {
+    const command = this.command(alphaRad, dynamicPressurePa, staticPressurePa, dt);
     if (!this.initialised) { this.position = command; this.initialised = true; }
     const rate = Math.max(-LefSchedule.rateLimitDegS, Math.min(LefSchedule.rateLimitDegS, (command - this.position) * LefSchedule.bandwidthRadS));
     this.position += rate * dt;

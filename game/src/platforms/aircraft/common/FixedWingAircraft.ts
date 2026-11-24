@@ -16,13 +16,15 @@ import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
+import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
 import type { AircraftDefinition, AircraftSystems, FlightSensors, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
 import { SurfaceActuator } from "./SurfaceActuator.js";
 
 export type GroundStatus =
   | { readonly kind: "airborne"; readonly aglM: number }
-  | { readonly kind: "crashed"; readonly impactSpeedMps: number }
+  | { readonly kind: "on-ground"; readonly groundSpeedMps: number }
+  | { readonly kind: "crashed"; readonly impactSpeedMps: number; readonly reason?: string }
   | { readonly kind: "terrain-unknown"; readonly reason: string };
 
 export interface EngineSnapshot extends TurbofanState {
@@ -57,6 +59,8 @@ export interface AircraftSnapshot {
   readonly engines: readonly EngineSnapshot[];
   readonly fuelKg: number;
   readonly massKg: number;
+  /** Landing gear state (absent when the aircraft has none). */
+  readonly gear?: GearStepResult & { readonly handleDown: boolean };
   /** Hydraulic network state (absent when the aircraft has none). */
   readonly hydraulics?: HydraulicSnapshot;
   readonly fcsMode: string;
@@ -70,7 +74,11 @@ export interface AircraftSnapshot {
 }
 
 export interface StartState {
+  /** CG position. For a ground start, put the CG at the height it rests at on its gear. */
   readonly positionEnuM: Vector3;
+  /** Gear handle at start (default: down for a ground start, up otherwise). */
+  readonly gearDown?: boolean;
+  readonly onGround?: boolean;
   /** Compass heading, rad (0 = north, clockwise). */
   readonly headingRad: number;
   readonly speedMps: number;
@@ -86,6 +94,10 @@ export class FixedWingAircraft {
   private readonly systems: AircraftSystems;
   private readonly actuators: ReadonlyMap<string, SurfaceActuator>;
   private readonly hydraulics: HydraulicNetwork | undefined;
+  private readonly surfaceLimits: ReadonlyMap<string, number>;
+  private readonly gear: LandingGear | undefined;
+  private gearHandleDown = true;
+  private gearCrash: string | undefined;
   private surfaceRates: Record<string, number> = {};
   private engines: { id: string; control: Fadec; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
   private body!: RigidBody;
@@ -106,9 +118,12 @@ export class FixedWingAircraft {
   public constructor(public readonly definition: AircraftDefinition, private readonly terrain: TerrainSurface, private readonly env: EnvironmentConfig, start: StartState) {
     this.systems = definition.createSystems();
     this.cgFractionMac = definition.mass.cgFractionMac;
-    this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS)]));
+    this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS, s.minDeg)]));
     this.hydraulics = definition.hydraulics ? new HydraulicNetwork(definition.hydraulics) : undefined;
+    this.gear = definition.landingGear ? new LandingGear(definition.landingGear) : undefined;
+    this.surfaceLimits = new Map(definition.surfaces.map((s) => [s.id, Math.max(Math.abs(s.limitDeg), Math.abs(s.minDeg ?? s.limitDeg))]));
     const context = {
+      setGearHandle: (down: boolean) => { this.gearHandleDown = down; },
       setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
       setCgFractionMac: (v: number) => { this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
@@ -144,6 +159,9 @@ export class FixedWingAircraft {
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
     this.hydraulics?.reset(true);
+    this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
+    this.gear?.reset(this.gearHandleDown);
+    this.gearCrash = undefined;
     this.surfaceRates = {};
     this.systems.fcs.reset();
     this.systems.devices?.reset();
@@ -163,7 +181,7 @@ export class FixedWingAircraft {
   }
 
   public setPilotInputs(p: PilotInputs): void {
-    this.pilot = { pitch: clamp(p.pitch, -1, 1), roll: clamp(p.roll, -1, 1), yaw: clamp(p.yaw, -1, 1) };
+    this.pilot = { pitch: clamp(p.pitch, -1, 1), roll: clamp(p.roll, -1, 1), yaw: clamp(p.yaw, -1, 1), brakes: clamp(p.brakes ?? 0, 0, 1) };
   }
 
   public setThrottle(t: number): void {
@@ -201,6 +219,7 @@ export class FixedWingAircraft {
 
   private surfacePositions(): Record<string, number> {
     const out: Record<string, number> = { ...this.devicePositions };
+    if (this.gear) out["gear"] = this.gear.state.extension; // 0 = up, 1 = down (for gear drag)
     for (const [id, a] of this.actuators) out[id] = a.positionDeg;
     return out;
   }
@@ -216,25 +235,32 @@ export class FixedWingAircraft {
     const beta = V > 1 ? Math.asin(clamp(v / V, -1, 1)) : 0;
     const att = attitude(st.bodyToWorld);
     const sensors: FlightSensors = {
-      nzG: this.nz, nyG: this.ny, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
+      nzG: this.nz, nyG: this.ny, weightOnWheels: this.gear?.state.weightOnWheels ?? false, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll
     };
 
     const fcs = this.systems.fcs.step(this.pilot, sensors, this.surfacePositions(), dt);
-    // Actuators move only as fast as their hydraulic supply allows; their actual motion is the
-    // network's flow demand for the next step.
+    // Scheduled devices: outputs for ids that have an actuator are commands to it; others are positions.
+    const deviceOut = this.systems.devices?.step(sensors, dt) ?? {};
+    const commands: Record<string, number> = { ...fcs.commands };
+    const positions: Record<string, number> = {};
+    for (const [id, v] of Object.entries(deviceOut)) { if (this.actuators.has(id)) commands[id] = v; else positions[id] = v; }
+    this.devicePositions = positions;
+    // Actuators move only as fast as their hydraulic supply and the aerodynamic hinge load allow;
+    // their actual motion is the network's flow demand for the next step.
     for (const [id, actuator] of this.actuators) {
       const before = actuator.positionDeg;
-      actuator.step(fcs.commands[id] ?? 0, dt, this.hydraulics?.rateFraction(id) ?? 1);
+      const command = commands[id] ?? 0;
+      const fraction = this.hydraulics?.rateFraction(id, { dynamicPressurePa: flow.dynamicPressurePa, deflectionDeg: before, limitDeg: this.surfaceLimits.get(id) ?? 1, movingAwayFromNeutral: Math.abs(command) > Math.abs(before) && command * before >= 0 }) ?? 1;
+      actuator.step(command, dt, fraction);
       this.surfaceRates[id] = (actuator.positionDeg - before) / dt;
     }
-    this.devicePositions = this.systems.devices?.step(sensors, dt) ?? {};
     this.fcsMode = fcs.mode;
     this.annunciations = fcs.annunciations;
 
     const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber };
-    const forces = [];
+    const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
     for (const e of this.engines) {
       const fuel = this.fuelKg > 0;
@@ -254,6 +280,14 @@ export class FixedWingAircraft {
       ratesRadps: st.angularVelocityBodyRadps, surfaces: this.surfacePositions(), cgFractionMac: this.cgFractionMac
     });
     forces.push({ sourceId: "aero.force", frame: "body.frd" as const, forceN: aero.forceBodyN });
+    if (this.gear) {
+      const result = this.gear.step(dt, st, (x, y) => { const g = this.terrain.sample(x, y); return g.status === "valid" ? g.heightM : undefined; }, {
+        handleDown: this.gearHandleDown, brakes: this.pilot.brakes ?? 0, steering: this.pilot.yaw,
+        hydraulicFraction: (id) => { if (!id || !this.hydraulics) return 1; const c = this.definition.hydraulics?.circuits.find((x) => x.id === id); return c ? Math.min(1, this.hydraulics.pressurePa(id) / c.nominalPressurePa) : 1; }
+      });
+      for (const f of result.forces) forces.push(f);
+      if (result.crash) this.gearCrash = result.crash;
+    }
     const loads = this.body.step(dt, {
       forces,
       moments: [{ sourceId: "aero.moment", frame: "body.frd", momentNm: aero.momentBodyNm }],
@@ -272,7 +306,15 @@ export class FixedWingAircraft {
     const s = this.terrain.sample(p[0], p[1]);
     if (s.status !== "valid") { this.ground = { kind: "terrain-unknown", reason: s.reason }; return; }
     const agl = p[2] - s.heightM;
-    this.ground = agl <= 0 ? { kind: "crashed", impactSpeedMps: Math.hypot(...this.body.state.velocityEnuMps) } : { kind: "airborne", aglM: agl };
+    const speed = Math.hypot(...this.body.state.velocityEnuMps);
+    if (this.gear) {
+      // With landing gear, only the gear model decides contact: crash on collapse, a gear-up
+      // landing or an airframe strike; weight on wheels is "on ground".
+      if (this.gearCrash) { this.ground = { kind: "crashed", impactSpeedMps: speed, reason: this.gearCrash }; return; }
+      this.ground = this.gear.state.weightOnWheels ? { kind: "on-ground", groundSpeedMps: Math.hypot(this.body.state.velocityEnuMps[0], this.body.state.velocityEnuMps[1]) } : { kind: "airborne", aglM: agl };
+      return;
+    }
+    this.ground = agl <= 0 ? { kind: "crashed", impactSpeedMps: speed } : { kind: "airborne", aglM: agl };
   }
 
   private snapshotAt(tick: number): AircraftSnapshot {
@@ -302,6 +344,7 @@ export class FixedWingAircraft {
       engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
       fuelKg: this.fuelKg,
       massKg: this.body.massProperties.massKg,
+      ...(this.gear ? { gear: { ...this.gear.state, handleDown: this.gearHandleDown } } : {}),
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
       fcsMode: this.fcsMode,
       annunciations: this.annunciations,

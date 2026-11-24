@@ -1,6 +1,6 @@
 # F-16C Block 50 — hydraulic installation
 
-**Shared owner:** [game/systems/hydraulics](../../../../systems/hydraulics/README.md). **Platform:** F-16C Block 50, GE F110-GE-129. **Status:** first implementation in `game/src/platforms/aircraft/f16c-block50/F16Hydraulics.ts` (A/B circuits, F110-driven pumps, FLCS accumulators, EPU pump on A, dual-fed primary surfaces, speedbrake on A). Component sizes are estimated (see F16_HYDRAULICS in F16Data.ts); utilities, LEF actuators, the EPU's electrical half and the brake/JFS accumulator are not modelled yet.
+**Shared owner:** [game/systems/hydraulics](../../../../systems/hydraulics/README.md). **Platform:** F-16C Block 50, GE F110-GE-129. **Status:** first implementation in `game/src/platforms/aircraft/f16c-block50/F16Hydraulics.ts` (A/B circuits, F110-driven pumps, FLCS accumulators, EPU pump on A, dual-fed primary surfaces and leading-edge flaps, speedbrake on A, landing gear/brakes/NWS on B, hinge-load-dependent actuator rates). Component sizes are estimated (see F16_HYDRAULICS in F16Data.ts); the EPU's electrical half, the brake/JFS accumulator, gun and refuelling are not modelled yet.
 
 ## Installation described by the available Block 50/52+ manual
 

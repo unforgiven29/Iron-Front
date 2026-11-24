@@ -25,7 +25,10 @@ import type { CockpitLayout } from "../../../rendering/three/CockpitLayout.js";
 export interface PilotInputs {
   readonly pitch: number;
   readonly roll: number;
+  /** Rudder pedals; also nose-wheel steering on the ground. */
   readonly yaw: number;
+  /** Wheel brakes, 0..1 (toe brakes). */
+  readonly brakes?: number;
 }
 
 /** Named surface or device positions, degrees. Names are package-defined (e.g. "elevator", "lef"). */
@@ -33,7 +36,9 @@ export type SurfacePositions = Readonly<Record<string, number>>;
 
 export interface ControlSurfaceSpec {
   readonly id: string;
+  /** Maximum deflection; travel is ±limitDeg unless minDeg is given. */
   readonly limitDeg: number;
+  readonly minDeg?: number;
   readonly rateDegS: number;
   readonly bandwidthRadS: number;
 }
@@ -43,6 +48,8 @@ export interface FlightSensors {
   readonly nzG: number;
   /** Lateral load factor (g), positive to the right. */
   readonly nyG: number;
+  /** Weight-on-wheels (squat switches); false for aircraft without landing gear. */
+  readonly weightOnWheels: boolean;
   readonly alphaRad: number;
   readonly betaRad: number;
   readonly ratesRadps: readonly [number, number, number];
@@ -71,7 +78,11 @@ export interface FlightControlSystem {
   step(pilot: PilotInputs, sensors: FlightSensors, surfaces: SurfacePositions, dt: number): FcsOutput;
 }
 
-/** Automatically scheduled devices (leading-edge flaps etc.). Returns achieved positions. */
+/**
+ * Automatically scheduled devices (leading-edge flaps etc.). Returns, per device id, the achieved
+ * position — or, when the definition also lists a control surface with that id, the COMMAND to
+ * that surface's actuator (so the device moves only as its actuator and hydraulic supply allow).
+ */
 export interface ScheduledDevices {
   reset(): void;
   step(sensors: FlightSensors, dt: number): SurfacePositions;
@@ -131,6 +142,8 @@ export interface AircraftControlContext {
   setCgFractionMac(value: number): void;
   /** Select an engine's control mode (e.g. a primary/secondary engine-control switch). */
   setEngineControlMode(engineId: string, mode: FadecMode): void;
+  /** Landing-gear handle. */
+  setGearHandle(down: boolean): void;
   /** Inject hydraulic faults (test/training switches). */
   setHydraulicFaults(faults: readonly HydraulicFault[]): void;
 }
@@ -159,6 +172,8 @@ export interface AircraftDefinition {
   readonly mass: MassProperties;
   readonly surfaces: readonly ControlSurfaceSpec[];
   readonly engines: readonly EngineInstallation[];
+  /** Optional landing gear (shared ground-handling model). Without it, any ground contact is a crash. */
+  readonly landingGear?: import("../../../physics/ground-handling/LandingGear.js").LandingGearSpec;
   /** Optional hydraulic power network; surfaces listed in it are rate-limited by their supply. */
   readonly hydraulics?: HydraulicInstallation;
   readonly cockpit: CockpitLayout;

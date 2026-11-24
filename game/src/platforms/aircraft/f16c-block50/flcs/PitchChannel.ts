@@ -12,6 +12,10 @@
  *   Δα_p (system B) = clamp(0.67/(s+0.67)·0.15·|p| − 3, 0, 5.4)
  * Units: g, deg, deg/s; δh positive = trailing edge down (nose down).
  *
+ * Not in TP-1538 (which simulated flight only): with weight on wheels the integrator is held at
+ * zero, as F-16-type FLCSs inhibit integrators on the ground, so it cannot wind up while the
+ * load factor is held at 1 g by the gear.
+ *
  * Deviation from the source: the positive g limit is the F-16C's published 9 g (TP-1538's
  * simulator used 8 g); the AoA limit in 1-g flight is then ≈26° instead of ≈25°. Pitch trim
  * (±2.4 g in the source) is not wired to a cockpit control yet.
@@ -80,7 +84,7 @@ export class PitchChannel {
     const error = feedback + limiter - command;
 
     const u = g.forwardGainDegPerG * schedule(PITCH_LOOP_GAIN, qbarK) * error;
-    this.integralDeg = clamp(this.integralDeg + g.integralPerS * u * dt, -g.integratorLimitDeg, g.integratorLimitDeg);
+    this.integralDeg = s.weightOnWheels ? 0 : clamp(this.integralDeg + g.integralPerS * u * dt, -g.integratorLimitDeg, g.integratorLimitDeg);
     const elevLimit = F16_ACTUATORS.elevatorLimitDeg.value;
     return {
       elevatorDeg: clamp(u + this.integralDeg + g.alphaStabilityDegPerDeg * alphaF, -elevLimit, elevLimit),

@@ -3,7 +3,8 @@
  * Three.js cockpit view, keyboard input and the frame loop. Nothing here is aircraft-specific:
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
-import { createTestTerrain } from "../debug/DebugFlyer.js";
+import { runwayLineUp } from "../world/infrastructure/Airfield.js";
+import { createTestRange } from "./TestRange.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
 import type { AircraftDefinition } from "../platforms/aircraft/common/AircraftDefinition.js";
 import { FixedWingAircraft, type AircraftSnapshot } from "../platforms/aircraft/common/FixedWingAircraft.js";
@@ -26,12 +27,20 @@ export interface AircraftSessionHandle {
   restart(): void;
 }
 
-export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition): AircraftSessionHandle {
-  const terrain = createTestTerrain();
+export type StartMode = "runway" | "air";
+
+export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway"): AircraftSessionHandle {
+  const { terrain, airfield } = createTestRange();
+  const runway = airfield.runways[0];
   const startState = () => {
-    const s = terrain.sample(0, -12000);
+    // Runway start: lined up 150 m past the threshold, engine at idle, gear down, on the brakes' hold point.
+    if (mode === "runway" && runway && definition.landingGear) {
+      const lineUp = runwayLineUp(airfield, runway, 150);
+      return { positionEnuM: [lineUp.positionEnuM[0], lineUp.positionEnuM[1], airfield.elevationM + (definition.landingGear.restCgHeightM ?? 2)] as const, headingRad: lineUp.headingRad, speedMps: 0, throttle: 0, onGround: true };
+    }
+    const s = terrain.sample(0, -18000);
     const ground = s.status === "valid" ? s.heightM : 0;
-    return { positionEnuM: [0, -12000, ground + 1800] as const, headingRad: 0, speedMps: 160, throttle: 0.5 };
+    return { positionEnuM: [0, -18000, ground + 1800] as const, headingRad: 0, speedMps: 160, throttle: 0.5 };
   };
   const jet = new FixedWingAircraft(definition, terrain, {
     originAltitudeMslM: 0, temperatureOffsetK: 0,
@@ -44,12 +53,12 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
   };
-  const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source);
+  const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
   let paused = false;
-  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0 }; };
+  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
 
   const held = new Set<string>();
-  let stick = { pitch: 0, roll: 0, yaw: 0 };
+  let stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
   let throttle = jet.snapshot().throttle;
   void throttle;
   frame.addEventListener("keydown", (e) => {
@@ -77,7 +86,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     stick = {
       pitch: toward(stick.pitch, axis(has("s", "arrowdown"), has("w", "arrowup")), 2.5),
       roll: toward(stick.roll, axis(has("d", "arrowright"), has("a", "arrowleft")), 3),
-      yaw: toward(stick.yaw, axis(has("e"), has("q")), 3)
+      yaw: toward(stick.yaw, axis(has("e"), has("q")), 3),
+      brakes: has(" ") ? 1 : 0
     };
     if (has("shift")) throttle = Math.min(1, throttle + 0.4 * dt);
     if (has("control")) throttle = Math.max(0, throttle - 0.4 * dt);
@@ -98,11 +108,11 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
 
 function hud(s: AircraftSnapshot, annunciate?: (s: AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[]): HudData {
   const warnings: { text: string; level: "caution" | "warning" }[] = [];
-  if (s.ground.kind === "crashed") warnings.push({ text: `CRASHED at ${(s.ground.impactSpeedMps * KT).toFixed(0)} kt — press R`, level: "warning" });
+  if (s.ground.kind === "crashed") warnings.push({ text: `CRASHED at ${(s.ground.impactSpeedMps * KT).toFixed(0)} kt${s.ground.reason ? ` (${s.ground.reason})` : ""} — press R`, level: "warning" });
   if (s.ground.kind === "terrain-unknown") warnings.push({ text: "TERRAIN DATA UNAVAILABLE", level: "caution" });
   if (s.ground.kind === "airborne" && s.ground.aglM < 150 && s.verticalSpeedMps < -5) warnings.push({ text: "PULL UP", level: "warning" });
   for (const a of s.annunciations) warnings.push({ text: a, level: a.includes("DIRECT") ? "warning" : "caution" });
-  if (s.outsideAeroEnvelope) warnings.push({ text: "OUTSIDE AERO DATA ENVELOPE", level: "caution" });
+  if (s.outsideAeroEnvelope && s.ground.kind === "airborne") warnings.push({ text: "OUTSIDE AERO DATA ENVELOPE", level: "caution" });
   if (s.engines.some((e) => e.flameout)) warnings.push({ text: "ENGINE FLAMEOUT — FUEL", level: "warning" });
   if (s.engines.some((e) => e.control.mode === "backup")) warnings.push({ text: "ENGINE CONTROL: BACKUP (SEC)", level: "caution" });
   for (const a of annunciate?.(s) ?? []) warnings.push({ text: a.text, level: a.level });

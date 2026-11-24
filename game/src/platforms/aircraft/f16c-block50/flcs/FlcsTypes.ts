@@ -14,6 +14,8 @@ export interface FlcsSensors {
   readonly nzG: number;
   /** Lateral load factor (g), positive to the right. */
   readonly nyG: number;
+  /** Weight on wheels (optional: false when absent). */
+  readonly weightOnWheels?: boolean;
   readonly alphaRad: number;
   readonly betaRad: number;
   /** Body rates p, q, r (rad/s). */

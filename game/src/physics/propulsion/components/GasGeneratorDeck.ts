@@ -57,8 +57,10 @@ const T_STD = 288.15, P_STD = 101325;
 /** Evaluate the deck at engine-face conditions and corrected fan speed. */
 export function evaluateGasGenerator(deck: GasGeneratorDeck, faceTemperatureK: number, facePressurePa: number, n1Corrected: number): GasGeneratorState {
   const theta = faceTemperatureK / T_STD, delta = facePressurePa / P_STD, rt = Math.sqrt(theta);
-  let outside = false;
-  const L = (t: Table1D) => { const r = lookup1D(t, n1Corrected); outside ||= r.clamped; return r.value; };
+  // Flag only real extrapolation (0.5 % tolerance at the table ends absorbs rounding at idle/MIL).
+  const bp = deck.nozzleFlowCorrectedKgS.breakpoints;
+  const outside = n1Corrected < (bp[0] as number) * 0.995 || n1Corrected > (bp[bp.length - 1] as number) * 1.005;
+  const L = (t: Table1D) => lookup1D(t, n1Corrected).value;
   return {
     n1Rpm: n1Corrected * rt * deck.referenceN1Rpm,
     n2Rpm: L(deck.n2Corrected) * rt * deck.referenceN2Rpm,

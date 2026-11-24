@@ -39,6 +39,8 @@ own way.
    - Keep the flight-control system readable by splitting it per axis, as the F-16 does in
      `f16c-block50/flcs/` (`PitchChannel`, `RollChannel`, `YawChannel`, wired by `F16FlightControls`).
    - `hydraulics` (optional): a `HydraulicInstallation` for the shared network in `game/src/systems/hydraulics/` — circuits, pumps and their drive, accumulators, emergency unit, and which circuit feeds each surface's actuator chambers. Surfaces listed there move only as fast as their supply allows.
+   - `landingGear` (optional): a `LandingGearSpec` for the shared ground-handling model (wheels with strut/tyre/brake/steering data, transit time, hydraulic circuits, sink-rate limit, airframe strike points, rest CG height). Without it any ground contact is a crash.
+   - Scheduled devices (e.g. leading-edge flaps) may also be listed as control surfaces; their device output is then the command to that surface's actuator.
    - `annunciate` (optional): the aircraft's own cautions/warnings from the snapshot (e.g. hydraulic pressure lights).
    - `switches`: switch definitions with their owner logic and optional keyboard keys.
    - `cockpit`: a `CockpitLayout`; `mfdPages`: functions that build MFD text from the snapshot.

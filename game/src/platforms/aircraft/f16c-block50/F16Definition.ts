@@ -7,12 +7,13 @@ import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevic
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness } from "./F16Compressibility.js";
-import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
+import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
 import { F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
+import { F16_LANDING_GEAR } from "./F16LandingGear.js";
 import { F16_SWITCHES, F16_TEST_CG, F16_TEST_HYDRAULIC_FAULTS } from "./F16Switches.js";
 
 export const F16_MANIFEST: ModuleManifest = {
@@ -48,7 +49,8 @@ function f16Aero(model: F16AeroModelId): AeroModel {
       const c = applyCompressibility(out.coefficients, input.alphaRad, input.mach);
       // Speedbrake drag along the air-relative velocity (estimated ΔCD; see F16_SPEEDBRAKE).
       const sb = Math.max(0, Math.min(1, (input.surfaces["speedbrake"] ?? 0) / F16_SPEEDBRAKE.maxDeflectionDeg.value));
-      const dCd = sb * F16_SPEEDBRAKE.dragCoefficientAtFull.value;
+      // Plus landing-gear drag in proportion to extension (estimated ΔCD; see F16_GEAR).
+      const dCd = sb * F16_SPEEDBRAKE.dragCoefficientAtFull.value + Math.max(0, Math.min(1, input.surfaces["gear"] ?? 0)) * F16_GEAR.dragCoefficient.value;
       const cx = c.cx - dCd * Math.cos(input.alphaRad) * Math.cos(input.betaRad);
       const cz = c.cz - dCd * Math.sin(input.alphaRad);
       const qS = input.dynamicPressurePa * F16_GEOMETRY.wingAreaM2.value;
@@ -107,7 +109,8 @@ function f16Devices(model: F16AeroModelId): ScheduledDevices | undefined {
   const lef = new LefSchedule();
   return {
     reset: () => lef.reset(),
-    step: (s, dt) => ({ lef: lef.step(s.alphaRad, s.dynamicPressurePa, s.staticPressurePa, dt) })
+    // Command to the hydraulic LEF actuator (surface "lef").
+    step: (s, dt) => ({ lef: lef.command(s.alphaRad, s.dynamicPressurePa, s.staticPressurePa, dt) })
   };
 }
 
@@ -123,11 +126,14 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
       { id: "elevator", limitDeg: a.elevatorLimitDeg.value, rateDegS: a.elevatorRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
       { id: "aileron", limitDeg: a.aileronLimitDeg.value, rateDegS: a.aileronRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
       { id: "rudder", limitDeg: a.rudderLimitDeg.value, rateDegS: a.rudderRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
-      { id: "speedbrake", limitDeg: F16_SPEEDBRAKE.maxDeflectionDeg.value, rateDegS: F16_SPEEDBRAKE.rateDegS.value, bandwidthRadS: 10 }
+      { id: "speedbrake", limitDeg: F16_SPEEDBRAKE.maxDeflectionDeg.value, minDeg: 0, rateDegS: F16_SPEEDBRAKE.rateDegS.value, bandwidthRadS: 10 },
+      // Leading-edge flaps: TP-1538 appendix A actuator (0.136 s lag, 25°/s, 0–25°).
+      ...(model === "hifi" ? [{ id: "lef", limitDeg: 25, minDeg: 0, rateDegS: LefSchedule.rateLimitDegS, bandwidthRadS: 1 / 0.136 }] : [])
     ],
     // Thrust along body x through the CG: engine offset/cant not sourced.
     engines: [{ id: "f110", design: F110_DESIGN, control: F110_CONTROL, positionBodyM: [0, 0, 0], thrustAxisBody: [1, 0, 0] }],
     hydraulics: F16_HYDRAULIC_INSTALLATION,
+    landingGear: F16_LANDING_GEAR,
     annunciate: f16Annunciations,
     cockpit: F16_COCKPIT_LAYOUT,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
@@ -154,6 +160,11 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           key: "n",
           definition: { id: F16_SWITCHES.engineControl, ownerId: "f16.engine.control", label: "ENG CONT", positions: ["PRI", "SEC"], defaultPosition: "PRI", provenance: "F-16 engine control switch: PRI = digital electronic control, SEC = hydromechanical secondary control (guarded switch in the real cockpit)" },
           onChange: (to, ctx) => { ctx.setEngineControlMode("f110", to === "SEC" ? "backup" : "primary"); return { accepted: true }; }
+        },
+        {
+          key: "g",
+          definition: { id: F16_SWITCHES.gearHandle, ownerId: "f16.landing-gear", label: "LDG GR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "F-16 landing-gear handle; cannot retract with weight on wheels (squat interlock in the gear model)" },
+          onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; }
         },
         {
           key: "h",
@@ -214,6 +225,7 @@ function flcsPage(s: AircraftSnapshot) {
       `AOA  ${(s.alphaRad * D).toFixed(1).padStart(6)}°`,
       `NZ   ${s.nzG.toFixed(2).padStart(6)} g`,
       `CG   ${(s.cgFractionMac * 100).toFixed(0)}% MAC ${s.switches[F16_SWITCHES.testCg] ?? ""}`,
+      `GEAR ${gearText(s)}`,
       `HYD  A ${psi(s, "A")}  B ${psi(s, "B")}${s.hydraulics?.emergencyUnit && s.hydraulics.emergencyUnit.state !== "off" ? "  EPU " + s.hydraulics.emergencyUnit.state.toUpperCase() : ""}`,
       ...s.annunciations
     ]
@@ -230,7 +242,17 @@ function f16Annunciations(s: AircraftSnapshot): { text: string; level: "caution"
   const out: { text: string; level: "caution" | "warning" }[] = [];
   const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < F16_HYDRAULICS.cautionBelowPa.value).map((c) => c.id);
   if (low.length > 0) out.push({ text: `HYD PRESS ${low.join("+")}`, level: low.length > 1 ? "warning" : "caution" });
+  const g = s.gear;
+  if (g && g.extension > 0 && g.extension < 1) out.push({ text: "GEAR IN TRANSIT", level: "caution" });
+  if (g && !g.handleDown && g.extension <= 0 && s.ground.kind === "airborne" && s.ground.aglM < 300 && s.verticalSpeedMps < -2 && s.equivalentAirspeedMps < 95) out.push({ text: "GEAR UP — LANDING", level: "warning" });
   const epu = s.hydraulics?.emergencyUnit;
   if (epu && epu.state !== "off") out.push({ text: epu.state === "depleted" ? "EPU FUEL DEPLETED" : "EPU RUN", level: epu.state === "depleted" ? "warning" : "caution" });
   return out;
+}
+
+function gearText(s: AircraftSnapshot): string {
+  const g = s.gear;
+  if (!g) return "—";
+  const pos = g.extension >= 1 ? "DN LOCKED" : g.extension <= 0 ? "UP" : `TRANSIT ${(g.extension * 100).toFixed(0)}%`;
+  return `${pos}${g.weightOnWheels ? "  WOW" : ""}`;
 }
