@@ -3,10 +3,11 @@
  * AircraftDefinition contract. The shared FixedWingAircraft runtime flies it.
  */
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
+import { groundEffect, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
 import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
-import { applyCompressibility, compressibilityFactors, controlEffectiveness } from "./F16Compressibility.js";
+import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW_SPEED_REFERENCE } from "./F16Compressibility.js";
 import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
@@ -37,6 +38,30 @@ export const F16_MANIFEST: ModuleManifest = {
 
 export type F16AeroModelId = "hifi" | "lofi";
 
+const F16_WING: WingPlanform = {
+  spanM: F16_GEOMETRY.spanM.value,
+  aspectRatio: F16_GEOMETRY.spanM.value ** 2 / F16_GEOMETRY.wingAreaM2.value,
+  midChordSweepRad: (F16_GEOMETRY.midChordSweepDeg.value * Math.PI) / 180
+};
+
+/**
+ * Ground effect (shared physics/aerodynamics/GroundEffect.ts) applied to the F-16 coefficients:
+ * attached-flow lift scaled by the lift-slope factor (blended out between α 12° and 20°, as for
+ * compressibility), and ideal induced drag CL²/(πA) rescaled by φ at the new lift.
+ */
+function applyGroundEffect(c: { cx: number; cz: number; cm: number }, alphaRad: number, mach: number, heightM: number | undefined): { cx: number; cz: number; cm: number } {
+  const ge = groundEffect(F16_WING, heightM === undefined ? undefined : heightM + F16_GEOMETRY.wingHeightAboveCgM.value, mach);
+  if (ge.inducedDragFactor >= 1 && ge.liftSlopeFactor <= 1) return c;
+  const ca = Math.cos(alphaRad), sa = Math.sin(alphaRad);
+  const cl = -c.cz * ca + c.cx * sa, cd = -c.cx * ca - c.cz * sa;
+  const attached = 1 - Math.min(1, Math.max(0, (Math.abs(alphaRad) * 180 / Math.PI - 12) / 8));
+  const cl0 = LOW_SPEED_REFERENCE.cl0;
+  const clGe = cl0 + (cl - cl0) * (1 + (ge.liftSlopeFactor - 1) * attached);
+  const ideal = (x: number) => (x * x) / (Math.PI * F16_WING.aspectRatio);
+  const cdGe = cd - ideal(cl) + ge.inducedDragFactor * ideal(clGe);
+  return { cx: -cdGe * ca + clGe * sa, cz: -clGe * ca - cdGe * sa, cm: c.cm };
+}
+
 /** Aero adapter: maps the shared named surfaces onto the F-16 coefficient assembly. */
 function f16Aero(model: F16AeroModelId): AeroModel {
   return {
@@ -46,7 +71,7 @@ function f16Aero(model: F16AeroModelId): AeroModel {
       const base = { ...input, surfaces };
       const out = model === "hifi" ? f16HifiAerodynamics({ ...base, lefDeg: input.surfaces["lef"] ?? 0, controlEffectiveness: controlEffectiveness(input.mach) }) : f16Aerodynamics(base);
       // Compressibility (NASA TP-3355 supersonic data; transonic estimated) on the low-speed tables.
-      const c = applyCompressibility(out.coefficients, input.alphaRad, input.mach);
+      const c = applyGroundEffect(applyCompressibility(out.coefficients, input.alphaRad, input.mach), input.alphaRad, input.mach, input.heightAboveGroundM);
       // Speedbrake drag along the air-relative velocity (estimated ΔCD; see F16_SPEEDBRAKE).
       const sb = Math.max(0, Math.min(1, (input.surfaces["speedbrake"] ?? 0) / F16_SPEEDBRAKE.maxDeflectionDeg.value));
       // Plus landing-gear drag in proportion to extension (estimated ΔCD; see F16_GEAR).

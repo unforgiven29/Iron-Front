@@ -1,6 +1,8 @@
 # Aerodynamics and local airflow
 
-**Owner:** physics/aerodynamics. **Status:** architecture only; no aerodynamic solver is implemented.
+**Ground effect:** implemented in `game/src/physics/aerodynamics/GroundEffect.ts` (McCormick induced-drag factor, effective-aspect-ratio lift slope; tests `game/tests/unit/GroundEffect.test.ts`). Tail-downwash pitching moment, bank asymmetry and dynamic ground effect are not modelled.
+
+**Owner:** physics/aerodynamics. **Status:** shared table lookup (`game/src/physics/aerodynamics/Tables.ts`) and ground effect are implemented; aircraft coefficient models live in their platform packages. No general aerodynamic solver is implemented.
 
 ## Responsibility
 Generate aerodynamic forces/moments from aircraft-specific geometry/data and local air velocity at each surface. Aircraft packages supply layout, coefficient datasets, controls and provenance. Rigidbody consumes loads.
