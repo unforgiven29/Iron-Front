@@ -13,7 +13,7 @@ import { mig29FuelSystem, mig29TankSpecs } from "./MiG29FuelSystem.js";
 import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_MASS as M } from "./MiG29Data.js";
-import { MIG29_ENGINES } from "./MiG29Engines.js";
+import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
 import { MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
 export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine" });
@@ -78,7 +78,8 @@ export const MIG29_PERFORMANCE_OPTIONS: PerformanceOptions = {
   }
 };
 
-export function createMiG29Definition(): AircraftDefinition {
+/** `engineMode`: RD-33 tuning set by the ground crew before flight (GAF T.O.: normal or limited power mode). */
+export function createMiG29Definition(options: { readonly engineMode?: Rd33PowerMode } = {}): AircraftDefinition {
   const referenceMass = M.emptyMassKg.value + M.internalFuelKg.value / 2;
   return {
     manifest: MIG29_MANIFEST,
@@ -93,7 +94,7 @@ export function createMiG29Definition(): AircraftDefinition {
       { id: "lef", limitDeg: K.lefMaxDeg.value, minDeg: 0, rateDegS: 15, bandwidthRadS: 5 },
       { id: "speedbrake", limitDeg: 60, minDeg: 0, rateDegS: 30, bandwidthRadS: 10 }
     ],
-    engines: MIG29_ENGINES,
+    engines: mig29Engines(options.engineMode ?? "NPM"),
     hydraulics: MIG29_HYDRAULIC_INSTALLATION,
     landingGear: MIG29_LANDING_GEAR,
     createFuelSystem: () => mig29FuelSystem(),

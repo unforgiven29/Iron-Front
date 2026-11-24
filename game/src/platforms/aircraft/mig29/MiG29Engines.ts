@@ -19,18 +19,25 @@ const BASE: TurbofanDesign = {
   installationLossFraction: E.installationLossFraction.value, reynoldsEfficiencyLoss: 0.05
 };
 
-/** RD-33 cycle with design temperatures DERIVED from the published (family) ratings. */
+/** RD-33 cycle with design temperatures DERIVED from the published ratings (normal power mode, NPM). */
 export const RD33_DESIGN: TurbofanDesign = { ...BASE, ...calibrate(BASE, E.militaryThrustN.value, E.maxAfterburnerThrustN.value) };
+/** Limited power mode (LPM, set by the ground crew): lower EGT limit → the published LPM ratings. */
+export const RD33_LPM_DESIGN: TurbofanDesign = { ...BASE, ...calibrate(BASE, E.limitedPowerMilitaryThrustN.value, E.limitedPowerMaxAfterburnerThrustN.value) };
+export type Rd33PowerMode = "NPM" | "LPM";
 
 export const RD33_CONTROL: FadecSchedule = {
   afterburnerDetentThrottle: E.afterburnerDetentThrottle.value, idleSpeed: E.idleSpeed.value, maxPhysicalSpeed: 1, maxCorrectedSpeed: 1.04,
   accelRatePerS: E.accelRatePerS.value, decelRatePerS: E.decelRatePerS.value,
-  afterburnerMinSpeedFraction: 0.97, afterburnerLightDelayS: 0.5, afterburnerRatePerS: 1.5,
+  afterburnerMinSpeedFraction: E.afterburnerMinSpeedFraction.value, afterburnerLightDelayS: E.afterburnerLightDelayS.value, afterburnerLightDuringAcceleration: true, afterburnerRatePerS: 1.5,
   backup: { maxPhysicalSpeed: 0.95, accelRatePerS: 0.05, afterburnerInhibited: true, nozzleClosed: false }
 };
 
 const y = E.lateralOffsetM.value;
-export const MIG29_ENGINES: readonly EngineInstallation[] = [
-  { id: "left", design: RD33_DESIGN, control: RD33_CONTROL, positionBodyM: [-4, -y, 0], thrustAxisBody: [1, 0, 0] },
-  { id: "right", design: RD33_DESIGN, control: RD33_CONTROL, positionBodyM: [-4, y, 0], thrustAxisBody: [1, 0, 0] }
-];
+export function mig29Engines(mode: Rd33PowerMode = "NPM"): readonly EngineInstallation[] {
+  const design = mode === "LPM" ? RD33_LPM_DESIGN : RD33_DESIGN;
+  return [
+    { id: "left", design, control: RD33_CONTROL, positionBodyM: [-4, -y, 0], thrustAxisBody: [1, 0, 0] },
+    { id: "right", design, control: RD33_CONTROL, positionBodyM: [-4, y, 0], thrustAxisBody: [1, 0, 0] }
+  ];
+}
+export const MIG29_ENGINES: readonly EngineInstallation[] = mig29Engines("NPM");
