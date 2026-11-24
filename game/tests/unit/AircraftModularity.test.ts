@@ -22,7 +22,7 @@ function testTwin(): AircraftDefinition {
     manifest: { manifestSchemaVersion: 1, id: "aircraft.test-twin", kind: "aircraft", name: "Test twin (synthetic)", version: "0.1.0", apiCompatibility: { minimum: "0.1.0", maximumExclusive: null }, provides: [{ id: "platform.aircraft.definition", apiVersion: "0.1.0" }], dependencies: [], configuration: [] },
     displayName: "Test twin",
     dataNote: "Synthetic test airframe.",
-    mass: { massKg: 15000, inertiaKgM2: [[25000, 0, 0], [0, 120000, 0], [0, 0, 140000]], cgFractionMac: 0.25, internalFuelKg: 3000 },
+    mass: { emptyMassKg: 12000, referenceMassKg: 15000, inertiaKgM2: [[25000, 0, 0], [0, 120000, 0], [0, 0, 140000]], cgFractionMac: 0.25, internalFuelKg: 3000 },
     surfaces: [
       { id: "stab", limitDeg: 25, rateDegS: 40, bandwidthRadS: 15 },
       { id: "ailerons", limitDeg: 20, rateDegS: 60, bandwidthRadS: 15 },

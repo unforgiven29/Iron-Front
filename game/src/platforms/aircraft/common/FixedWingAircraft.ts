@@ -12,7 +12,7 @@ import { ControlRegistry } from "../../../core/controls/ControlRegistry.js";
 import { SimulationScheduler } from "../../../core/simulation/SimulationScheduler.js";
 import { localAirflow, sampleEnvironment, standardAtmosphere, type EnvironmentConfig } from "../../../physics/environment/Atmosphere.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
-import { RigidBody, rotateVector } from "../../../physics/rigidbody/RigidBody.js";
+import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
 import type { AircraftDefinition, AircraftSystems, FlightSensors, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
 import { SurfaceActuator } from "./SurfaceActuator.js";
@@ -51,6 +51,7 @@ export interface AircraftSnapshot {
   readonly surfaces: SurfacePositions;
   readonly engines: readonly EngineSnapshot[];
   readonly fuelKg: number;
+  readonly massKg: number;
   readonly fcsMode: string;
   readonly annunciations: readonly string[];
   readonly cgFractionMac: number;
@@ -114,12 +115,12 @@ export class FixedWingAircraft {
   public reset(start: StartState): void {
     const yaw = -start.headingRad + Math.PI / 2;
     const q = mul([0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)], [1, 0, 0, 0]);
+    this.fuelKg = this.definition.mass.internalFuelKg;
     this.body = new RigidBody(
-      { massKg: this.definition.mass.massKg, inertiaKgM2: this.definition.mass.inertiaKgM2 },
+      this.massProperties(),
       { positionEnuM: start.positionEnuM, velocityEnuMps: rotateVector(q, [start.speedMps, 0, 0]), bodyToWorld: q, angularVelocityBodyRadps: [0, 0, 0] }
     );
     this.engines = this.definition.engines.map((install) => ({ id: install.id, install, core: new MixedFlowTurbofan(install.design, install.afterburnerDetentThrottle, start.throttle) }));
-    this.fuelKg = this.definition.mass.internalFuelKg;
     this.throttle = start.throttle;
     for (const a of this.actuators.values()) a.reset();
     this.systems.fcs.reset();
@@ -156,6 +157,15 @@ export class FixedWingAircraft {
 
   public snapshot(): AircraftSnapshot {
     return this.last;
+  }
+
+  /** Current mass properties: empty mass + fuel, inertia scaled with mass (see MassProperties). */
+  private massProperties(): { massKg: number; inertiaKgM2: Matrix3 } {
+    const m = this.definition.mass;
+    const massKg = m.emptyMassKg + this.fuelKg;
+    const k = massKg / m.referenceMassKg;
+    const I = m.inertiaKgM2;
+    return { massKg, inertiaKgM2: [[I[0][0] * k, I[0][1] * k, I[0][2] * k], [I[1][0] * k, I[1][1] * k, I[1][2] * k], [I[2][0] * k, I[2][1] * k, I[2][2] * k]] };
   }
 
   private surfacePositions(): Record<string, number> {
@@ -196,6 +206,8 @@ export class FixedWingAircraft {
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
     }
     this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
+    // Mass properties change only between integration steps.
+    this.body.setMassProperties(this.massProperties());
 
     const aero = this.systems.aero.compute({
       alphaRad: alpha, betaRad: beta, trueAirspeedMps: V, dynamicPressurePa: flow.dynamicPressurePa, mach: flow.machNumber,
@@ -209,7 +221,7 @@ export class FixedWingAircraft {
     });
     const q = st.bodyToWorld;
     const fBody = rotateVector([-q[0], -q[1], -q[2], q[3]], loads.forceEnuN);
-    this.nz = -fBody[2] / (this.definition.mass.massKg * 9.80665);
+    this.nz = -fBody[2] / (this.body.massProperties.massKg * 9.80665);
     this.air = { alpha, beta, tas: V, eas: Math.sqrt((2 * flow.dynamicPressurePa) / SEA_LEVEL_DENSITY), mach: flow.machNumber, outside: aero.outsideEnvelope, reasons: aero.envelopeReasons };
   }
 
@@ -248,6 +260,7 @@ export class FixedWingAircraft {
       surfaces: Object.freeze(this.surfacePositions()),
       engines: this.engines.map((e) => ({ ...e.core.state, id: e.id })),
       fuelKg: this.fuelKg,
+      massKg: this.body.massProperties.massKg,
       fcsMode: this.fcsMode,
       annunciations: this.annunciations,
       cgFractionMac: this.cgFractionMac,

@@ -108,9 +108,12 @@ export interface EngineInstallation {
 }
 
 export interface MassProperties {
-  /** Mass used by the rigid body. Fuel burn does not change it yet (planned). */
-  readonly massKg: number;
+  /** Mass without fuel (everything else aboard), kg. Total mass = emptyMassKg + current fuel. */
+  readonly emptyMassKg: number;
+  /** Inertia about the CG at `referenceMassKg`. Scaled in proportion to total mass (estimate: fuel
+   * is assumed distributed like the rest of the aircraft until a tank model exists). */
   readonly inertiaKgM2: Matrix3;
+  readonly referenceMassKg: number;
   readonly cgFractionMac: number;
   readonly internalFuelKg: number;
 }

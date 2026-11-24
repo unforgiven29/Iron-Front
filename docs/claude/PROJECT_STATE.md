@@ -101,6 +101,12 @@ Build and test narrow, replaceable services in this order:
 5. **Done, provisional data:** high-fidelity NASA TP-1538 aero (43 tables, α to 90°, β-dependence, LEF increments) with the published LEF schedule is now the default F-16 aero model. The FLCS roll loop gained an integral term, needed because the real data has a small roll asymmetry at β = 0.
 6. **Done, partly estimated:** physics-based F110 gas-path engine (`game/src/physics/propulsion/MixedFlowTurbofan.ts`), calibrated to published SLS dry and AB thrust. Altitude/Mach lapse, ram drag and fuel flow are emergent.
 7. **Done:** modular aircraft architecture. The shared `FixedWingAircraft` runtime flies any `AircraftDefinition` (`game/src/platforms/aircraft/common/`). The F-16 is a package implementing that contract and is loaded through the module system (`game/src/app/AircraftCatalog.ts`). How to add an aircraft: `docs/claude/adding-an-aircraft.md`. A test-only twin-engine package proves a structurally different aircraft flies on the same runtime.
+8. **Done, partly estimated:** F-16 high-speed and performance accuracy pass.
+   - Supersonic aero from **NASA TP-3355** F-16C wind-tunnel data (CDmin, CLα, induced drag, aerodynamic-centre shift at M 1.6–2.16); the transonic band is estimated.
+   - The F110 inlet is an exact normal-shock pitot inlet, with installation and Reynolds losses (estimated). A compressor-exit temperature limit is derived from two published speed points.
+   - Fuel-driven mass (USAF 8,936 kg empty + fuel) and speedbrake (estimated drag).
+   - Fly-by-wire features documented for the F-16: AoA/g limiter, roll-rate fade with AoA, ARI, stability-axis roll, washout yaw damper and pedal fade (gains estimated).
+   - Shared steady-state performance calculator. Validated: max level speed ≈M1.26 at sea level (published ≈1.2) and M1.89 at 40,000 ft (published max sustained 1.89); ceiling above 50,000 ft. Open discrepancy: sea-level climb ≈68,000 ft/min vs a commonly quoted ≈50,000.
 4. **Done:** app routes. `/` is the full-screen F-16 game with a start/pause menu (`game/src/app/GameScreen.ts`, `F16Session.ts`). `/#debug` is the developer tools page (foundation status, runtime monitor, debug flyer).
 3. **Done, provisional renderer:** untextured Three.js F-16 cockpit with world, HUD and two MFDs (`game/src/rendering/three/`, `game/src/app/F16CockpitSection.ts`; ADR-0002). The cockpit geometry is approximate and visual-only.
 

@@ -6,7 +6,7 @@
  * marked "estimated" or "unknown" with a reason, never presented as Block 50 data.
  */
 
-export type ParameterStatus = "primary-published" | "secondary-reported" | "estimated" | "unknown";
+export type ParameterStatus = "primary-published" | "secondary-reported" | "derived" | "estimated" | "unknown";
 
 export interface Parameter<T = number> {
   readonly value: T;
@@ -37,6 +37,7 @@ export const F16_MASS = Object.freeze({
   iyyKgM2: { value: 55814 * SLUG_FT2, unit: "kg·m²", status: "secondary-reported", source: SL, note: SL_NOTE } as Parameter,
   izzKgM2: { value: 63100 * SLUG_FT2, unit: "kg·m²", status: "secondary-reported", source: SL, note: SL_NOTE } as Parameter,
   ixzKgM2: { value: 982 * SLUG_FT2, unit: "kg·m²", status: "secondary-reported", source: SL, note: "Product of inertia Jxz (body FRD); tensor entry is -Jxz" } as Parameter,
+  emptyMassKg: { value: 8936, unit: "kg", status: "primary-published", source: "USAF F-16 fact sheet ('weight without fuel', 19,700 lb)", note: "Family-level figure; pilot, gun ammunition and stores are not added. Total mass = this + fuel." } as Parameter,
   cgFractionMac: { value: 0.35, unit: "MAC fraction", status: "secondary-reported", source: SL, note: "Nominal CG used for the published trim checks" } as Parameter,
   engineAngularMomentum: { value: Number.NaN, unit: "kg·m²/s", status: "unknown", source: "none", note: "F110-GE-129 rotor angular momentum not publicly available; gyroscopic engine coupling not modelled" } as Parameter
 });
@@ -73,7 +74,18 @@ export const F16_ENGINE = Object.freeze({
   spoolDownTimeConstantS: { value: 1.0, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
   afterburnerLightDelayS: { value: 0.4, unit: "s", status: "estimated", source: "project estimate" } as Parameter,
   afterburnerDetentThrottle: { value: 0.77, unit: "throttle fraction", status: "secondary-reported", source: SL, note: "Throttle position of the MIL/AB break in the source simulation" } as Parameter,
+  inletSubsonicRecovery: { value: 0.98, unit: "-", status: "estimated", source: "project estimate", note: "Fixed pitot (normal-shock) inlet; supersonic recovery is exact normal-shock gas dynamics" } as Parameter,
+  maxCompressorExitTemperatureK: { value: 1020, unit: "K", status: "derived", source: "Calibrated: the one value that reproduces both published points — sea-level max ≈ M1.2 and 40,000 ft max sustained ≈ M1.89 (F-16 performance references)", note: "Real F110 T3 limit not public. Sensitivity (with installation/Reynolds losses): 1000 K → SL M1.22 / 40k M1.85; 1040 K → M1.29 / M1.93; 1020 K chosen" } as Parameter,
+  installationLossFraction: { value: 0.05, unit: "fraction of gross thrust", status: "estimated", source: "project estimate", note: "Typical fighter installation losses (bleed, power extraction, spillage); applied in calibration so the SLS rating is met installed" } as Parameter,
+  reynoldsEfficiencyLoss: { value: 0.06, unit: "-", status: "estimated", source: "project estimate", note: "Component efficiency falls by up to ~6 % at very low Reynolds-number index (high altitude); typical magnitude for small turbofans" } as Parameter,
   internalFuelKg: { value: 3175, unit: "kg", status: "primary-published", source: "USAF F-16 fact sheet", note: "Family-level figure; tank layout/feed not modelled" } as Parameter
+});
+
+/** Speedbrakes: split fuselage-mounted panels (F-16 manual family). */
+export const F16_SPEEDBRAKE = Object.freeze({
+  maxDeflectionDeg: { value: 60, unit: "deg", status: "secondary-reported", source: "F-16 flight manual family (60° max; 43° with gear down)", note: "Gear-down limit not modelled (no gear yet)" } as Parameter,
+  rateDegS: { value: 30, unit: "deg/s", status: "estimated", source: "project estimate", note: "≈2 s full travel" } as Parameter,
+  dragCoefficientAtFull: { value: 0.075, unit: "ΔCD on S_ref", status: "estimated", source: "project estimate", note: "Two ~1 m² plates at 60° (flat-plate CD≈1.2 on projected area) / 27.9 m² wing; no public F-16 speedbrake drag data" } as Parameter
 });
 
 /** Flight-control limits. Gains in F16FlightControls are project-designed, not the F-16 OFP. */
@@ -81,7 +93,7 @@ export const F16_FLCS_LIMITS = Object.freeze({
   maxPositiveG: { value: 9, unit: "g", status: "primary-published", source: "USAF F-16 fact sheet ('can withstand up to 9 G's')" } as Parameter,
   maxNegativeG: { value: -3, unit: "g", status: "estimated", source: "project estimate", note: "Commonly cited family limit; Block 50 manual not verified" } as Parameter,
   alphaLimitDeg: { value: 25, unit: "deg", status: "estimated", source: "project estimate", note: "F-16 FLCS AoA limiter is documented in the flight manual family; exact Block 50 value not verified" } as Parameter,
-  maxRollRateDegS: { value: 240, unit: "deg/s", status: "estimated", source: "project estimate" } as Parameter
+  maxRollRateDegS: { value: 308, unit: "deg/s", status: "estimated", source: "Commonly cited F-16 FLCS roll-rate command limit; primary source (Droste & Walker, AIAA case study) not accessible" } as Parameter
 });
 
 /** Every parameter, for listing and audit. */

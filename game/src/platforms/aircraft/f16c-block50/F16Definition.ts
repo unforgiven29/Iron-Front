@@ -6,7 +6,8 @@ import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
-import { F16_ACTUATORS, F16_ENGINE, F16_MASS } from "./F16Data.js";
+import { applyCompressibility, compressibilityFactors } from "./F16Compressibility.js";
+import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { f16Aerodynamics, F110_DESIGN, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
@@ -41,20 +42,39 @@ function f16Aero(model: F16AeroModelId): AeroModel {
       const surfaces = { elevatorDeg: input.surfaces["elevator"] ?? 0, aileronDeg: input.surfaces["aileron"] ?? 0, rudderDeg: input.surfaces["rudder"] ?? 0 };
       const base = { ...input, surfaces };
       const out = model === "hifi" ? f16HifiAerodynamics({ ...base, lefDeg: input.surfaces["lef"] ?? 0 }) : f16Aerodynamics(base);
-      return { forceBodyN: out.forceBodyN, momentBodyNm: out.momentBodyNm, outsideEnvelope: out.outsideEnvelope, envelopeReasons: out.envelopeReasons };
+      // Compressibility (NASA TP-3355 supersonic data; transonic estimated) on the low-speed tables.
+      const c = applyCompressibility(out.coefficients, input.alphaRad, input.mach);
+      // Speedbrake drag along the air-relative velocity (estimated ΔCD; see F16_SPEEDBRAKE).
+      const sb = Math.max(0, Math.min(1, (input.surfaces["speedbrake"] ?? 0) / F16_SPEEDBRAKE.maxDeflectionDeg.value));
+      const dCd = sb * F16_SPEEDBRAKE.dragCoefficientAtFull.value;
+      const cx = c.cx - dCd * Math.cos(input.alphaRad) * Math.cos(input.betaRad);
+      const cz = c.cz - dCd * Math.sin(input.alphaRad);
+      const qS = input.dynamicPressurePa * F16_GEOMETRY.wingAreaM2.value;
+      const reasons = out.envelopeReasons.filter((r) => !r.startsWith("Mach"));
+      const f = compressibilityFactors(input.mach);
+      if (input.mach > 2.16) reasons.push(`Mach ${input.mach.toFixed(2)} above the TP-3355 supersonic data (M 2.16)`);
+      else if (f.basis === "estimated" && input.mach > 0.85) reasons.push(`Mach ${input.mach.toFixed(2)}: transonic corrections are estimated`);
+      return {
+        forceBodyN: [qS * cx, out.forceBodyN[1], qS * cz],
+        momentBodyNm: [out.momentBodyNm[0], qS * F16_GEOMETRY.meanChordM.value * c.cm, out.momentBodyNm[2]],
+        outsideEnvelope: reasons.length > 0,
+        envelopeReasons: reasons
+      };
     }
   };
 }
 
 /** FLCS adapter: NORM (project-designed fly-by-wire) or DIRECT (test: stick straight to surfaces). */
-function f16Fcs(): FlightControlSystem & { setMode(mode: "NORM" | "DIRECT", currentElevatorDeg: number): void } {
+function f16Fcs(): FlightControlSystem & { setMode(mode: "NORM" | "DIRECT", currentElevatorDeg: number): void; setSpeedbrake(out: boolean): void } {
   const flcs = new F16FlightControls();
   let mode: "NORM" | "DIRECT" = "NORM";
+  let speedbrakeOut = false;
   let directTrimDeg = 0;
   const a = F16_ACTUATORS;
   return {
     reset: () => { flcs.reset(); },
     mode: () => mode,
+    setSpeedbrake: (out: boolean) => { speedbrakeOut = out; },
     setMode: (m, currentElevatorDeg) => {
       mode = m;
       // Entering DIRECT keeps the current stabilator position as pitch trim (like a trim wheel).
@@ -68,13 +88,13 @@ function f16Fcs(): FlightControlSystem & { setMode(mode: "NORM" | "DIRECT", curr
         return {
           mode,
           annunciations: ["FLCS DIRECT — NO AUGMENTATION (TEST)"],
-          commands: { elevator: directTrimDeg - pilot.pitch * a.elevatorLimitDeg.value, aileron: -pilot.roll * a.aileronLimitDeg.value, rudder: -pilot.yaw * a.rudderLimitDeg.value }
+          commands: { elevator: directTrimDeg - pilot.pitch * a.elevatorLimitDeg.value, aileron: -pilot.roll * a.aileronLimitDeg.value, rudder: -pilot.yaw * a.rudderLimitDeg.value, speedbrake: speedbrakeOut ? F16_SPEEDBRAKE.maxDeflectionDeg.value : 0 }
         };
       }
       return {
         mode,
         annunciations: out.alphaLimiting ? ["AOA LIMIT"] : [],
-        commands: { elevator: out.commands.elevatorDeg, aileron: out.commands.aileronDeg, rudder: out.commands.rudderDeg }
+        commands: { elevator: out.commands.elevatorDeg, aileron: out.commands.aileronDeg, rudder: out.commands.rudderDeg, speedbrake: speedbrakeOut ? F16_SPEEDBRAKE.maxDeflectionDeg.value : 0 }
       };
     }
   };
@@ -96,11 +116,12 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     manifest: F16_MANIFEST,
     displayName: "F-16C Block 50",
     dataNote: "Provisional flight model: NASA TP-1538 low-speed F-16 wind-tunnel data (not Block 50-specific, no data above Mach 0.6), F110 gas-path engine calibrated to published thrust, project-designed fly-by-wire.",
-    mass: { massKg: F16_MASS.massKg.value, inertiaKgM2: f16InertiaTensor(), cgFractionMac: F16_MASS.cgFractionMac.value, internalFuelKg: F16_ENGINE.internalFuelKg.value },
+    mass: { emptyMassKg: F16_MASS.emptyMassKg.value, inertiaKgM2: f16InertiaTensor(), referenceMassKg: F16_MASS.massKg.value, cgFractionMac: F16_MASS.cgFractionMac.value, internalFuelKg: F16_ENGINE.internalFuelKg.value },
     surfaces: [
       { id: "elevator", limitDeg: a.elevatorLimitDeg.value, rateDegS: a.elevatorRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
       { id: "aileron", limitDeg: a.aileronLimitDeg.value, rateDegS: a.aileronRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
-      { id: "rudder", limitDeg: a.rudderLimitDeg.value, rateDegS: a.rudderRateDegS.value, bandwidthRadS: a.bandwidthRadS.value }
+      { id: "rudder", limitDeg: a.rudderLimitDeg.value, rateDegS: a.rudderRateDegS.value, bandwidthRadS: a.bandwidthRadS.value },
+      { id: "speedbrake", limitDeg: F16_SPEEDBRAKE.maxDeflectionDeg.value, rateDegS: F16_SPEEDBRAKE.rateDegS.value, bandwidthRadS: 10 }
     ],
     // Thrust along body x through the CG: engine offset/cant not sourced.
     engines: [{ id: "f110", design: F110_DESIGN, afterburnerDetentThrottle: F16_ENGINE.afterburnerDetentThrottle.value, positionBodyM: [0, 0, 0], thrustAxisBody: [1, 0, 0] }],
@@ -114,6 +135,11 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           key: "f",
           definition: { id: F16_SWITCHES.flcsMode, ownerId: "f16.flcs", label: "FLCS MODE", positions: ["NORM", "DIRECT"], defaultPosition: "NORM", provenance: "Simulation test switch. The real F-16 has no fly-by-wire OFF switch." },
           onChange: (to) => { fcs.setMode(to as "NORM" | "DIRECT", lastElevator); return { accepted: true }; }
+        },
+        {
+          key: "b",
+          definition: { id: F16_SWITCHES.speedbrake, ownerId: "f16.speedbrake", label: "SPEEDBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Real F-16 control is a 3-position throttle thumb switch; modelled as a toggle" },
+          onChange: (to) => { fcs.setSpeedbrake(to === "EXTEND"); return { accepted: true }; }
         },
         {
           key: "c",
@@ -148,6 +174,7 @@ function engPage(s: AircraftSnapshot) {
       `A/B  ${e.afterburnerLit ? "ON" : "OFF"}`,
       `FF   ${(e.fuelFlowKgS * 3600).toFixed(0)} kg/h`,
       `FUEL ${s.fuelKg.toFixed(0)} kg`,
+      `GW   ${s.massKg.toFixed(0)} kg`,
       "F110 CYCLE: CALIBRATED"
     ]
   };
@@ -163,6 +190,7 @@ function flcsPage(s: AircraftSnapshot) {
       `FLPN ${f(s.surfaces["aileron"])}°`,
       `RUD  ${f(s.surfaces["rudder"])}°`,
       `LEF  ${f(s.surfaces["lef"])}°`,
+      `SPDB ${f(s.surfaces["speedbrake"])}°`,
       `AOA  ${(s.alphaRad * D).toFixed(1).padStart(6)}°`,
       `NZ   ${s.nzG.toFixed(2).padStart(6)} g`,
       `CG   ${(s.cgFractionMac * 100).toFixed(0)}% MAC ${s.switches[F16_SWITCHES.testCg] ?? ""}`,
