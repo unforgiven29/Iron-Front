@@ -24,6 +24,7 @@
  * instead keeps the throat large enough, and slows the engine when it cannot), inlet distortion, relight.
  */
 
+import { lookup1D, type Table1D } from "../aerodynamics/Tables.js";
 import type { InletCondition } from "./components/Inlet.js";
 import { evaluateGasGenerator, type GasGeneratorDeck } from "./components/GasGeneratorDeck.js";
 import type { InletModel } from "./components/Inlet.js";
@@ -72,6 +73,8 @@ export interface TurbofanDesign {
    * speed; an engine package may fit k to published part-power data.
    */
   readonly flowSpeedExponent?: number;
+  /** Optional transient, stability and health behaviour (two-spool lag, surge, oil/vibration/life, AB zones). */
+  readonly dynamics?: EngineDynamicsSpec;
   readonly reynoldsEfficiencyLoss?: number;
 }
 
@@ -270,11 +273,63 @@ export function calibrate(design: TurbofanDesign, militaryThrustN: number, maxAf
   return { turbineInletTemperatureK: tit, afterburnerMaxTemperatureK: tab };
 }
 
+/**
+ * Engine transient and health behaviour, supplied per engine package (values with provenance there).
+ *  - Two spools: the core (NH) follows the control's speed demand with `rotorTimeConstantS`; the
+ *    fan (NL) lags the core with `fanTimeConstantS`. Airflow and thrust follow the FAN, so thrust
+ *    lags the core during a spool-up.
+ *  - Surge: margin(Nc) from a table minus penalties for core acceleration, inlet distortion and
+ *    afterburner light-off pressure pulses. Margin < 0 → surge: thrust and airflow collapse, EGT rises,
+ *    and the recovery logic (fuel dip / IGV closure / relight) holds the engine for `recoveryS`.
+ *  - Health: oil temperature (first-order toward ambient + rise × NH²), oil pressure ∝ NH², vibration
+ *    (∝ NH, spikes in surge), life counters (hot-section time weighted by TIT, AB time, surges).
+ *  - Afterburner: `zones` light in sequence (one every `zoneDelayS`); below `blowoutBurnerPressurePa`
+ *    the flame blows out and may relight after `relightDelayS`.
+ */
+export interface EngineDynamicsSpec {
+  readonly fanTimeConstantS: number;
+  readonly surge?: {
+    readonly baseMarginByCorrectedSpeed: Table1D;
+    /** Margin lost per (fraction of speed per second) of core acceleration. */
+    readonly accelerationPenalty: number;
+    /** Margin lost at full distortion index (1). */
+    readonly distortionPenalty: number;
+    /** Margin lost per (fraction per second) of afterburner increase (light-off pressure pulse). */
+    readonly afterburnerPulsePenalty: number;
+    readonly recoveryS: number;
+    readonly thrustFractionInSurge: number;
+    readonly egtRiseK: number;
+  };
+  readonly health?: { readonly oilTimeConstantS: number; readonly oilTemperatureRiseK: number; readonly oilPressureAtMaxPa: number; readonly vibrationAtMax: number };
+  readonly afterburner?: { readonly zones: number; readonly zoneDelayS: number; readonly blowoutBurnerPressurePa: number; readonly relightDelayS: number };
+}
+
+export interface EngineHealth {
+  readonly oilTemperatureK: number;
+  readonly oilPressurePa: number;
+  /** Vibration, fraction of the warning level (1 = limit). */
+  readonly vibration: number;
+  /** Life usage: equivalent hot-section seconds (TIT-weighted), afterburner seconds, surge events. */
+  readonly hotSectionEquivalentS: number;
+  readonly afterburnerTimeS: number;
+  readonly surgeCount: number;
+}
+
 export interface TurbofanState extends CycleResult {
-  /** Physical spool speed as a fraction of design. */
+  /** Physical spool speed as a fraction of design (the core, NH). */
   readonly spoolSpeed: number;
+  /** Fan / LP spool speed fraction (NL); equals the core speed without a two-spool model. */
+  readonly fanSpeed: number;
   readonly afterburnerFraction: number;
   readonly afterburnerLit: boolean;
+  /** Afterburner zones lit and the total (0/0 without a zone model). */
+  readonly afterburnerZonesLit: number;
+  readonly afterburnerZones: number;
+  readonly afterburnerBlowout: boolean;
+  /** Surge margin, fraction (NaN without a surge model); true while surging / recovering. */
+  readonly surgeMargin: number;
+  readonly surging: boolean;
+  readonly health?: EngineHealth;
   readonly flameout: boolean;
 }
 
@@ -290,32 +345,107 @@ export interface EngineDemand {
 /** Rotor dynamics and gas path following an engine-control demand; fuel-starvation flameout. */
 export class MixedFlowTurbofan {
   private spool: number;
+  private fan: number;
   private ab = 0;
+  private abLit = 0;
+  private zoneTimer = 0;
+  private blowoutTimer = 0;
+  private surgeTimer = 0;
+  private surgeSpool = 0;
+  private oilK = 288.15;
+  private life = { hot: 0, ab: 0, surges: 0 };
   private last: TurbofanState;
 
   public constructor(private readonly design: TurbofanDesign, initialSpeed: number) {
     this.spool = initialSpeed;
-    this.last = { ...solveCycle(design, { temperatureK: T_STD, pressurePa: P_STD, mach: 0 }, initialSpeed, 0), spoolSpeed: initialSpeed, afterburnerFraction: 0, afterburnerLit: false, flameout: false };
+    this.fan = initialSpeed;
+    const h = design.dynamics?.health;
+    if (h) this.oilK = 288.15 + h.oilTemperatureRiseK * initialSpeed * initialSpeed;
+    this.last = this.compose(solveCycle(design, { temperatureK: T_STD, pressurePa: P_STD, mach: 0 }, initialSpeed, 0), { surgeMargin: Number.NaN, flameout: false });
   }
 
   public get state(): TurbofanState {
     return this.last;
   }
 
+  private compose(cycle: CycleResult, x: { surgeMargin: number; flameout: boolean }): TurbofanState {
+    const dyn = this.design.dynamics, zones = dyn?.afterburner?.zones ?? 0;
+    const h = dyn?.health;
+    return {
+      ...cycle,
+      spoolSpeed: this.spool, fanSpeed: this.fan,
+      afterburnerFraction: this.abLit, afterburnerLit: this.abLit > 0,
+      afterburnerZonesLit: zones ? Math.min(zones, Math.ceil(this.abLit * zones - 1e-6)) : 0, afterburnerZones: zones,
+      afterburnerBlowout: this.blowoutTimer > 0,
+      surgeMargin: x.surgeMargin, surging: this.surgeTimer > 0,
+      ...(h ? { health: {
+        oilTemperatureK: this.oilK, oilPressurePa: h.oilPressureAtMaxPa * this.spool * this.spool,
+        vibration: Math.min(2, h.vibrationAtMax * this.spool + (this.surgeTimer > 0 ? 1.2 : 0)),
+        hotSectionEquivalentS: this.life.hot, afterburnerTimeS: this.life.ab, surgeCount: this.life.surges
+      } } : {}),
+      flameout: x.flameout
+    };
+  }
+
   public step(demand: EngineDemand, ambient: Ambient, fuelAvailable: boolean, dt: number): TurbofanState {
-    const d = this.design;
+    const d = this.design, dyn = d.dynamics;
+    const h = dyn?.health;
+    if (h) this.oilK += ((ambient.temperatureK + h.oilTemperatureRiseK * this.spool * this.spool) - this.oilK) * (1 - Math.exp(-dt / h.oilTimeConstantS));
     if (!fuelAvailable) {
       // Windmilling run-down (no relight model).
       this.spool = Math.max(0, this.spool - this.spool * (dt / (4 * d.rotorTimeConstantS)));
-      this.ab = 0;
-      this.last = { ...solveCycle(d, ambient, 0.2, 0), netThrustN: 0, grossThrustN: 0, fuelFlowKgS: 0, spoolSpeed: this.spool, afterburnerFraction: 0, afterburnerLit: false, flameout: true };
+      this.fan = Math.max(0, this.fan - this.fan * (dt / (4 * (dyn?.fanTimeConstantS ?? d.rotorTimeConstantS))));
+      this.ab = 0; this.abLit = 0; this.surgeTimer = 0;
+      this.last = this.compose({ ...solveCycle(d, ambient, 0.2, 0), netThrustN: 0, grossThrustN: 0, fuelFlowKgS: 0 }, { surgeMargin: Number.NaN, flameout: true });
       return this.last;
     }
-    this.spool += (demand.speed - this.spool) * (1 - Math.exp(-dt / d.rotorTimeConstantS));
-    this.ab = Math.max(0, Math.min(1, demand.afterburner));
+    const before = this.spool;
+    const surging = this.surgeTimer > 0;
+    // Core: follows the demand; during surge recovery the fuel dip lets it sag (bounded) below where the surge began.
+    const coreTarget = surging ? Math.min(demand.speed, this.surgeSpool - 0.08) : demand.speed;
+    this.spool += (coreTarget - this.spool) * (1 - Math.exp(-dt / d.rotorTimeConstantS));
+    // Fan: lags the core (two-spool).
+    this.fan = dyn ? this.fan + (this.spool - this.fan) * (1 - Math.exp(-dt / dyn.fanTimeConstantS)) : this.spool;
+    const accel = (this.spool - before) / Math.max(1e-6, dt);
+    // Afterburner request from the control; zones light in sequence; blow-out below the burner-pressure limit.
+    const abReq = surging ? 0 : Math.max(0, Math.min(1, demand.afterburner));
+    const abLitBefore = this.abLit;
+    this.ab = abReq;
+    const ab = dyn?.afterburner;
+    if (ab) {
+      if (this.blowoutTimer > 0) { this.blowoutTimer = Math.max(0, this.blowoutTimer - dt); this.abLit = 0; }
+      else {
+        const zoneStep = 1 / ab.zones;
+        if (this.ab > this.abLit) { this.zoneTimer += dt; if (this.zoneTimer >= ab.zoneDelayS || this.abLit > 0) { this.abLit = Math.min(this.ab, this.abLit + zoneStep * (dt / Math.max(1e-3, ab.zoneDelayS))); this.zoneTimer = ab.zoneDelayS; } }
+        else { this.abLit = this.ab; if (this.ab === 0) this.zoneTimer = 0; }
+      }
+    } else this.abLit = this.ab;
     const theta = (ambient.temperatureK * (1 + 0.2 * ambient.mach * ambient.mach)) / T_STD;
-    const cycle = solveCycle(d, ambient, this.spool / Math.sqrt(theta), this.ab, { throat: demand.throat ?? { kind: "auto" } });
-    this.last = { ...cycle, netThrustN: Math.max(0, cycle.netThrustN), spoolSpeed: this.spool, afterburnerFraction: this.ab, afterburnerLit: this.ab > 0, flameout: false };
+    let cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), this.abLit, { throat: demand.throat ?? { kind: "auto" } });
+    if (ab && this.abLit > 0 && cycle.compressorExitPressurePa < ab.blowoutBurnerPressurePa) {
+      this.blowoutTimer = ab.relightDelayS; this.abLit = 0;
+      cycle = solveCycle(d, ambient, this.fan / Math.sqrt(theta), 0, { throat: demand.throat ?? { kind: "auto" } });
+    }
+    // Surge margin and surge events (the light-off pressure pulse follows the zones actually lighting).
+    const abRise = Math.max(0, this.abLit - abLitBefore) / Math.max(1e-6, dt);
+    let margin = Number.NaN;
+    const sg = dyn?.surge;
+    if (sg) {
+      const distortion = ambient.inletCondition?.state?.distortion ?? 0;
+      margin = lookup1D(sg.baseMarginByCorrectedSpeed, cycle.correctedSpeed).value - sg.accelerationPenalty * Math.max(0, accel) - sg.distortionPenalty * distortion - sg.afterburnerPulsePenalty * abRise;
+      if (this.surgeTimer > 0) this.surgeTimer = Math.max(0, this.surgeTimer - dt);
+      else if (margin < 0) { this.surgeTimer = sg.recoveryS; this.surgeSpool = this.spool; this.life.surges += 1; }
+      if (this.surgeTimer > 0) {
+        const f = sg.thrustFractionInSurge;
+        cycle = { ...cycle, netThrustN: cycle.netThrustN * f, grossThrustN: cycle.grossThrustN * f, airflowKgS: cycle.airflowKgS * (0.5 + 0.5 * f), fuelFlowKgS: cycle.fuelFlowKgS * f,
+          ...(cycle.exhaustGasTemperatureK !== undefined ? { exhaustGasTemperatureK: cycle.exhaustGasTemperatureK + sg.egtRiseK } : {}) };
+      }
+    }
+    // Life usage: hot-section time weighted by turbine temperature (or EGT for data decks), AB time.
+    const hotT = Number.isFinite(cycle.turbineInletTemperatureK) ? cycle.turbineInletTemperatureK / d.turbineInletTemperatureK : (cycle.exhaustGasTemperatureK ?? 0) / 1000;
+    this.life.hot += dt * Math.max(0, hotT) ** 4;
+    if (this.abLit > 0) this.life.ab += dt;
+    this.last = this.compose({ ...cycle, netThrustN: Math.max(0, cycle.netThrustN) }, { surgeMargin: margin, flameout: false });
     return this.last;
   }
 }

@@ -109,6 +109,16 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
       for (const e of s.engines) if (e.flameout) out.push({ text: `${e.id.toUpperCase()} ENGINE OUT`, level: "warning" });
       const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < 0.4 * 21e6).map((c) => c.id.toUpperCase());
       if (low.length) out.push({ text: `HYD ${low.join("+")} LOW`, level: low.length > 1 ? "warning" : "caution" });
+      // Engine captions (GAF T.O.): oil temperature > 195 °C, oil pressure below 1.8 kp/cm² (50–89 % NH) or
+      // 2.7 kp/cm² (> 89 %) — the manual's 20 s persistence is not modelled — vibration, AB blow-out, surge.
+      for (const e of s.engines) {
+        const side = e.id === "left" ? "LEFT" : "RIGHT", h = e.health;
+        if (e.surging) out.push({ text: `${side} ENG SURGE`, level: "warning" });
+        if (e.afterburnerBlowout) out.push({ text: `${side} AB BLOW-OUT`, level: "caution" });
+        if (h && h.oilTemperatureK - 273.15 > 195) out.push({ text: `OIL TEMP ${side}`, level: "warning" });
+        if (h && e.spoolSpeed >= 0.5 && h.oilPressurePa < (e.spoolSpeed > 0.89 ? 2.7 : 1.8) * 98066.5) out.push({ text: `OIL PRESS ${side}`, level: "warning" });
+        if (h && h.vibration > 1) out.push({ text: `VIBR ${side}`, level: "caution" });
+      }
       // AEKRAN generator captions (GAF T.O.: "AC GEN", "DC GEN", "TWO GEN").
       const online = (id: string) => s.electrical?.sources.find((x) => x.id === id)?.online ?? true;
       const ac = online("gen.ac"), dc = online("gen.dc");

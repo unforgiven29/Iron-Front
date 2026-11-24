@@ -76,6 +76,12 @@ export interface FadecSchedule {
    * throat follows the flow.
    */
   readonly dryNozzleMinPosition?: Table1D;
+  /**
+   * Optional low-inlet-pressure acceleration limit (combustor stability at altitude / low speed): the
+   * acceleration rate scales with inlet total pressure ratio δ2 below `referenceDelta`, down to
+   * `minScale` — the "RPM hang-up" behaviour of some engines at high altitude and low airspeed.
+   */
+  readonly lowPressureAcceleration?: { readonly referenceDelta: number; readonly minScale: number };
   /** Degraded/backup mode behaviour. */
   readonly backup: {
     readonly maxPhysicalSpeed: number;
@@ -93,7 +99,7 @@ export interface FadecSensors {
   readonly fuelAvailable: boolean;
 }
 
-export type FadecLimit = "nozzle-area" | "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope";
+export type FadecLimit = "nozzle-area" | "max-speed" | "corrected-speed" | "compressor-exit-temperature" | "turbine-inlet-temperature" | "min-burner-pressure" | "acceleration" | "deceleration" | "afterburner-inhibited" | "afterburner-envelope" | "low-pressure-acceleration";
 
 export interface FadecOutput {
   readonly mode: FadecMode;
@@ -264,8 +270,16 @@ export class Fadec {
     const target = this.steady(throttle, sensors.ambient, dt);
     const limits = [...target.limits];
 
+    // The acceleration schedule works from the ACTUAL rotor: if it has fallen well behind the demand
+    // (surge recovery, hang-up), the demand restarts from it instead of commanding a jump.
+    if (this.demand > sensors.spoolSpeed + 0.12) this.demand = sensors.spoolSpeed + 0.12;
     // Acceleration / deceleration schedules: rate limits on the speed demand.
-    const accel = this.mode === "backup" ? s.backup.accelRatePerS : s.accelRatePerS;
+    let accel = this.mode === "backup" ? s.backup.accelRatePerS : s.accelRatePerS;
+    if (s.lowPressureAcceleration) {
+      const a = sensors.ambient, delta2 = (a.pressurePa * (1 + 0.2 * a.mach * a.mach) ** 3.5) / 101325;
+      const scale = Math.max(s.lowPressureAcceleration.minScale, Math.min(1, delta2 / s.lowPressureAcceleration.referenceDelta));
+      if (scale < 1) { accel *= scale; if (target.speed > this.demand + 1e-4) limits.push("low-pressure-acceleration"); }
+    }
     const up = accel * dt, down = s.decelRatePerS * dt;
     if (target.speed > this.demand + up) { this.demand += up; limits.push("acceleration"); }
     else if (target.speed < this.demand - down) { this.demand -= down; limits.push("deceleration"); }

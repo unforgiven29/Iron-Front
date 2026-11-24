@@ -3,7 +3,7 @@
  * deck values: N1/N2, EGT), the forward/aft fuel systems with reservoirs and wing tanks, main /
  * standby / EPU generators with PMG, TRs and batteries, and hydraulic systems A/B with the EPU.
  */
-import { box, COLORS, engineCutaway, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
+import { box, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_HYDRAULICS } from "./F16Data.js";
 
@@ -136,10 +136,17 @@ function flcsPage(s: Snap): string {
     ${text(12, 632, "Control laws: NASA TP-1538 (F-16 simulator FLCS), not the production Block 50 OFP.", { size: 9, color: COLORS.dim })}`);
 }
 
+function healthPage(s: Snap): string {
+  const e = s.engines[0];
+  return svg(600, 450, `${e ? engineHealthPanel(150, 14, 300, e, "F110-GE-129") : ""}
+    ${text(10, 446, "Transient, stall-margin, oil and augmentor-zone values estimated (no F110 data in the project).", { size: 9, color: COLORS.dim })}`);
+}
+
 export const F16_EFB = {
   title: "F-16C EFB",
   pages: [
     { id: "engine", title: "Engine", render: (s: Snap) => enginePage(s) },
+    { id: "health", title: "Eng Health", render: (s: Snap) => healthPage(s) },
     { id: "flcs", title: "FLCS", render: (s: Snap) => flcsPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap, p: Snap | undefined) => fuelPage(s, p) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
