@@ -3,7 +3,7 @@
  * public; see MiG29Data.ts header). Structurally independent of the F-16 table model: here the
  * coefficients are built analytically.
  *
- *  - Lift: DATCOM/Helmbold lift-curve slope subsonic, linear supersonic theory 4/√(M²−1)
+ *  - Lift: DATCOM/Helmbold lift-curve slope subsonic (× a Mach correction fitted to GAF fig. A8-13), linear supersonic theory 4/√(M²−1)
  *    (bounded by the subsonic value), smooth blend M 0.9–1.2; plus Polhamus-type vortex lift
  *    Kv·sin²α·cosα for the LERX/wing; leading-edge flaps add lift; past the stall α the attached
  *    model blends to flat-plate normal force 1.2·sin α.
@@ -17,7 +17,7 @@
  */
 import { groundEffect, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
 import type { AeroModel, AeroOutput } from "../common/AircraftDefinition.js";
-import { MIG29_AERO as A, MIG29_GEOMETRY as G } from "./MiG29Data.js";
+import { MIG29_AERO as A, MIG29_GEOMETRY as G, MIG29_LIFT_SLOPE_MACH_FACTOR as LF } from "./MiG29Data.js";
 
 const DEG = Math.PI / 180;
 const S = G.wingAreaM2.value, B = G.spanM.value, C = G.meanChordM.value;
@@ -31,8 +31,18 @@ function helmbold(mach: number): number {
   return (2 * Math.PI * AR) / (2 + Math.sqrt(4 + AR * AR * (b2 + t * t)));
 }
 
-/** Lift-curve slope, per rad. */
+function machFactor(mach: number): number {
+  if (mach <= LF[0]!.m) return LF[0]!.f;
+  for (let i = 1; i < LF.length; i++) { const a = LF[i - 1]!, b = LF[i]!; if (mach <= b.m) return a.f + ((b.f - a.f) * (mach - a.m)) / (b.m - a.m); }
+  return LF[LF.length - 1]!.f;
+}
+
+/** Lift-curve slope, per rad: analytic theory × fitted Mach correction. */
 export function liftSlope(mach: number): number {
+  return analyticLiftSlope(mach) * machFactor(mach);
+}
+
+function analyticLiftSlope(mach: number): number {
   const sub = helmbold(mach);
   const sup = (m: number) => Math.min(helmbold(0.9), (4 / Math.sqrt(m * m - 1)) * 0.95);
   if (mach <= 0.9) return sub;
@@ -66,7 +76,8 @@ export function mig29Aerodynamics(): AeroModel {
       // Lift and drag in stability axes.
       const sa = Math.sin(a), ca = Math.cos(a);
       const lef = Math.max(0, s["lef"] ?? 0);
-      const attachedCl = cla * sa * ca + G.lerxVortexLiftFactor.value * Math.abs(sa) * sa * ca + A.lefLiftPerDeg.value * lef * smooth((Math.abs(a) / DEG - 8) / 10);
+      const ae = a - A.zeroLiftAlphaDeg.value * DEG, sae = Math.sin(ae), cae = Math.cos(ae);
+      const attachedCl = cla * sae * cae + G.lerxVortexLiftFactor.value * Math.abs(sae) * sae * cae + A.lefLiftPerDeg.value * lef * smooth((Math.abs(a) / DEG - 8) / 10);
       const stall = A.stallAlphaDeg.value + 0.2 * lef;
       const sep = smooth((Math.abs(a) / DEG - stall) / 6);
       const flatCn = 1.2 * sa;

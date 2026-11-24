@@ -44,6 +44,13 @@ export const MIG29_MASS = Object.freeze({
 });
 
 /** Aerodynamic model constants (component method; see MiG29Aerodynamics.ts). */
+/**
+ * Mach correction on the analytic lift-curve slope (multiplier, linear between nodes; 1 below
+ * M 0.85). DERIVED: fitted to the 7 g angle-of-attack curves of GAF T.O. 1F-MIG29-1 fig. A8-13
+ * (assumed 13,000 kg). See tests/unit/MiG29Lift.test.ts.
+ */
+export const MIG29_LIFT_SLOPE_MACH_FACTOR: { m: number; f: number }[] = [{ m: 0.85, f: 1 }, { m: 0.98, f: 1.613 }, { m: 1.17, f: 1.028 }, { m: 1.7, f: 0.844 }];
+
 export const MIG29_AERO = Object.freeze({
   zeroLiftDragSubsonic: P(0.022, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Fitted jointly with e and the drag-rise peak; Raymer estimate was 0.021"),
   zeroLiftDragPeak: P(0.055, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer typical value was 0.046"),
@@ -51,7 +58,8 @@ export const MIG29_AERO = Object.freeze({
   oswaldEfficiency: P(0.60, "-", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Effective value absorbing trim drag and high-alpha losses; Raymer estimate was 0.80"),
   highLiftDragBreakCl: P(0.9, "CL", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form (separation above the break CL)"),
   highLiftDragFactor: P(0.3, "ΔCD per (CL − CLbreak)²", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form"),
-  stallAlphaDeg: P(28, "deg", "estimated", EST, "Attached + vortex lift break; flight-manual AoA limits not used"),
+  zeroLiftAlphaDeg: P(0, "deg", "derived", "GAF fig. A8-13 7 g curves: a non-zero offset worsened the fit at every altitude", "Body AoA at zero lift (camber/incidence)"),
+  stallAlphaDeg: P(20.2, "deg", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-13: 9 g at 26° AoA at M0.54 SL / M0.64 9,840 ft / M0.74 16,400 ft (assumed 13,000 kg)", "Lift-break onset with LEF retracted; +0.2° per degree of LEF; Polhamus vortex factor kept at 1.0"),
   staticMarginSubsonic: P(0.05, "MAC fraction", "estimated", EST, "Conventionally stable; no relaxed stability"),
   staticMarginSupersonic: P(0.20, "MAC fraction", "estimated", "Aerodynamic-centre shift to ≈half chord supersonic (textbook)"),
   stabilatorPowerPerRad: P(-0.65, "Cm per rad", "estimated", "Tail volume × tail lift slope estimate"),
