@@ -32,4 +32,18 @@ export interface CockpitLayout {
   readonly parts: readonly CockpitPart[];
   /** Vertical field of view, degrees. */
   readonly fieldOfViewDeg: number;
+  /**
+   * Optional 3D shell model (glTF/GLB) drawn around the simple parts (tub, sills, canopy frame).
+   * Visual only: it is never clicked and never used for reach or vision analysis. The view scales
+   * the model so its longest horizontal extent equals `lengthM`, applies `rotationRad` (about the
+   * model's own axes; glTF is +Y up) and places its bounding-box centre at `centreM` (body FRD
+   * metres from the design eye point). If loading fails the simple parts stay on their own.
+   */
+  readonly shellModel?: {
+    readonly url: string;
+    readonly lengthM: number;
+    readonly centreM: readonly [number, number, number];
+    readonly rotationRad?: readonly [number, number, number];
+    readonly provenance: string;
+  };
 }

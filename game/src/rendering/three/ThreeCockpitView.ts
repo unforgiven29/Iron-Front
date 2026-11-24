@@ -10,6 +10,7 @@
  * coordinates do not lose float32 precision on the GPU.
  */
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { Quaternion, Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { rotateVector } from "../../physics/rigidbody/RigidBody.js";
 import type { AirfieldSpec } from "../../world/infrastructure/Airfield.js";
@@ -179,7 +180,28 @@ export class ThreeCockpitView {
     return new THREE.Vector3(p[1], -p[2], -p[0]);
   }
 
+  /** Load the layout's optional shell model; failures leave the simple parts on their own. */
+  private loadShell(): void {
+    const shell = this.layout.shellModel;
+    if (!shell) return;
+    new GLTFLoader().load(shell.url, (gltf) => {
+      const model = gltf.scene;
+      const [rx, ry, rz] = shell.rotationRad ?? [0, 0, 0];
+      model.rotation.set(rx, ry, rz);
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+      const k = shell.lengthM / Math.max(size.x, size.z, 1e-6);
+      model.scale.setScalar(k);
+      model.updateMatrixWorld(true);
+      const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+      model.position.copy(this.bodyToCamera(shell.centreM).sub(centre));
+      model.traverse((o) => { o.userData = { ...o.userData, shell: true }; });
+      this.cockpit.add(model);
+    }, undefined, () => { /* keep the simple cockpit */ });
+  }
+
   private buildCockpit(): void {
+    this.loadShell();
     for (const part of this.layout.parts) {
       let geometry: THREE.BufferGeometry;
       let material: THREE.Material;
@@ -238,7 +260,7 @@ export class ThreeCockpitView {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    for (const hit of this.raycaster.intersectObjects(this.cockpit.children)) {
+    for (const hit of this.raycaster.intersectObjects(this.cockpit.children.filter((o) => !o.userData["shell"]))) {
       const part = this.layout.parts.find((p) => p.id === hit.object.userData["partId"]);
       if (part?.binding?.kind === "switch") {
         this.source.cycleSwitch(part.binding.switchId);
