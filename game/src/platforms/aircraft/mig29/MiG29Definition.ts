@@ -4,6 +4,7 @@
  * Shared code used: the FixedWingAircraft runtime, rigid body, atmosphere, terrain, propulsion
  * (generic-map cycle + FADEC), hydraulics, ground handling, ground effect, cockpit renderer.
  */
+import type { PerformanceOptions } from "../common/Performance.js";
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { AircraftDefinition, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
@@ -61,6 +62,19 @@ export function lefSchedule(): ScheduledDevices {
     }
   };
 }
+
+/**
+ * Settings for the shared steady-state performance calculator. Taileron trim range is the full
+ * mechanical travel (35° nose-up); LEF follow the steady-state AoA/Mach logic of lefSchedule().
+ */
+export const MIG29_PERFORMANCE_OPTIONS: PerformanceOptions = {
+  pitchSurfaceId: "elevator",
+  pitchSurfaceLimitDeg: K.stabilatorNoseUpDeg.value,
+  devices: (alpha, q, ps) => {
+    const mach = Math.sqrt(q / (0.7 * ps)); // q = 0.7·p·M²
+    return { lef: alpha * 180 / Math.PI >= K.lefExtendAlphaDeg.value && mach < K.lefMachLimit.value ? K.lefMaxDeg.value : 0 };
+  }
+};
 
 export function createMiG29Definition(): AircraftDefinition {
   const referenceMass = M.emptyMassKg.value + M.internalFuelKg.value / 2;
