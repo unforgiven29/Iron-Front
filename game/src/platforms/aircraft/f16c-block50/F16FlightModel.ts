@@ -1,14 +1,13 @@
 /**
- * F-16C Block 50 reduced-table aerodynamic assembly, F110 cycle design and inertia tensor.
+ * F-16C Block 50 reduced-table aerodynamic assembly and inertia tensor.
  *
  * Owner: F-16 platform package. These are F-16-specific: the shared physics code knows nothing
  * about them, and the MiG-29 will have its own, structurally independent model.
  * Aero data provenance: see AeroData.ts (provisional, early-F-16 low-speed tables).
  */
 import { lookup1D, lookup2D } from "../../../physics/aerodynamics/Tables.js";
-import { calibrate, type TurbofanDesign } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { CM, CN_BETA, CL_BETA, CX, CZ0, DAMPING, DCL_DA, DCL_DR, DCN_DA, DCN_DR, F16_AERO_PROVENANCE } from "./AeroData.js";
-import { F16_ENGINE, F16_GEOMETRY, F16_MASS } from "./F16Data.js";
+import { F16_GEOMETRY, F16_MASS } from "./F16Data.js";
 
 const RAD = 180 / Math.PI;
 
@@ -83,27 +82,8 @@ export function f16Aerodynamics(input: AeroInput): AeroOutput {
   };
 }
 
-const F110_DESIGN_BASE: TurbofanDesign = {
-  airflowKgS: F16_ENGINE.airflowKgS.value,
-  bypassRatio: F16_ENGINE.bypassRatio.value,
-  overallPressureRatio: F16_ENGINE.overallPressureRatio.value,
-  fanPressureRatio: F16_ENGINE.fanPressureRatio.value,
-  fanEfficiency: 0.86, compressorEfficiency: 0.86, turbineEfficiency: 0.89, burnerEfficiency: 0.99, afterburnerEfficiency: 0.9, nozzleVelocityCoefficient: 0.98,
-  turbineInletTemperatureK: 1600, afterburnerMaxTemperatureK: 2000,
-  idleCorrectedSpeed: F16_ENGINE.idleCorrectedSpeed.value,
-  spoolUpTimeConstantS: F16_ENGINE.spoolUpTimeConstantS.value,
-  spoolDownTimeConstantS: F16_ENGINE.spoolDownTimeConstantS.value,
-  afterburnerLightDelayS: F16_ENGINE.afterburnerLightDelayS.value,
-  afterburnerRatePerS: 2,
-  inlet: "pitot-normal-shock",
-  inletSubsonicRecovery: F16_ENGINE.inletSubsonicRecovery.value,
-  maxCompressorExitTemperatureK: F16_ENGINE.maxCompressorExitTemperatureK.value,
-  installationLossFraction: F16_ENGINE.installationLossFraction.value,
-  reynoldsEfficiencyLoss: F16_ENGINE.reynoldsEfficiencyLoss.value
-};
-
-/** F110 cycle with design temperatures DERIVED from the published SLS dry/AB ratings. */
-export const F110_DESIGN: TurbofanDesign = { ...F110_DESIGN_BASE, ...calibrate(F110_DESIGN_BASE, F16_ENGINE.militaryThrustN.value, F16_ENGINE.maxAfterburnerThrustN.value) };
+/** The F110 engine (gas path + FADEC) lives in F110Engine.ts; re-exported here for existing imports. */
+export { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 
 /** Inertia tensor about the CG in body FRD from the source's Jx, Jy, Jz, Jxz. */
 export function f16InertiaTensor(): [[number, number, number], [number, number, number], [number, number, number]] {

@@ -1,9 +1,13 @@
 /**
- * Mixed-flow afterburning turbofan: quasi-steady 0-D gas-path cycle with spool dynamics.
+ * Mixed-flow afterburning turbofan PLANT: quasi-steady 0-D gas-path cycle plus rotor dynamics.
  *
  * Owner: physics/propulsion. Platform-neutral: an aircraft package supplies the engine's
  * cycle parameters (and their provenance) and calibrates unknown design temperatures against
  * published thrust ratings.
+ *
+ * Control is NOT in this file. The engine control (Fadec.ts) turns the throttle into a speed and
+ * afterburner demand and owns every limit; this plant only follows the demand with rotor
+ * inertia and computes the thermodynamics:  throttle → Fadec → demand → MixedFlowTurbofan → thrust.
  *
  * Gas path: freestream → inlet (MIL-E-5008B ram recovery) → fan → core compressor → burner →
  * HP/LP turbine (powers fan + compressor) → bypass/core mixer → afterburner → nozzle (ideally
@@ -14,7 +18,7 @@
  * inlet temperature schedules with corrected speed. Altitude and Mach trends, ram drag, fuel flow
  * and the afterburner fuel penalty come out of the thermodynamics. Absolute accuracy away from
  * the calibration point is limited by those generic maps and is not validated against F110 data.
- * Not modelled: compressor stall/surge margin, variable geometry, bleed/power extraction, nozzle
+ * Not modelled: compressor stall/surge itself, variable geometry, bleed/power extraction, nozzle
  * area scheduling and pressure thrust, inlet distortion, relight.
  */
 
@@ -34,15 +38,8 @@ export interface TurbofanDesign {
   readonly turbineInletTemperatureK: number;
   /** Maximum afterburner exit temperature, K (usually calibrated). */
   readonly afterburnerMaxTemperatureK: number;
-  /** Corrected spool speed at idle (fraction of design). */
-  readonly idleCorrectedSpeed: number;
-  /** Spool acceleration / deceleration time constants, s. */
-  readonly spoolUpTimeConstantS: number;
-  readonly spoolDownTimeConstantS: number;
-  /** Delay before afterburner thrust starts after selection, s. */
-  readonly afterburnerLightDelayS: number;
-  /** Afterburner fraction rate, 1/s. */
-  readonly afterburnerRatePerS: number;
+  /** Rotor response time constant to a speed demand, s (spool inertia; the FADEC rate-limits the demand). */
+  readonly rotorTimeConstantS: number;
   /**
    * Inlet type. "pitot-normal-shock": fixed pitot inlet (e.g. F-16), total-pressure recovery set by
    * a normal shock above Mach 1 (exact gas dynamics) times `inletSubsonicRecovery`.
@@ -51,8 +48,6 @@ export interface TurbofanDesign {
   readonly inlet?: "pitot-normal-shock" | "mil-e-5008b";
   /** Subsonic duct total-pressure recovery (default 1). */
   readonly inletSubsonicRecovery?: number;
-  /** Compressor-exit total temperature limit, K. The control reduces spool speed to respect it. */
-  readonly maxCompressorExitTemperatureK?: number;
   /** Fraction of net thrust lost to installation (bleed, power extraction, spillage, nozzle). Default 0. */
   readonly installationLossFraction?: number;
   /**
@@ -80,8 +75,6 @@ export interface CycleResult {
   readonly compressorExitPressurePa: number;
   readonly correctedSpeed: number;
   readonly compressorExitTemperatureK: number;
-  /** True when the compressor-exit temperature limit reduced spool speed. */
-  readonly t3Limited?: boolean;
 }
 
 const CP_COLD = 1004.5, G_COLD = 1.4;
@@ -108,23 +101,11 @@ function recovery(d: TurbofanDesign, mach: number): number {
 }
 
 /**
- * Steady cycle at a corrected spool speed and afterburner fraction. Pure function.
- * `tit` and `tab` override the design temperatures (used by calibration).
+ * Steady cycle at a corrected spool speed and afterburner fraction. Pure function; no limits
+ * (those belong to the engine control). `tit` and `tab` override the design temperatures (used
+ * by calibration).
  */
 export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: number, abFraction: number, tit = d.turbineInletTemperatureK, tab = d.afterburnerMaxTemperatureK): CycleResult {
-  const limit = d.maxCompressorExitTemperatureK;
-  const first = solveCycleRaw(d, amb, correctedSpeed, abFraction, tit, tab);
-  if (limit === undefined || first.compressorExitTemperatureK <= limit) return first;
-  // Engine control holds the compressor-exit temperature limit by reducing corrected speed.
-  let lo = 0.2, hi = Math.min(1.05, correctedSpeed);
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2;
-    if (solveCycleRaw(d, amb, mid, abFraction, tit, tab).compressorExitTemperatureK > limit) hi = mid; else lo = mid;
-  }
-  return { ...solveCycleRaw(d, amb, lo, abFraction, tit, tab), t3Limited: true };
-}
-
-function solveCycleRaw(d: TurbofanDesign, amb: Ambient, correctedSpeed: number, abFraction: number, tit: number, tab: number): CycleResult {
   const M = Math.max(0, amb.mach);
   const T0 = amb.temperatureK, p0 = amb.pressurePa;
   const V0 = M * Math.sqrt(G_COLD * R * T0);
@@ -217,57 +198,41 @@ export interface TurbofanState extends CycleResult {
   readonly flameout: boolean;
 }
 
-/** Throttle 0..1 with an afterburner detent; spool and afterburner dynamics; fuel-starvation flameout. */
+export interface EngineDemand {
+  /** Physical spool speed demand, fraction of design. */
+  readonly speed: number;
+  /** Afterburner demand, 0..1. */
+  readonly afterburner: number;
+}
+
+/** Rotor dynamics and gas path following an engine-control demand; fuel-starvation flameout. */
 export class MixedFlowTurbofan {
   private spool: number;
   private ab = 0;
-  private abTimer = 0;
   private last: TurbofanState;
 
-  public constructor(private readonly design: TurbofanDesign, private readonly afterburnerDetent: number, initialThrottle = 0.5) {
-    this.spool = this.targetSpeed(initialThrottle);
-    this.last = { ...solveCycle(design, { temperatureK: T_STD, pressurePa: P_STD, mach: 0 }, this.spool, 0), spoolSpeed: this.spool, afterburnerFraction: 0, afterburnerLit: false, flameout: false };
+  public constructor(private readonly design: TurbofanDesign, initialSpeed: number) {
+    this.spool = initialSpeed;
+    this.last = { ...solveCycle(design, { temperatureK: T_STD, pressurePa: P_STD, mach: 0 }, initialSpeed, 0), spoolSpeed: initialSpeed, afterburnerFraction: 0, afterburnerLit: false, flameout: false };
   }
 
   public get state(): TurbofanState {
     return this.last;
   }
 
-  /** Corrected-speed target for a throttle position (dry range: idle → 100 %). */
-  public targetSpeed(throttle: number): number {
-    const t = Math.max(0, Math.min(1, throttle));
-    const dry = Math.min(1, t / this.afterburnerDetent);
-    return this.design.idleCorrectedSpeed + (1 - this.design.idleCorrectedSpeed) * dry;
-  }
-
-  public reset(throttle: number): void {
-    this.spool = this.targetSpeed(throttle);
-    this.ab = 0;
-    this.abTimer = 0;
-  }
-
-  public step(throttle: number, ambient: Ambient, fuelAvailable: boolean, dt: number): TurbofanState {
+  public step(demand: EngineDemand, ambient: Ambient, fuelAvailable: boolean, dt: number): TurbofanState {
     const d = this.design;
     if (!fuelAvailable) {
-      this.spool = Math.max(0, this.spool - this.spool * (dt / d.spoolDownTimeConstantS));
+      // Windmilling run-down (no relight model).
+      this.spool = Math.max(0, this.spool - this.spool * (dt / (4 * d.rotorTimeConstantS)));
       this.ab = 0;
       this.last = { ...solveCycle(d, ambient, 0.2, 0), netThrustN: 0, grossThrustN: 0, fuelFlowKgS: 0, spoolSpeed: this.spool, afterburnerFraction: 0, afterburnerLit: false, flameout: true };
       return this.last;
     }
-    const target = this.targetSpeed(throttle);
-    const tau = target > this.spool ? d.spoolUpTimeConstantS : d.spoolDownTimeConstantS;
-    this.spool += (target - this.spool) * (1 - Math.exp(-dt / tau));
-
-    const abRequest = throttle > this.afterburnerDetent ? (throttle - this.afterburnerDetent) / (1 - this.afterburnerDetent) : 0;
-    const abAllowed = this.spool > 0.97;
-    if (abRequest > 0 && abAllowed) this.abTimer += dt; else this.abTimer = 0;
-    const abTarget = this.abTimer >= d.afterburnerLightDelayS ? abRequest : 0;
-    const step = d.afterburnerRatePerS * dt;
-    this.ab = abTarget > this.ab ? Math.min(abTarget, this.ab + step) : Math.max(abTarget, this.ab - step * 2);
-
+    this.spool += (demand.speed - this.spool) * (1 - Math.exp(-dt / d.rotorTimeConstantS));
+    this.ab = Math.max(0, Math.min(1, demand.afterburner));
     const theta = (ambient.temperatureK * (1 + 0.2 * ambient.mach * ambient.mach)) / T_STD;
-    const corrected = this.spool / Math.sqrt(theta);
-    const cycle = solveCycle(d, ambient, corrected, this.ab);
+    const cycle = solveCycle(d, ambient, this.spool / Math.sqrt(theta), this.ab);
     this.last = { ...cycle, netThrustN: Math.max(0, cycle.netThrustN), spoolSpeed: this.spool, afterburnerFraction: this.ab, afterburnerLit: this.ab > 0, flameout: false };
     return this.last;
   }

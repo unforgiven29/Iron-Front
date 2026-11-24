@@ -104,6 +104,7 @@ function hud(s: AircraftSnapshot): HudData {
   for (const a of s.annunciations) warnings.push({ text: a, level: a.includes("DIRECT") ? "warning" : "caution" });
   if (s.outsideAeroEnvelope) warnings.push({ text: "OUTSIDE AERO DATA ENVELOPE", level: "caution" });
   if (s.engines.some((e) => e.flameout)) warnings.push({ text: "ENGINE FLAMEOUT — FUEL", level: "warning" });
+  if (s.engines.some((e) => e.control.mode === "backup")) warnings.push({ text: "ENGINE CONTROL: BACKUP (SEC)", level: "caution" });
   if (s.faults.length > 0) warnings.push({ text: `SIM FAULT: ${s.faults[s.faults.length - 1]}`, level: "warning" });
   return {
     airspeedKt: s.equivalentAirspeedMps * KT,
