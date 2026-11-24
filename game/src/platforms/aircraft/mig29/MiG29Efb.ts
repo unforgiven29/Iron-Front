@@ -36,15 +36,19 @@ function enginesPage(s: Snap): string {
   const l = eng(s, "left"), r = eng(s, "right");
   const g = gbxSpeed(s);
   const feedL = flowing(s, "tank2", "left") || flowing(s, "accumulator", "left"), feedR = flowing(s, "tank2", "right") || flowing(s, "accumulator", "right");
-  return svg(640, 620, `
-    ${intakeBox(16, s, "left", "LH")}${intakeBox(434, s, "right", "RH")}
-    ${tank(270, 30, 100, 56, kg(s, "tank2"), cap(s, "tank2"), "TANK 2 · FEED")}
-    ${pipe([[300, 86], [300, 118], [100, 118], [100, 150]], { flow: feedL })}${pipe([[340, 86], [340, 118], [540, 118], [540, 150]], { flow: feedR })}
+  const lim = { oilTempWarnC: 195, oilPressMinPa: 1.8 * 98066.5 };
+  return svg(800, 1080, `
+    ${intakeBox(16, s, "left", "LH")}${intakeBox(594, s, "right", "RH")}
+    ${tank(350, 30, 100, 56, kg(s, "tank2"), cap(s, "tank2"), "TANK 2 · FEED")}
+    ${pipe([[380, 86], [380, 118], [100, 118], [100, 150]], { flow: feedL })}${pipe([[420, 86], [420, 118], [700, 118], [700, 150]], { flow: feedR })}
     ${l ? engineCutaway(100, 150, l, "right", `LH ${num(l.spoolSpeed * 100, 1)} % NH`) : ""}
-    ${r ? engineCutaway(540, 150, r, "left", `RH ${num(r.spoolSpeed * 100, 1)} % NH`) : ""}
-    ${box(240, 515, 160, 54, "GEARBOX (GBX)", [`${g.by} engine · ${num(g.v * 100, 1)} %`, "AC+DC GEN · 2 HYD · fuel"], g.v > 0.5 ? "on" : "warn")}
-    ${text(320, 590, `${num(s.engines.reduce((a, e) => a + e.netThrustN, 0) / 1000, 1)} kN · ${num(s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600)} kg/h`, { anchor: "middle", size: 15, weight: 700 })}
-    ${text(320, 610, `${(s.engines[0]?.control.mode ?? "").toUpperCase()} · ${s.engines.flatMap((e) => e.control.activeLimits).join(", ") || "no limiter"}`, { anchor: "middle", size: 10, color: COLORS.dim })}`);
+    ${r ? engineCutaway(700, 150, r, "left", `RH ${num(r.spoolSpeed * 100, 1)} % NH`) : ""}
+    ${box(320, 515, 160, 54, "GEARBOX (GBX)", [`${g.by} engine · ${num(g.v * 100, 1)} %`, "AC+DC GEN · 2 HYD · fuel"], g.v > 0.5 ? "on" : "warn")}
+    ${text(400, 590, `${num(s.engines.reduce((a, e) => a + e.netThrustN, 0) / 1000, 1)} kN · ${num(s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600)} kg/h`, { anchor: "middle", size: 15, weight: 700 })}
+    ${text(400, 610, `${(s.engines[0]?.control.mode ?? "").toUpperCase()} · ${s.engines.flatMap((e) => e.control.activeLimits).join(", ") || "no limiter"}`, { anchor: "middle", size: 10, color: COLORS.dim })}
+    ${text(16, 642, "ENGINE HEALTH", { size: 13, weight: 700, color: "#7fd4ff" })}
+    ${l ? engineHealthPanel(10, 650, 385, l, "LH RD-33", lim) : ""}${r ? engineHealthPanel(405, 650, 385, r, "RH RD-33", lim) : ""}
+    ${text(10, 1076, "Oil warn >195 °C; <1.8 kp/cm² (50–89 %) / <2.7 (>89 %) — GAF T.O.; margins estimated", { size: 9, color: COLORS.dim })}`);
 }
 
 function fuelPage(s: Snap): string {
@@ -129,18 +133,11 @@ function hydraulicsPage(s: Snap): string {
     ${text(20, 470, "Relief 24 MPa · low warning 10 MPa · accumulators 8 MPa N₂ (GAF T.O.)", { size: 10, color: COLORS.dim })}`);
 }
 
-function healthPage(s: Snap): string {
-  const l = eng(s, "left"), r = eng(s, "right");
-  const lim = { oilTempWarnC: 195, oilPressMinPa: 1.8 * 98066.5 };
-  return svg(600, 450, `${l ? engineHealthPanel(10, 14, 285, l, "LH RD-33", lim) : ""}${r ? engineHealthPanel(305, 14, 285, r, "RH RD-33", lim) : ""}
-    ${text(10, 446, "Oil warn >195 °C; <1.8 kp/cm² (50–89 %) / <2.7 (>89 %) — GAF T.O.; margins estimated", { size: 9, color: COLORS.dim })}`);
-}
 
 export const MIG29_EFB = {
   title: "MiG-29 EFB",
   pages: [
     { id: "engines", title: "Engines", render: (s: Snap) => enginesPage(s) },
-    { id: "health", title: "Eng Health", render: (s: Snap) => healthPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap) => fuelPage(s) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
     { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) }

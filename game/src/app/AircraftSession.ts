@@ -119,6 +119,7 @@ function hud(s: AircraftSnapshot, annunciate?: (s: AircraftSnapshot) => readonly
   if (s.outsideAeroEnvelope && s.ground.kind === "airborne") warnings.push({ text: "OUTSIDE AERO DATA ENVELOPE", level: "caution" });
   if (s.engines.some((e) => e.flameout)) warnings.push({ text: "ENGINE FLAMEOUT — FUEL", level: "warning" });
   if (s.engines.some((e) => e.control.mode === "backup")) warnings.push({ text: "ENGINE CONTROL: BACKUP (SEC)", level: "caution" });
+  for (const a of s.lights) warnings.push({ text: a.text, level: a.level });
   for (const a of annunciate?.(s) ?? []) warnings.push({ text: a.text, level: a.level });
   if (s.faults.length > 0) warnings.push({ text: `SIM FAULT: ${s.faults[s.faults.length - 1]}`, level: "warning" });
   return {

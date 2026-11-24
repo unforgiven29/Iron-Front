@@ -10,7 +10,7 @@ import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevic
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness, LOW_SPEED_REFERENCE } from "./F16Compressibility.js";
-import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
+import { F16_ACTUATORS, F16_ENGINE, F16_GEAR, F16_GEOMETRY, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { f16AccessoryDrives, f16SystemsCoupling, F16_ELECTRICAL_INSTALLATION } from "./F16Electrical.js";
 import { f16FuelSystem, f16TankSpecs } from "./F16FuelSystem.js";
 import { F16FlightControls, ROLL_GAINS } from "./F16FlightControls.js";
@@ -19,6 +19,7 @@ import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
 import { F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
 import { F16_LANDING_GEAR } from "./F16LandingGear.js";
+import { f16Monitor } from "./F16Monitor.js";
 import { F16_SWITCHES, F16_TEST_CG, F16_TEST_HYDRAULIC_FAULTS } from "./F16Switches.js";
 
 export const F16_MANIFEST: ModuleManifest = {
@@ -240,6 +241,29 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "MAIN GEN FAIL" ? ["gen.main"] : ["gen.main", "gen.standby"]); return { accepted: true }; }
         },
         {
+          definition: { id: F16_SWITCHES.fuelMaster, ownerId: "f16.fuel", label: "FUEL MASTER", positions: ["MASTER", "OFF"], defaultPosition: "MASTER", provenance: "T.O. GR1F-16CJ-1 fig 1-23: guarded; drives the main fuel shutoff valve (24 s travel)" },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          key: "k",
+          definition: { id: F16_SWITCHES.engFeed, ownerId: "f16.fuel", label: "ENG FEED", positions: ["NORM", "AFT", "FWD", "OFF"], defaultPosition: "NORM", provenance: "T.O. GR1F-16CJ-1 fig 1-23: OFF / NORM / AFT / FWD" },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          key: "u",
+          definition: { id: F16_SWITCHES.fuelQtySel, ownerId: "f16.fuel", label: "FUEL QTY SEL", positions: ["NORM", "RSVR", "INT WING", "TEST"], defaultPosition: "NORM", provenance: "T.O. GR1F-16CJ-1 fig 1-24 (EXT positions omitted: no external tanks modelled). Out of NORM disables automatic forward transfer" },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          key: "o",
+          definition: { id: F16_SWITCHES.airRefuel, ownerId: "f16.fuel", label: "AIR REFUEL", positions: ["CLOSE", "OPEN"], defaultPosition: "CLOSE", provenance: "T.O. GR1F-16CJ-1 fig 1-23 (slipway door state only; no tanker model)" },
+          onChange: () => ({ accepted: true })
+        },
+        {
+          definition: { id: F16_SWITCHES.tankInerting, ownerId: "f16.fuel", label: "TANK INERTING", positions: ["OFF", "TANK INERTING"], defaultPosition: "OFF", provenance: "T.O. GR1F-16CJ-1 fig 1-23 (state reported only; Halon/pressure schedule not modelled)" },
+          onChange: () => ({ accepted: true })
+        },
+        {
           key: "h",
           definition: { id: F16_SWITCHES.hydraulicFault, ownerId: "f16.hydraulics", label: "HYD FAULT (TEST)", positions: Object.keys(F16_TEST_HYDRAULIC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven hydraulic pumps. Not a real F-16 control." },
           onChange: (to, ctx) => { ctx.setHydraulicFaults(F16_TEST_HYDRAULIC_FAULTS[to as keyof typeof F16_TEST_HYDRAULIC_FAULTS].map((pumpId) => ({ kind: "pump-failed" as const, pumpId }))); return { accepted: true }; }
@@ -259,7 +283,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
         }
       };
       const devices = f16Devices(model);
-      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), ...(devices ? { devices } : {}) };
+      return { aero: f16Aero(model), fcs: trackingFcs, switches, accessoryDrives: f16AccessoryDrives(), monitor: f16Monitor(), ...(devices ? { devices } : {}) };
     }
   };
 }
@@ -317,18 +341,13 @@ function psi(s: AircraftSnapshot, circuitId: string): string {
   return c ? (c.pressurePa / 6894.757).toFixed(0).padStart(4) : " ---";
 }
 
-/** F-16 cautions from the hydraulic network (thresholds in F16_HYDRAULICS; see provenance there). */
+/** F-16 display-only advisories (the caution/warning lights themselves come from F16Monitor). */
 function f16Annunciations(s: AircraftSnapshot): { text: string; level: "caution" | "warning" }[] {
   const out: { text: string; level: "caution" | "warning" }[] = [];
-  const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < F16_HYDRAULICS.cautionBelowPa.value).map((c) => c.id);
-  if (low.length > 0) out.push({ text: `HYD PRESS ${low.join("+")}`, level: low.length > 1 ? "warning" : "caution" });
   const g = s.gear;
   if (g && g.extension > 0 && g.extension < 1) out.push({ text: "GEAR IN TRANSIT", level: "caution" });
   if (g && !g.handleDown && g.extension <= 0 && s.ground.kind === "airborne" && s.ground.aglM < 300 && s.verticalSpeedMps < -2 && s.equivalentAirspeedMps < 95) out.push({ text: "GEAR UP — LANDING", level: "warning" });
   const epu = s.hydraulics?.emergencyUnit;
-  const online = (id: string) => s.electrical?.sources.find((x) => x.id === id)?.online ?? true;
-  if (!online("gen.main")) out.push({ text: "ELEC SYS", level: "caution" });
-  if (s.electrical?.buses.find((b) => b.id === "flcs")?.sourceId === "battery.flcs") out.push({ text: "FLCS PMG", level: "caution" });
   if (epu && epu.state !== "off") out.push({ text: epu.state === "depleted" ? "EPU FUEL DEPLETED" : "EPU RUN", level: epu.state === "depleted" ? "warning" : "caution" });
   return out;
 }

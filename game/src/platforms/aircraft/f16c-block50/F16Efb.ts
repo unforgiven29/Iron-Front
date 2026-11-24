@@ -14,63 +14,130 @@ const cap = (s: Snap, id: string) => s.fuelTanks?.find((t) => t.id === id)?.capa
 const falling = (s: Snap, p: Snap | undefined, id: string) => !!p && kg(p, id) - kg(s, id) > 0.05;
 const lb = (k: number) => `${(k / LB).toFixed(0)}`;
 
+const ind = (s: Snap, k: string) => s.indications[k] ?? Number.NaN;
+const fi = (s: Snap, k: string) => s.fuelComponents?.indications?.[k] ?? Number.NaN;
+const pumpRunning = (s: Snap, id: string) => s.fuelComponents?.pumps.find((p) => p.id === id)?.running ?? false;
+const valveOpen = (s: Snap, id: string) => s.fuelComponents?.valves.find((v) => v.id === id)?.open ?? false;
+const flowKgS = (s: Snap, from: string, to: string) => s.fuelComponents?.flows.filter((f) => f.from === from && f.to === to).reduce((a, f) => a + f.kgS, 0) ?? 0;
+
+/** Round cockpit-style gauge (needle over an arc), value from the systems monitor. */
+function gauge(cx: number, cy: number, label: string, v: number, lo: number, hi: number, fmt: string, red?: number): string {
+  const f = Number.isFinite(v) ? Math.max(0, Math.min(1, (v - lo) / (hi - lo))) : 0;
+  const ang = (-225 + 270 * f) * Math.PI / 180, r = 34;
+  const redArc = red !== undefined ? (() => { const fr = (red - lo) / (hi - lo), a0 = (-225 + 270 * fr) * Math.PI / 180, a1 = 45 * Math.PI / 180;
+    return `<path d="M${cx + r * Math.cos(a0)},${cy + r * Math.sin(a0)} A${r},${r} 0 ${fr < 0.33 ? 1 : 0} 1 ${cx + r * Math.cos(a1)},${cy + r * Math.sin(a1)}" stroke="${COLORS.warn}" stroke-width="4" fill="none"/>`; })() : "";
+  return `<circle cx="${cx}" cy="${cy}" r="${r + 6}" fill="#111" stroke="#555"/>
+    <path d="M${cx + r * Math.cos(-225 * Math.PI / 180)},${cy + r * Math.sin(-225 * Math.PI / 180)} A${r},${r} 0 1 1 ${cx + r * Math.cos(45 * Math.PI / 180)},${cy + r * Math.sin(45 * Math.PI / 180)}" stroke="#666" stroke-width="2" fill="none"/>${redArc}
+    <line x1="${cx}" y1="${cy}" x2="${cx + (r - 4) * Math.cos(ang)}" y2="${cy + (r - 4) * Math.sin(ang)}" stroke="#f4f4f4" stroke-width="2.5"/>
+    ${text(cx, cy + 22, fmt, { anchor: "middle", size: 11, weight: 700 })}${text(cx, cy + 56, label, { anchor: "middle", size: 10, color: COLORS.dim })}`;
+}
+
+function lightsRow(s: Snap, x: number, y: number): string {
+  const all = ["ENGINE", "HYD/OIL PRESS", "FWD FUEL LOW", "AFT FUEL LOW", "FUEL/OIL HOT", "SEC", "ELEC SYS", "GRAVITY FEED"];
+  const on = new Set(s.lights.map((l) => l.text));
+  return all.map((t, i) => { const lv = s.lights.find((l) => l.text === t)?.level; const col = !on.has(t) ? "#2a2c2f" : lv === "warning" ? "#a31515" : "#a86a00";
+    return `<rect x="${x + (i % 4) * 146}" y="${y + Math.floor(i / 4) * 30}" width="140" height="24" rx="3" fill="${col}" stroke="#555"/>${text(x + (i % 4) * 146 + 70, y + Math.floor(i / 4) * 30 + 16, t, { anchor: "middle", size: 10, weight: 700, color: on.has(t) ? "#fff" : "#666" })}`; }).join("");
+}
+
 function enginePage(s: Snap): string {
   const e = s.engines[0];
   if (!e) return svg(600, 200, text(20, 40, "No engine"));
-  return svg(600, 690, `
-    ${tank(250, 14, 100, 50, kg(s, "fwdReservoir") + kg(s, "aftReservoir"), cap(s, "fwdReservoir") + cap(s, "aftReservoir"), "RESERVOIRS", { unit: lb })}
-    ${pump(268, 58, e.fuelFlowKgS > 0, 7)}${pump(332, 58, e.fuelFlowKgS > 0, 7)}
-    ${pipe([[300, 64], [300, 100], [250, 100], [250, 150]], { flow: e.fuelFlowKgS > 0 })}
-    ${engineCutaway(250, 150, e, "right", `N2 ${num(e.n2Rpm)} rpm`)}
-    ${text(40, 180, `N1 ${num(e.n1Rpm)} rpm`, { size: 13, weight: 600 })}
-    ${text(40, 200, `EGT ${e.exhaustGasTemperatureK !== undefined ? (e.exhaustGasTemperatureK - 273.15).toFixed(0) + "°C" : "—"}`, { size: 13, weight: 600 })}
-    ${text(40, 220, `FTIT n/a in deck`, { size: 10, color: COLORS.dim })}
-    ${text(40, 260, `ENG CONT ${e.control.mode === "backup" ? "SEC" : "PRI"}`, { size: 13, color: e.control.mode === "backup" ? COLORS.caution : COLORS.ok, weight: 600 })}
-    ${text(40, 280, e.control.activeLimits.join(", ") || "no limiter", { size: 10, color: COLORS.dim })}
-    ${text(40, 320, `${num(e.netThrustN / 4.4482216)} lbf`, { size: 16, weight: 700 })}
-    ${text(40, 340, `${num(e.fuelFlowKgS * 3600 / LB)} PPH`, { size: 13 })}
-    ${e.outsideDeck ? text(40, 370, "OUTSIDE ENGINE DECK", { size: 11, color: COLORS.caution }) : ""}`);
+  const st = e.stations, sec = e.control.mode === "backup";
+  const igv = ind(s, "igvClosedFraction"), vsv = ind(s, "vsvResetS");
+  return svg(600, 1310, `
+    ${text(16, 24, "COCKPIT ENGINE INSTRUMENTS (T.O. GR1F-16CJ-1, GE 129)", { size: 11, color: COLORS.dim })}
+    ${gauge(70, 80, "RPM %", ind(s, "rpmPercent"), 0, 110, `${num(ind(s, "rpmPercent"))}`)}
+    ${gauge(185, 80, "FTIT °C", ind(s, "ftitC"), 200, 1200, `${num(ind(s, "ftitC"))}`, 980)}
+    ${gauge(300, 80, "NOZ POS %", ind(s, "nozzlePercent"), 0, 100, `${num(ind(s, "nozzlePercent"))}`)}
+    ${gauge(415, 80, "OIL psi", ind(s, "oilPsi"), 0, 100, `${num(ind(s, "oilPsi"))}`, 65)}
+    <rect x="480" y="56" width="104" height="44" rx="4" fill="#111" stroke="#555"/>${text(532, 85, `${num(ind(s, "fuelFlowPph"))}`, { anchor: "middle", size: 16, weight: 700 })}${text(532, 136, "FUEL FLOW pph", { anchor: "middle", size: 10, color: COLORS.dim })}
+    ${lightsRow(s, 16, 160)}
+    ${tank(250, 232, 100, 44, kg(s, "fwdReservoir") + kg(s, "aftReservoir"), cap(s, "fwdReservoir") + cap(s, "aftReservoir"), "RESERVOIRS", { unit: lb })}
+    ${pipe([[300, 276], [300, 300], [250, 300], [250, 330]], { flow: e.fuelFlowKgS > 0 })}
+    ${engineCutaway(250, 330, e, "right", `N2 ${num(e.n2Rpm)} rpm`)}
+    ${box(16, 330, 170, 132, sec ? "SEC (MEC)" : "DEC (PRI)", [
+      sec ? "MEC: fuel" : "fuel·nozzle·IGV·AB",
+      `IGV ${Number.isFinite(igv) ? (igv >= 0.99 ? "CLOSED" : igv <= 0.01 ? "OPEN" : `${num((1 - igv) * 100)} % open`) : "—"}${sec ? " (fixed)" : ""}`,
+      `VSV ${vsv > 0 ? `RESET ${num(vsv)} s` : "normal schedule"}`,
+      `IGN ${ind(s, "highEnergyIgnition") ? "HIGH ENERGY" : ind(s, "lowEnergyIgnition") ? "LOW ENERGY" : "off"}`,
+      `AB ${sec ? "INHIBITED" : e.afterburnerLit ? `${e.afterburnerZonesLit}/${e.afterburnerZones} zones` : "off"}`
+    ], sec ? "shed" : "on")}
+    ${box(16, 476, 170, 74, "FUEL TO ENGINE", [`${num(fi(s, "feedFuelTemperatureK") - 273.15)} °C after HX`, `main valve ${num(fi(s, "mainValvePosition") * 100)} %`, fi(s, "ffpRunning") ? "FFP running (HYD A)" : "FFP BYPASS"], fi(s, "fuelHot") ? "warn" : "on")}
+    ${text(16, 772, `${num(e.netThrustN / 4.4482216)} lbf`, { size: 16, weight: 700 })}
+    ${text(200, 772, `N1 ${num(e.n1Rpm)} rpm · ${e.control.activeLimits.join(", ") || "no limiter"}`, { size: 10, color: COLORS.dim })}
+    ${st ? text(16, 794, `P3/P2 ${num(st.pt3Pa / st.pt2Pa, 1)} · BPR ${num(st.bypassRatio, 2)} · main ${num(st.mainFuelKgS * 3600 / LB)} pph f/a ${num(st.fuelAirRatio, 4)} · AB ${num(st.afterburnerFuelKgS * 3600 / LB)} pph`, { size: 10 }) : ""}
+    ${e.outsideDeck ? text(16, 812, "OUTSIDE ENGINE DECK", { size: 11, color: COLORS.caution }) : ""}
+    ${text(16, 836, "ENGINE HEALTH", { size: 13, weight: 700, color: "#7fd4ff" })}
+    ${engineHealthPanel(150, 846, 300, e, "F110-GE-129", { oilPressMinPa: 15 * 6894.757 })}
+    ${text(16, 1284, "Limits (fig 5-2): FTIT 980 °C MIL/AB, 935 start; RPM 108 % (109 transient); oil 25–65 psi MIL, 15 min idle.", { size: 9, color: COLORS.dim })}
+    ${text(16, 1298, "ENGINE: RPM < 60 % or FTIT > 1,100 °C 2 s. HYD/OIL: oil < 10 psi 30 s. IGV schedule estimated.", { size: 9, color: COLORS.dim })}`);
 }
 
 function fuelPage(s: Snap, p: Snap | undefined): string {
-  const ff = s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600 / LB;
   const t = (id: string, x: number, y: number, w: number, h: number, label: string, shape?: string) => tank(x, y, w, h, kg(s, id), cap(s, id), label, { unit: lb, active: falling(s, p, id), ...(shape ? { shape } : {}) });
-  const fwd = kg(s, "f1") + kg(s, "fwdReservoir"), aft = kg(s, "a1") + kg(s, "aftReservoir");
-  return svg(600, 690, `
-    ${text(24, 40, `${(s.fuelKg / LB).toFixed(0)} lb`, { size: 22 })}
-    ${text(24, 70, `${ff.toFixed(0)} PPH`, { size: 16 })}
-    ${text(24, 100, `FWD ${lb(fwd)}  AFT ${lb(aft)}`, { size: 12 })}
-    ${text(24, 118, `imbalance ${lb(Math.abs(fwd - aft))} lb`, { size: 11, color: COLORS.dim })}
-    ${t("f1", 240, 70, 120, 130, "F-1 (FWD)")}${t("fwdReservoir", 255, 220, 90, 60, "FWD RES")}${pump(273, 270, falling(s, p, "fwdReservoir") || ff > 0, 7)}
-    ${t("aftReservoir", 255, 300, 90, 60, "AFT RES")}${pump(327, 350, ff > 0, 7)}${t("a1", 240, 380, 120, 120, "A-1 (AFT)")}
-    ${t("wingL", 60, 230, 165, 90, "L WING", "M60,260 L225,230 L225,290 L80,320 Z")}${t("wingR", 375, 230, 165, 90, "R WING", "M540,260 L375,230 L375,290 L520,320 Z")}
-    ${pipe([[300, 200], [300, 220]], { flow: falling(s, p, "f1") })}${pipe([[300, 360], [300, 380]], { flow: falling(s, p, "a1") })}
-    ${pipe([[225, 255], [232, 255], [232, 120], [240, 120]], { flow: falling(s, p, "wingL") })}${pipe([[375, 275], [368, 275], [368, 440], [360, 440]], { flow: falling(s, p, "wingR") })}
-    ${pipe([[345, 250], [430, 250], [430, 560], [300, 560], [300, 640]], { flow: ff > 0 })}${pipe([[345, 330], [430, 330]], { flow: ff > 0 })}
-    ${valve(300, 600, true)}${text(300, 664, "ENGINE FEED", { anchor: "middle", size: 11 })}
-    ${text(24, 640, `CG ${(s.cgFractionMac * 100).toFixed(1)} % MAC`, { size: 13 })}`);
+  const fwd = kg(s, "f1") + kg(s, "f2") + kg(s, "fwdReservoir"), aft = kg(s, "a1") + kg(s, "aftReservoir");
+  const imbalance = fwd < aft; // C: red AL pointer when FR < AL
+  const sw = (id: string) => s.switches[id] ?? "—";
+  const fl = (a: string, b: string) => flowKgS(s, a, b) > 1e-3;
+  const pumpLabel = (x: number, y: number, id: string, name: string) => `${pump(x, y, pumpRunning(s, id), 8)}${text(x + 12, y + 4, name, { size: 9, color: COLORS.dim })}`;
+  const ff = s.engines.reduce((a, e) => a + e.fuelFlowKgS, 0) * 3600 / LB;
+  return svg(600, 860, `
+    ${text(16, 30, `TOTAL ${lb(s.fuelKg)} lb`, { size: 20, weight: 700 })}${text(16, 54, `${num(ff)} pph`, { size: 14 })}
+    ${text(16, 78, `FR (fwd) ${lb(fwd)} · AL (aft) ${lb(aft)}`, { size: 12, color: imbalance ? COLORS.warn : COLORS.text })}
+    ${text(16, 96, imbalance ? "IMBALANCE — red AL pointer" : `fwd heavy ${lb(fwd - aft)} lb`, { size: 11, color: imbalance ? COLORS.warn : COLORS.dim })}
+    ${box(400, 12, 190, 104, "FUEL CONTROL", [`FUEL MASTER ${sw("f16.fuel.master")}`, `ENG FEED ${sw("f16.fuel.eng-feed")}`, `QTY SEL ${sw("f16.fuel.qty-sel")}`, `AIR REFUEL ${sw("f16.fuel.air-refuel")}`, `INERTING ${sw("f16.fuel.tank-inerting")}`], "on")}
+    ${text(300, 136, "FORWARD SYSTEM", { anchor: "middle", size: 10, color: COLORS.dim })}
+    ${t("f1", 240, 142, 120, 90, "F-1")}${pumpLabel(372, 190, "xfer.f1", "XFER")}
+    ${t("f2", 240, 252, 120, 80, "F-2")}
+    ${t("fwdReservoir", 255, 352, 90, 56, "FWD RSVR")}${pumpLabel(372, 384, "boost.fwd", "BOOST")}${text(372, 404, pumpRunning(s, "ejector.fwd") ? "ejector ON" : "", { size: 9, color: COLORS.dim })}
+    ${t("aftReservoir", 255, 448, 90, 56, "AFT RSVR")}${pumpLabel(372, 480, "boost.aft", "BOOST")}${text(372, 500, pumpRunning(s, "ejector.aft") ? "ejector ON" : "", { size: 9, color: COLORS.dim })}
+    ${t("a1", 240, 524, 120, 110, "A-1")}${pumpLabel(372, 580, "xfer.a1", "XFER")}
+    ${text(300, 650, "AFT SYSTEM", { anchor: "middle", size: 10, color: COLORS.dim })}
+    ${t("wingR", 420, 240, 160, 80, "R WING (fwd sys)", "M580,270 L420,240 L420,300 L560,320 Z")}${pumpLabel(470, 336, "xfer.wingR", "XFER")}
+    ${t("wingL", 20, 500, 160, 80, "L WING (aft sys)", "M20,530 L180,500 L180,560 L40,580 Z")}
+    ${pipe([[420, 285], [380, 285], [380, 292], [360, 292]], { flow: fl("wingR", "f2") })}
+    ${pipe([[300, 232], [300, 252]], { flow: fl("f1", "f2") })}${pipe([[300, 332], [300, 352]], { flow: fl("f2", "fwdReservoir") })}
+    ${pipe([[180, 545], [210, 545], [210, 580], [240, 580]], { flow: fl("wingL", "a1") })}${pipe([[300, 524], [300, 504]], { flow: fl("a1", "aftReservoir") })}
+    ${pipe([[240, 560], [200, 560], [200, 300], [240, 300]], { flow: fl("a1", "f2") })}${valve(200, 430, valveOpen(s, "trim"))}${text(150, 434, "TRIM", { size: 9, color: COLORS.dim })}
+    ${pipe([[255, 380], [220, 380], [220, 476], [255, 476]], { flow: fl("aftReservoir", "f2") || fl("fwdReservoir", "a1") })}${valve(220, 428, valveOpen(s, "crossfeed"))}${text(226, 450, "XFEED", { size: 9, color: COLORS.dim })}
+    ${pipe([[345, 380], [440, 380], [440, 690]], { flow: fl("fwdReservoir", "f110") })}${pipe([[345, 476], [440, 476]], { flow: fl("aftReservoir", "f110") })}
+    ${box(380, 690, 120, 50, "FFP (HYD A)", [pumpRunning(s, "ffp") ? "PROPORTIONING" : "BYPASS"], pumpRunning(s, "ffp") ? "on" : "shed")}
+    ${pipe([[440, 740], [440, 760], [300, 760]], { flow: ff > 0 })}
+    ${box(170, 740, 130, 50, "FUEL/OIL HX", [`${num(fi(s, "feedFuelTemperatureK") - 273.15)} °C`], fi(s, "fuelHot") ? "warn" : "on")}
+    ${pipe([[170, 765], [110, 765], [110, 800]], { flow: ff > 0 })}${valve(110, 812, valveOpen(s, "mainShutoff"))}${text(124, 816, `MAIN S/O ${num(fi(s, "mainValvePosition") * 100)} %`, { size: 9 })}
+    ${text(20, 848, `→ F110  ·  tanks ${num(fi(s, "tankFuelTemperatureK") - 273.15)} °C  ·  CG ${num(s.cgFractionMac * 100, 1)} % MAC  ·  auto fwd transfer ${fi(s, "autoTransferArmed") ? "ARMED" : "off"}${fi(s, "gravityFeed") ? "  ·  GRAVITY FEED" : ""}`, { size: 10 })}`);
 }
 
 function electricsPage(s: Snap): string {
   const el = s.electrical;
   if (!el) return svg(600, 200, text(20, 40, "No electrical model"));
-  const src = (id: string) => el.sources.find((x) => x.id === id)!;
-  const bus = (id: string) => el.buses.find((x) => x.id === id)!;
-  const gen = (x: number, y: number, id: string, name: string) => { const o = src(id); return box(x, y, 150, 58, name, [o.tripped ? "TRIPPED" : o.online ? "ONLINE" : "OFF", `${(o.loadW / 1000).toFixed(1)} kVA`], o.tripped ? "warn" : o.online ? "on" : "off"); };
-  const busBox = (x: number, y: number, id: string, name: string, v: number) => { const b = bus(id); return box(x, y, 180, 58, name, [b.powered ? `from ${b.sourceId}` : "UNPOWERED", `${v} V · ${(b.loadW / v).toFixed(1)} A${b.shed ? " · SHED" : ""}`], !b.powered ? "warn" : b.shed ? "shed" : "on", v > 100 ? "#ff9b9b" : "#9bb0ff"); };
+  const src = (id: string) => el.sources.find((x) => x.id === id);
+  const bus = (id: string) => el.buses.find((x) => x.id === id);
+  const gen = (x: number, y: number, id: string, name: string) => { const o = src(id); if (!o) return ""; return box(x, y, 140, 58, name, [o.tripped ? "TRIPPED" : o.online ? "ON LINE" : o.available ? "AVAILABLE" : "OFF", `${(o.loadW / 1000).toFixed(1)} kVA`], o.tripped ? "warn" : o.online ? "on" : o.available ? "shed" : "off"); };
+  const NAMES: Record<string, string> = { "gen.main": "main gen", "gen.standby": "standby gen", "gen.epu": "EPU gen", "pmg.flcs": "FLCS PMG", "pmg.epu": "EPU PMG", "battery.main": "BATTERY", "conv.flcs": "conv/reg ← EM DC", "conv.dc.nonessential": "converter", "conv.dc.essential": "converter", "conv.dc.emergency1": "converter", "conv.dc.emergency2": "converter" };
+  const busBox = (x: number, y: number, id: string, name: string, ac: boolean) => { const b = bus(id); if (!b) return ""; return box(x, y, 134, 50, name, [b.powered ? `← ${NAMES[b.sourceId ?? ""] ?? b.sourceId}` : "UNPOWERED"], !b.powered ? "warn" : "on", ac ? "#ff9b9b" : "#9bb0ff"); };
+  const light = (x: number, y: number, k: string, label: string) => { const on = (s.indications[k] ?? 0) > 0; return `<rect x="${x}" y="${y}" width="96" height="22" rx="3" fill="${on ? "#a86a00" : "#2a2c2f"}" stroke="#555"/>${text(x + 48, y + 15, label, { anchor: "middle", size: 9, weight: 700, color: on ? "#fff" : "#666" })}`; };
   const epu = s.hydraulics?.emergencyUnit;
-  return svg(600, 600, `
-    ${gen(20, 20, "gen.main", "MAIN GEN 60 kVA")}${gen(225, 20, "gen.standby", "STBY GEN 10 kVA")}${gen(430, 20, "gen.epu", "EPU GEN 5 kVA")}
-    ${pipe([[95, 78], [95, 150]], { flow: src("gen.main").online, color: COLORS.elec, fluid: "#ffb3b3" })}${pipe([[300, 78], [300, 250]], { flow: src("gen.standby").online, color: COLORS.elec, fluid: "#ffb3b3" })}${pipe([[505, 78], [505, 250], [390, 250]], { flow: src("gen.epu").online, color: COLORS.elec, fluid: "#ffb3b3" })}
-    ${busBox(10, 150, "ac.nonessential", "AC NON-ESS", 115)}${busBox(210, 250, "ac.essential", "AC ESSENTIAL", 115)}
-    ${box(210, 345, 180, 46, "TR", [src("tr").online ? `${(src("tr").loadW / 1000).toFixed(1)} kW` : "off"], src("tr").online ? "on" : "off", "#9bb0ff")}
-    ${pipe([[300, 308], [300, 345]], { flow: src("tr").online, color: COLORS.dc, fluid: "#b3c4ff" })}
-    ${busBox(210, 420, "dc.essential", "DC ESSENTIAL", 28)}${pipe([[300, 391], [300, 420]], { flow: bus("dc.essential").powered, color: COLORS.dc, fluid: "#b3c4ff" })}
-    ${box(420, 420, 160, 58, "MAIN BATTERY", [`${num(src("battery.main").chargeAh, 1)} Ah`, src("battery.main").online ? "DISCHARGING" : "standby"], src("battery.main").online ? "shed" : "on", "#8fe28f")}
-    ${busBox(10, 520, "flcs", "FLCS POWER", 28)}
-    ${box(210, 520, 120, 58, "FLCS PMG", [src("pmg").online ? "ONLINE" : "OFF"], src("pmg").online ? "on" : "warn", "#8fe28f")}
-    ${box(345, 520, 120, 58, "FLCS BATT", [`${num(src("battery.flcs").chargeAh, 1)} Ah`], src("battery.flcs").online ? "shed" : "on", "#8fe28f")}
-    ${text(20, 120, `EPU ${epu ? epu.state.toUpperCase() : "—"}${epu && epu.state !== "off" ? ` · ${epu.remainingS.toFixed(0)} s` : ""}`, { size: 12, color: epu && epu.state !== "off" ? COLORS.caution : COLORS.dim })}`);
+  return svg(600, 700, `
+    ${light(12, 10, "elecFlcsPmg", "FLCS PMG")}${light(112, 10, "elecMainGen", "MAIN GEN")}${light(212, 10, "elecStbyGen", "STBY GEN")}${light(312, 10, "elecEpuGen", "EPU GEN")}${light(412, 10, "elecBattToFlcs", "ACFT BATT TO FLCS")}
+    ${gen(12, 44, "gen.main", "MAIN GEN 60 kVA")}${gen(160, 44, "gen.standby", "STBY GEN 10 kVA")}${gen(308, 44, "gen.epu", "EPU GEN 5 kVA")}${gen(456, 44, "pmg.flcs", "FLCS PMG")}
+    ${text(12, 124, "AC BUSES", { size: 11, color: COLORS.dim })}
+    ${busBox(12, 130, "ac.nonessential", "NON-ESS AC", true)}${busBox(158, 130, "ac.essential", "ESSENTIAL AC", true)}${busBox(304, 130, "ac.emergency1", "EMERG AC 1", true)}${busBox(450, 130, "ac.emergency2", "EMERG AC 2", true)}
+    ${pipe([[79, 180], [79, 240]], { flow: !!bus("dc.nonessential")?.powered, color: COLORS.dc, fluid: "#b3c4ff" })}${pipe([[225, 180], [225, 240]], { flow: !!bus("dc.essential")?.powered, color: COLORS.dc, fluid: "#b3c4ff" })}
+    ${pipe([[371, 180], [371, 240]], { flow: !!bus("dc.emergency1")?.powered, color: COLORS.dc, fluid: "#b3c4ff" })}${pipe([[517, 180], [517, 240]], { flow: !!bus("dc.emergency2")?.powered, color: COLORS.dc, fluid: "#b3c4ff" })}
+    ${text(12, 214, "AC→DC converters", { size: 9, color: COLORS.dim })}
+    ${text(12, 236, "DC BUSES", { size: 11, color: COLORS.dim })}
+    ${busBox(12, 242, "dc.nonessential", "NON-ESS DC", false)}${busBox(158, 242, "dc.essential", "ESSENTIAL DC", false)}${busBox(304, 242, "dc.emergency1", "EMERG DC 1", false)}${busBox(450, 242, "dc.emergency2", "EMERG DC 2", false)}
+    ${busBox(304, 312, "dc.battery1", "BATTERY BUS 1", false)}${busBox(450, 312, "dc.battery2", "BATTERY BUS 2", false)}
+    ${box(12, 312, 280, 50, "AIRCRAFT BATTERY", [`${num(src("battery.main")?.chargeAh ?? 0, 1)} Ah · ${src("battery.main")?.online ? "DISCHARGING" : "charging / standby"}`], src("battery.main")?.online ? "shed" : "on", "#8fe28f")}
+    ${busBox(12, 392, "flcs", "FLCS POWER (A–D)", false)}
+    ${box(158, 392, 280, 50, "FLCS CONVERTER/REGULATORS", ["PMG · EPU PMG · EMERG DC · ACFT BATT"], "on", "#8fe28f")}
+    ${text(12, 472, `EPU ${epu ? epu.state.toUpperCase() : "—"}${epu && epu.state !== "off" ? ` · ${epu.remainingS.toFixed(0)} s hydrazine` : ""}`, { size: 12, color: epu && epu.state !== "off" ? COLORS.caution : COLORS.dim })}
+    ${text(12, 500, "Loads on each bus (manual figs 1-31/1-32):", { size: 10, color: COLORS.dim })}
+    ${["Non-ess DC: fuel pumps 1, 2, 4 · FCR · ECM", "Essential DC: fuel pumps 3, 5 · radar altimeter · stations", "Emerg DC 1: FUEL LOW lights · FLCS A/B · INS · TACAN · speedbrakes", "Emerg DC 2: auto fwd fuel transfer · HUD · FLCS C/D · gear command",
+      "Battery 1: ENGINE, HYD/OIL PRESS lights · FTIT, RPM gauges · JFS", "Battery 2: DEC · FUEL MASTER · ELEC SYS caution",
+      "Main gen → all buses · standby → all but non-ess · EPU → emergency + battery only"].map((l, i) => text(12, 518 + i * 16, l, { size: 10, color: i === 6 ? COLORS.text : COLORS.dim })).join("")}
+    ${text(12, 690, "T.O. GR1F-16CJ-1 Section I. Loads, battery capacity and converter ratings estimated; FLCS branches lumped.", { size: 9, color: COLORS.dim })}`);
 }
 
 function hydraulicsPage(s: Snap): string {
@@ -84,13 +151,15 @@ function hydraulicsPage(s: Snap): string {
   };
   const e = s.engines[0], epu = h.emergencyUnit;
   const engPump = (e?.spoolSpeed ?? 0) > 0.3;
-  return svg(600, 480, `
+  return svg(600, 520, `
     ${circ(20, "A", "SYSTEM A")}${circ(350, "B", "SYSTEM B")}${pump(135, 220, engPump)}${pump(465, 220, engPump)}
     ${pipe([[135, 229], [135, 270], [300, 270]], { flow: engPump, color: COLORS.hyd, fluid: "#e9d5ff" })}${pipe([[465, 229], [465, 270], [300, 270]], { flow: engPump, color: COLORS.hyd, fluid: "#e9d5ff" })}
     ${box(200, 270, 200, 90, "FLIGHT CONTROLS", ["stabilators · flaperons", "rudder · LEF", "A + B (one chamber each)"], "on", "#d9b3ff")}
     ${box(20, 270, 160, 74, "EPU PUMP → A", [epu ? epu.state.toUpperCase() : "—", epu ? `${epu.remainingS.toFixed(0)} s fuel` : ""], epu && epu.state === "running" ? "shed" : "off", "#d9b3ff")}
-    ${box(420, 270, 160, 74, "UTILITIES (B)", ["gear · brakes", "NWS · speedbrake (A)"], "on", "#d9b3ff")}
-    ${text(20, 400, "Pumps on the engine accessory drive gearbox; EPU auto-starts on dual low pressure or loss of both generators.", { size: 10, color: COLORS.dim })}`);
+    ${box(420, 270, 160, 90, "UTILITIES (B)", ["LG · brakes · NWS", "gun · AR door/latch", "brake/JFS accumulators"], "on", "#d9b3ff")}
+    ${box(20, 360, 160, 74, "SYS A ONLY", ["speedbrakes", "fuel flow proportioner"], "on", "#d9b3ff")}
+    ${hbar(420, 380, 160, "BRAKE/JFS ACC", (s.indications["brakeJfsAccumulatorCharge"] ?? 0), `${num(s.indications["brakeJfsAccumulatorPsi"] ?? 0)} psi`, (s.indications["brakeJfsAccumulatorCharge"] ?? 0) < 0.3 ? COLORS.caution : COLORS.ok)}
+    ${["3,000 psi systems A and B on the ADG; HYD/OIL PRESS below 1,000 psi.", "Both feed the FLCS and LEFs (reduced rate on one system).", "EPU pump → A on dual low pressure or loss of both generators.", "B charges the brake/JFS accumulators above 12 % rpm (40–60 s)."].map((l, i) => text(20, 452 + i * 15, l, { size: 10, color: COLORS.dim })).join("")}`);
 }
 
 /** Rolling history for the FLCS strip charts (UI state only). */
@@ -136,17 +205,11 @@ function flcsPage(s: Snap): string {
     ${text(12, 632, "Control laws: NASA TP-1538 (F-16 simulator FLCS), not the production Block 50 OFP.", { size: 9, color: COLORS.dim })}`);
 }
 
-function healthPage(s: Snap): string {
-  const e = s.engines[0];
-  return svg(600, 450, `${e ? engineHealthPanel(150, 14, 300, e, "F110-GE-129") : ""}
-    ${text(10, 446, "Transient, stall-margin, oil and augmentor-zone values estimated (no F110 data in the project).", { size: 9, color: COLORS.dim })}`);
-}
 
 export const F16_EFB = {
   title: "F-16C EFB",
   pages: [
     { id: "engine", title: "Engine", render: (s: Snap) => enginePage(s) },
-    { id: "health", title: "Eng Health", render: (s: Snap) => healthPage(s) },
     { id: "flcs", title: "FLCS", render: (s: Snap) => flcsPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap, p: Snap | undefined) => fuelPage(s, p) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },

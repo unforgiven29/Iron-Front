@@ -3,7 +3,7 @@ import { mig29FuelSystem } from "../../src/platforms/aircraft/mig29/MiG29FuelSys
 import { mig29Intake, mig29IntakeSystem } from "../../src/platforms/aircraft/mig29/MiG29Intake.js";
 
 const KT = 0.514444, D = Math.PI / 180;
-const sensors = (o: { wow?: boolean; kias?: number; mach?: number; alphaDeg?: number }) => ({ nzG: 1, nyG: 0, weightOnWheels: o.wow ?? false, alphaRad: (o.alphaDeg ?? 3) * D, betaRad: 0, ratesRadps: [0, 0, 0] as const, dynamicPressurePa: 0.5 * 1.225 * ((o.kias ?? 300) * KT) ** 2, staticPressurePa: 101325, mach: o.mach ?? 0.5, trueAirspeedMps: (o.kias ?? 300) * KT, pitchRad: 0, rollRad: 0 });
+const sensors = (o: { wow?: boolean; kias?: number; mach?: number; alphaDeg?: number; betaDeg?: number }) => ({ nzG: 1, nyG: 0, weightOnWheels: o.wow ?? false, alphaRad: (o.alphaDeg ?? 3) * D, betaRad: (o.betaDeg ?? 0) * D, ratesRadps: [0, 0, 0] as const, dynamicPressurePa: 0.5 * 1.225 * ((o.kias ?? 300) * KT) ** 2, staticPressurePa: 101325, mach: o.mach ?? 0.5, trueAirspeedMps: (o.kias ?? 300) * KT, pitchRad: 0, rollRad: 0 });
 const ctx = (o: Parameters<typeof sensors>[0] & { gear?: boolean; hyd?: number; n?: number }) => ({ sensors: sensors(o), gearDown: o.gear ?? false, engineSpeed: () => o.n ?? 0.9, hydraulicPressurePa: () => o.hyd ?? 21e6, throttle: 0.5 });
 const run = (sys: ReturnType<typeof mig29IntakeSystem>, c: ReturnType<typeof ctx>, s: number) => { let st = sys.step(c, 0.01); for (let i = 0; i < s * 100; i++) st = sys.step(c, 0.01); return st["left"]!; };
 
@@ -73,5 +73,13 @@ describe("MiG-29 fuel pumps and valves", () => {
     step(cl, { flow: 2, dc: false }, 60);
     expect(cl.components!().valves.find((v) => v.id === "clTransfer")!.open).toBe(false);
     expect(cl.tanks.kg("centerline")).toBeCloseTo(cl.tanks.spec("centerline").capacityKg, 3);
+  });
+});
+
+describe("MiG-29 intake distortion needs real airflow (regression: ground surge in a light wind)", () => {
+  it("a crosswind at taxi speed (β ≈ 60°) gives no distortion; the same sideslip in flight does", () => {
+    const sys = mig29IntakeSystem(["left"]);
+    expect(run(sys, ctx({ wow: true, kias: 3, gear: true, betaDeg: 60, alphaDeg: 40 }), 1).distortion).toBe(0);
+    expect(run(mig29IntakeSystem(["left"]), ctx({ kias: 300, betaDeg: 20 }), 1).distortion).toBeGreaterThan(0.5);
   });
 });
