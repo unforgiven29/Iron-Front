@@ -1,6 +1,6 @@
 # Aircraft hydraulic power and actuation supply
 
-**Owner:** game/systems/hydraulics. **Status:** architecture specification; a complete hydraulic-network solver is not implemented.
+**Owner:** game/systems/hydraulics. **Status:** lumped-circuit network implemented in `game/src/systems/hydraulics/HydraulicNetwork.ts` (tests: `game/tests/unit/HydraulicNetwork.test.ts`): circuit pressure with fluid and accumulator compliance, pressure-compensated pumps on engine or emergency drive, accumulators, emergency unit (trigger, delay, endurance), leakage/relief, pump and leak faults, servo-valve actuator authority. Line resistance/transients, valves, reservoirs, temperature, contamination, hinge loads and electrical coupling are not implemented.
 
 This system models hydraulic fluid power as a finite, connected, dynamic network. Aircraft packages define exact circuits, pumps, reservoirs, fluid, accumulators, lines, valves, isolation logic, actuators and emergency supply. The shared solver models those installed components; it must not impose a universal number of circuits or assume all aircraft use the same pressure, fluid, backup or crossfeed arrangement.
 

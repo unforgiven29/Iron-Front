@@ -7,12 +7,13 @@ import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevic
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
 import { applyCompressibility, compressibilityFactors, controlEffectiveness } from "./F16Compressibility.js";
-import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
+import { F16_ACTUATORS, F16_ENGINE, F16_GEOMETRY, F16_HYDRAULICS, F16_MASS, F16_SPEEDBRAKE } from "./F16Data.js";
 import { F16FlightControls } from "./F16FlightControls.js";
 import { F110_CONTROL, F110_DESIGN } from "./F110Engine.js";
 import { f16Aerodynamics, f16InertiaTensor } from "./F16FlightModel.js";
 import { f16HifiAerodynamics, LefSchedule } from "./F16HifiAerodynamics.js";
-import { F16_SWITCHES, F16_TEST_CG } from "./F16Switches.js";
+import { F16_HYDRAULIC_INSTALLATION } from "./F16Hydraulics.js";
+import { F16_SWITCHES, F16_TEST_CG, F16_TEST_HYDRAULIC_FAULTS } from "./F16Switches.js";
 
 export const F16_MANIFEST: ModuleManifest = {
   manifestSchemaVersion: 1,
@@ -126,6 +127,8 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     ],
     // Thrust along body x through the CG: engine offset/cant not sourced.
     engines: [{ id: "f110", design: F110_DESIGN, control: F110_CONTROL, positionBodyM: [0, 0, 0], thrustAxisBody: [1, 0, 0] }],
+    hydraulics: F16_HYDRAULIC_INSTALLATION,
+    annunciate: f16Annunciations,
     cockpit: F16_COCKPIT_LAYOUT,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createSystems: () => {
@@ -151,6 +154,11 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           key: "n",
           definition: { id: F16_SWITCHES.engineControl, ownerId: "f16.engine.control", label: "ENG CONT", positions: ["PRI", "SEC"], defaultPosition: "PRI", provenance: "F-16 engine control switch: PRI = digital electronic control, SEC = hydromechanical secondary control (guarded switch in the real cockpit)" },
           onChange: (to, ctx) => { ctx.setEngineControlMode("f110", to === "SEC" ? "backup" : "primary"); return { accepted: true }; }
+        },
+        {
+          key: "h",
+          definition: { id: F16_SWITCHES.hydraulicFault, ownerId: "f16.hydraulics", label: "HYD FAULT (TEST)", positions: Object.keys(F16_TEST_HYDRAULIC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven hydraulic pumps. Not a real F-16 control." },
+          onChange: (to, ctx) => { ctx.setHydraulicFaults(F16_TEST_HYDRAULIC_FAULTS[to as keyof typeof F16_TEST_HYDRAULIC_FAULTS].map((pumpId) => ({ kind: "pump-failed" as const, pumpId }))); return { accepted: true }; }
         }
       ];
       // Track the achieved stabilator so DIRECT can capture it as trim.
@@ -206,7 +214,23 @@ function flcsPage(s: AircraftSnapshot) {
       `AOA  ${(s.alphaRad * D).toFixed(1).padStart(6)}°`,
       `NZ   ${s.nzG.toFixed(2).padStart(6)} g`,
       `CG   ${(s.cgFractionMac * 100).toFixed(0)}% MAC ${s.switches[F16_SWITCHES.testCg] ?? ""}`,
+      `HYD  A ${psi(s, "A")}  B ${psi(s, "B")}${s.hydraulics?.emergencyUnit && s.hydraulics.emergencyUnit.state !== "off" ? "  EPU " + s.hydraulics.emergencyUnit.state.toUpperCase() : ""}`,
       ...s.annunciations
     ]
   };
+}
+
+function psi(s: AircraftSnapshot, circuitId: string): string {
+  const c = s.hydraulics?.circuits.find((x) => x.id === circuitId);
+  return c ? (c.pressurePa / 6894.757).toFixed(0).padStart(4) : " ---";
+}
+
+/** F-16 cautions from the hydraulic network (thresholds in F16_HYDRAULICS; see provenance there). */
+function f16Annunciations(s: AircraftSnapshot): { text: string; level: "caution" | "warning" }[] {
+  const out: { text: string; level: "caution" | "warning" }[] = [];
+  const low = (s.hydraulics?.circuits ?? []).filter((c) => c.pressurePa < F16_HYDRAULICS.cautionBelowPa.value).map((c) => c.id);
+  if (low.length > 0) out.push({ text: `HYD PRESS ${low.join("+")}`, level: low.length > 1 ? "warning" : "caution" });
+  const epu = s.hydraulics?.emergencyUnit;
+  if (epu && epu.state !== "off") out.push({ text: epu.state === "depleted" ? "EPU FUEL DEPLETED" : "EPU RUN", level: epu.state === "depleted" ? "warning" : "caution" });
+  return out;
 }

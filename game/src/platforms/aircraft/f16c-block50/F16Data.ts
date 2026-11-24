@@ -105,6 +105,37 @@ export const F16_ENGINE_CONTROL = Object.freeze({
   secAfterburnerInhibited: { value: 1, unit: "boolean", status: "secondary-reported", source: "Widely reported F-16 SEC-mode behaviour (afterburner inhibited); Block 50 flight manual not verified" } as Parameter
 });
 
+/**
+ * Hydraulic installation (game/modules/planes/F-16/systems/hydraulics.md). Topology from the
+ * Block 50/52+ flight manual as summarised in the repo dossier (HAF T.O. GR1F16CJ-1): two
+ * independent 3000-psi systems A and B with engine-driven pumps; both feed the primary flight
+ * controls; speedbrakes on A only; an isolated FLCS accumulator on each; the EPU's pump supplies
+ * System A when both normal systems are lost. Component sizes are NOT public: estimated.
+ */
+const PSI = 6894.757, GPM = 6.309e-5, LITRE = 1e-3, IN3 = 1.6387e-5;
+const HYD_MANUAL = "HAF T.O. GR1F16CJ-1 (Block 50/52+), via game/modules/planes/F-16/systems/hydraulics.md";
+export const F16_HYDRAULICS = Object.freeze({
+  nominalPressurePa: { value: 3000 * PSI, unit: "Pa", status: "secondary-reported", source: HYD_MANUAL, note: "3000 psi, systems A and B" } as Parameter,
+  reliefPressurePa: { value: 3650 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "Typical relief setting above a 3000-psi system" } as Parameter,
+  pumpRatedFlowM3s: { value: 35 * GPM, unit: "m³/s", status: "estimated", source: "project estimate", note: "Engine-driven pump flow at intermediate core speed; real F-16 pump curves not public" } as Parameter,
+  pumpCompensatorBandPa: { value: 200 * PSI, unit: "Pa", status: "estimated", source: "project estimate" } as Parameter,
+  fluidVolumeM3: { value: 12 * LITRE, unit: "m³", status: "estimated", source: "project estimate", note: "Pressurised volume per system" } as Parameter,
+  bulkModulusPa: { value: 1.5e9, unit: "Pa", status: "secondary-reported", source: "Typical MIL-PRF-83282/5606 hydraulic fluid effective bulk modulus (reference value, not F-16 specific)" } as Parameter,
+  leakageM3sPerPa: { value: (0.4 * GPM) / (3000 * PSI), unit: "m³/s/Pa", status: "estimated", source: "project estimate", note: "≈0.4 gpm internal leakage at 3000 psi" } as Parameter,
+  flcsAccumulatorGasM3: { value: 1.0 * LITRE, unit: "m³", status: "estimated", source: "project estimate", note: "FLCS accumulator per system (manual: exists; size not public)" } as Parameter,
+  flcsAccumulatorPrechargePa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate" } as Parameter,
+  epuAutoStartBelowPa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "Manual: EPU starts on dual hydraulic loss (and electrical triggers, not modelled); threshold not verified" } as Parameter,
+  epuStartDelayS: { value: 2, unit: "s", status: "estimated", source: "project estimate", note: "FLCS accumulators bridge this gap (manual)" } as Parameter,
+  epuEnduranceS: { value: 600, unit: "s", status: "estimated", source: "project estimate", note: "Hydrazine-limited; real figure depends on bleed-air assist and load" } as Parameter,
+  epuPumpFlowM3s: { value: 10 * GPM, unit: "m³/s", status: "estimated", source: "project estimate", note: "Emergency pump, much smaller than the engine-driven pumps" } as Parameter,
+  stabilatorDisplacementM3PerDeg: { value: 1.3 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate", note: "Both stabilator actuators, one chamber each per system" } as Parameter,
+  rollDisplacementM3PerDeg: { value: 0.9 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate", note: "Flaperon + differential-tail roll control" } as Parameter,
+  rudderDisplacementM3PerDeg: { value: 0.35 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate" } as Parameter,
+  speedbrakeDisplacementM3PerDeg: { value: 0.6 * IN3, unit: "m³/deg", status: "estimated", source: "project estimate", note: "System A only (manual)" } as Parameter,
+  designLoadFraction: { value: 1 / 3, unit: "fraction of full-pressure force", status: "estimated", source: "project estimate", note: "Constant hinge-load assumption; gives ≈70 % rate on one system (manual: 'reduced')" } as Parameter,
+  cautionBelowPa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "HYD/OIL PRESS caution threshold not verified for Block 50" } as Parameter
+});
+
 /** Speedbrakes: split fuselage-mounted panels (F-16 manual family). */
 export const F16_SPEEDBRAKE = Object.freeze({
   maxDeflectionDeg: { value: 60, unit: "deg", status: "secondary-reported", source: "F-16 flight manual family (60° max; 43° with gear down)", note: "Gear-down limit not modelled (no gear yet)" } as Parameter,
@@ -122,6 +153,6 @@ export const F16_FLCS_LIMITS = Object.freeze({
 
 /** Every parameter, for listing and audit. */
 export function allF16Parameters(): { group: string; name: string; parameter: Parameter }[] {
-  const groups = { geometry: F16_GEOMETRY, mass: F16_MASS, actuators: F16_ACTUATORS, engine: F16_ENGINE, engineControl: F16_ENGINE_CONTROL, speedbrake: F16_SPEEDBRAKE, flcs: F16_FLCS_LIMITS };
+  const groups = { geometry: F16_GEOMETRY, mass: F16_MASS, actuators: F16_ACTUATORS, engine: F16_ENGINE, engineControl: F16_ENGINE_CONTROL, hydraulics: F16_HYDRAULICS, speedbrake: F16_SPEEDBRAKE, flcs: F16_FLCS_LIMITS };
   return Object.entries(groups).flatMap(([group, g]) => Object.entries(g).map(([name, parameter]) => ({ group, name, parameter: parameter as Parameter })));
 }

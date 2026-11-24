@@ -18,6 +18,7 @@ import type { Vector3 } from "../../../core/coordinates/CoordinateFrames.js";
 import type { Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
 import type { FadecMode, FadecSchedule } from "../../../physics/propulsion/Fadec.js";
 import type { Ambient, TurbofanDesign } from "../../../physics/propulsion/MixedFlowTurbofan.js";
+import type { HydraulicFault, HydraulicInstallation } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import type { CockpitLayout } from "../../../rendering/three/CockpitLayout.js";
 
 /** Pilot controls, normalised. +pitch = stick back, +roll = stick right, +yaw = right pedal. */
@@ -130,6 +131,8 @@ export interface AircraftControlContext {
   setCgFractionMac(value: number): void;
   /** Select an engine's control mode (e.g. a primary/secondary engine-control switch). */
   setEngineControlMode(engineId: string, mode: FadecMode): void;
+  /** Inject hydraulic faults (test/training switches). */
+  setHydraulicFaults(faults: readonly HydraulicFault[]): void;
 }
 
 export interface SwitchBinding {
@@ -156,7 +159,11 @@ export interface AircraftDefinition {
   readonly mass: MassProperties;
   readonly surfaces: readonly ControlSurfaceSpec[];
   readonly engines: readonly EngineInstallation[];
+  /** Optional hydraulic power network; surfaces listed in it are rate-limited by their supply. */
+  readonly hydraulics?: HydraulicInstallation;
   readonly cockpit: CockpitLayout;
+  /** Aircraft-specific cautions and warnings built from the snapshot (e.g. hydraulic pressure lights). */
+  readonly annunciate?: (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[];
   /** Pilot-facing MFD pages built from the snapshot (package decides what to show). */
   readonly mfdPages?: Readonly<Record<string, (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => { title: string; lines: string[] }>>;
   createSystems(): AircraftSystems;
