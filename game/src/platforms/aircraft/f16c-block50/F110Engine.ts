@@ -80,6 +80,13 @@ const BASE: Omit<TurbofanDesign, "nozzle"> = {
   fanEfficiency: 0.86, compressorEfficiency: 0.86, turbineEfficiency: 0.89, burnerEfficiency: 0.99, afterburnerEfficiency: 0.9,
   turbineInletTemperatureK: Number.NaN, afterburnerMaxTemperatureK: 2000,
   rotorTimeConstantS: E.rotorTimeConstantS.value,
+  // Transient / stability / health: ESTIMATED (no F110 transient, stall-margin or augmentor-zone data in the repo).
+  dynamics: {
+    fanTimeConstantS: 0.5,
+    surge: { baseMarginByCorrectedSpeed: { breakpoints: [0.5, 0.8, 1.0, 1.08], values: [0.24, 0.22, 0.16, 0.1] }, accelerationPenalty: 0.5, distortionPenalty: 0.25, afterburnerPulsePenalty: 0.03, recoveryS: 2.5, thrustFractionInSurge: 0.2, egtRiseK: 120 },
+    health: { oilTimeConstantS: 120, oilTemperatureRiseK: 80, oilPressureAtMaxPa: 3.4e5, vibrationAtMax: 0.4 },
+    afterburner: { zones: 5, zoneDelayS: 0.2, blowoutBurnerPressurePa: 2.2e5, relightDelayS: 2.5 }
+  },
   inlet: pitotInlet(E.inletSubsonicRecovery.value),
   gasGenerator: GAS_GENERATOR,
   installationLossFraction: E.installationLossFraction.value,

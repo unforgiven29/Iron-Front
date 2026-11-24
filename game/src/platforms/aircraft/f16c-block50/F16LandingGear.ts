@@ -22,8 +22,9 @@ export const F16_LANDING_GEAR: LandingGearSpec = {
   gearCircuitId: "B", brakeCircuitId: "B", steeringCircuitId: "B",
   maxSinkRateMps: G.maxSinkRateMps.value,
   restCgHeightM: z - 0.11,
-  // Estimated airframe strike points: nose, ventral exhaust/tail (≈12° tail-strike pitch), wingtips (≈13° bank), belly.
-  airframePointsBodyM: [[7.6, 0, 0.6], [-6.8, 0, 0.4], [0.5, -4.7, 0.9], [0.5, 4.7, 0.9], [0, 0, 1.2]]
+  // Estimated airframe strike points: nose, ventral exhaust/tail (≈14.5° tail-strike pitch, struts extended —
+  // above the 13° AoA routinely flown at touchdown and the 13° aerobraking pitch of F-16 procedures), wingtips (≈13° bank), belly.
+  airframePointsBodyM: [[7.6, 0, 0.6], [-6.8, 0, 0.116], [0.5, -4.7, 0.9], [0.5, 4.7, 0.9], [0, 0, 1.2]]
 };
 
 /** CG height above flat ground with the gear down, at rest (static strut compression included). */

@@ -58,7 +58,10 @@ describe("F110 engine (GE deck gas generator + calibrated afterburner)", () => {
   });
 
   it("the plant follows a demand with rotor lag and flames out without fuel", () => {
-    const e = new MixedFlowTurbofan(BENCH, F110_CONTROL.idleSpeed);
+    // Plant only, driven by a raw step (no engine control): surge is tested separately, so it is off here.
+    const { surge: _surge, ...noSurge } = BENCH.dynamics!;
+    void _surge;
+    const e = new MixedFlowTurbofan({ ...BENCH, dynamics: noSurge }, F110_CONTROL.idleSpeed);
     const sl = at(0, 0);
     let s = e.step({ speed: 1, afterburner: 0 }, sl, true, 0.1);
     expect(s.spoolSpeed).toBeGreaterThan(F110_CONTROL.idleSpeed);

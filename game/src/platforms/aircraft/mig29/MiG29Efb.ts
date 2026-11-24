@@ -4,7 +4,7 @@
  * generators with PTO and batteries, and the main/boost hydraulic systems with the emergency pump.
  * Layouts are schematic (after GAF T.O. 1F-MIG29-1 figs. 1-18/1-19 and the system descriptions).
  */
-import { box, COLORS, engineCutaway, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
+import { box, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { MIG29_HYDRAULICS } from "./MiG29Data.js";
 import { F34_KG_PER_L } from "./MiG29FuelSystem.js";
@@ -127,10 +127,18 @@ function hydraulicsPage(s: Snap): string {
     ${text(20, 470, "Relief 24 MPa · low warning 10 MPa · accumulators 8 MPa N₂ (GAF T.O.)", { size: 10, color: COLORS.dim })}`);
 }
 
+function healthPage(s: Snap): string {
+  const l = eng(s, "left"), r = eng(s, "right");
+  const lim = { oilTempWarnC: 195, oilPressMinPa: 1.8 * 98066.5 };
+  return svg(600, 450, `${l ? engineHealthPanel(10, 14, 285, l, "LH RD-33", lim) : ""}${r ? engineHealthPanel(305, 14, 285, r, "RH RD-33", lim) : ""}
+    ${text(10, 446, "Oil warn >195 °C; <1.8 kp/cm² (50–89 %) / <2.7 (>89 %) — GAF T.O.; margins estimated", { size: 9, color: COLORS.dim })}`);
+}
+
 export const MIG29_EFB = {
   title: "MiG-29 EFB",
   pages: [
     { id: "engines", title: "Engines", render: (s: Snap) => enginesPage(s) },
+    { id: "health", title: "Eng Health", render: (s: Snap) => healthPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap) => fuelPage(s) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
     { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) }

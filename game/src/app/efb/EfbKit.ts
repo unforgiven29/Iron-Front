@@ -112,3 +112,30 @@ export function engineCutaway(cx: number, top: number, e: EngineSnapshot, side: 
 export function svg(width: number, height: number, body: string): string {
   return `<svg class="efb-svg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, Menlo, Consolas, monospace">${body}</svg>`;
 }
+
+/** Engine health / stability panel (two spools, surge margin, oil, vibration, AB zones, life). */
+export function engineHealthPanel(x: number, y: number, w: number, e: EngineSnapshot, title: string, limits: { oilTempWarnC?: number; oilPressMinPa?: number } = {}): string {
+  const h = e.health;
+  const sm = e.surgeMargin, smF = Number.isFinite(sm) ? Math.max(0, Math.min(1, sm / 0.25)) : 0;
+  const smColor = e.surging ? COLORS.warn : sm < 0.05 ? COLORS.caution : COLORS.ok;
+  const zones = e.afterburnerZones;
+  const zoneBoxes = Array.from({ length: zones }, (_, i) => `<rect x="${x + 10 + i * 34}" y="${y + 330}" width="28" height="14" rx="2" fill="${e.afterburnerBlowout ? COLORS.warn : i < e.afterburnerZonesLit ? "#ff9a3c" : "#3a3d41"}" stroke="#777"/>`).join("");
+  const oilC = h ? h.oilTemperatureK - 273.15 : Number.NaN;
+  const oilWarn = limits.oilTempWarnC !== undefined && oilC > limits.oilTempWarnC;
+  const pressLow = h !== undefined && limits.oilPressMinPa !== undefined && e.spoolSpeed > 0.5 && h.oilPressurePa < limits.oilPressMinPa;
+  return `<rect x="${x}" y="${y}" width="${w}" height="420" rx="6" fill="${COLORS.panel}" stroke="#44474c"/>
+    ${text(x + 10, y + 22, title, { size: 13, weight: 700, color: "#7fd4ff" })}
+    ${e.surging ? text(x + w - 10, y + 22, "SURGE", { size: 13, anchor: "end", weight: 700, color: COLORS.warn }) : ""}
+    ${hbar(x + 10, y + 52, w - 20, "NH core", e.spoolSpeed / 1.05, `${num(e.spoolSpeed * 100, 1)} %`, "#4fb3ff")}
+    ${hbar(x + 10, y + 86, w - 20, "NL fan", e.fanSpeed / 1.05, `${num(e.fanSpeed * 100, 1)} %`, "#7fd4ff")}
+    ${hbar(x + 10, y + 120, w - 20, "SURGE MARGIN", smF, Number.isFinite(sm) ? `${num(sm * 100, 1)} %` : "—", smColor)}
+    ${h ? `${hbar(x + 10, y + 154, w - 20, "OIL TEMP", (h.oilTemperatureK - 273.15) / 220, `${num(oilC)}°C`, oilWarn ? COLORS.warn : COLORS.ok)}
+    ${hbar(x + 10, y + 188, w - 20, "OIL PRESS", h.oilPressurePa / 4.5e5, `${num(h.oilPressurePa / 98066.5, 2)} kp/cm²`, pressLow ? COLORS.warn : COLORS.ok)}
+    ${hbar(x + 10, y + 222, w - 20, "VIBRATION", h.vibration, `${num(h.vibration * 100)} %`, h.vibration > 1 ? COLORS.warn : h.vibration > 0.7 ? COLORS.caution : COLORS.ok)}
+    ${text(x + 10, y + 260, `hot-section ${num(h.hotSectionEquivalentS / 60, 1)} eq-min`, { size: 11 })}
+    ${text(x + 10, y + 278, `afterburner ${num(h.afterburnerTimeS, 0)} s · surges ${h.surgeCount}`, { size: 11 })}` : text(x + 10, y + 160, "no health model", { size: 11, color: COLORS.dim })}
+    ${text(x + 10, y + 318, `AFTERBURNER ${zones ? `${e.afterburnerZonesLit}/${zones} zones` : ""}${e.afterburnerBlowout ? " · BLOW-OUT" : ""}`, { size: 11, color: e.afterburnerBlowout ? COLORS.warn : COLORS.text })}
+    ${zoneBoxes}
+    ${text(x + 10, y + 372, `limiters: ${e.control.activeLimits.join(", ") || "none"}`, { size: 10, color: COLORS.dim })}
+    ${text(x + 10, y + 390, `${e.control.mode.toUpperCase()} · demand ${num(e.control.speedDemand * 100, 1)} %`, { size: 10, color: COLORS.dim })}`;
+}
