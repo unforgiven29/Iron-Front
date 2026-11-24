@@ -47,8 +47,9 @@ export function mig29ControlSystem(): FlightControlSystem & { setSau(mode: SauMo
   let sau: SauMode = "ON";
   let speedbrake = false;
   let trim = 0;
+  let nzMax = 1;
   return {
-    reset: () => { trim = 0; },
+    reset: () => { trim = 0; nzMax = 1; },
     mode: () => `SAU ${sau}`,
     setSau: (m) => { sau = m; },
     setSpeedbrake: (out) => { speedbrake = out; },
@@ -66,9 +67,16 @@ export function mig29ControlSystem(): FlightControlSystem & { setSau(mode: SauMo
       if (Math.abs(pilot.pitch) < 0.05 && !s.weightOnWheels) {
         trim = clamp(trim + clamp(0.3 * q, -K.autoTrimRateDegS.value, K.autoTrimRateDegS.value) * dt, -K.pitchTrimAuthority.value * upAuth, K.pitchTrimAuthority.value * downAuth);
       }
-      // AoA limiter (pitch kicker); the system is inhibited on the ground / gear down (no WOW proxy beyond squat).
+      // AoA limiter (pitch kicker, GAF T.O.): triggers on AoA, pitch rate or a combination of both, and is
+      // disabled unless the nose gear is up and locked.
       const maxAlpha = lefOut ? K.maxAlphaLefOutDeg.value : K.maxAlphaLefInDeg.value;
-      const kicker = s.weightOnWheels ? 0 : Math.max(0, alpha - maxAlpha) * K.kickerGainDegPerDeg.value;
+      const armed = !s.weightOnWheels && s.gearUpLocked !== false;
+      const kicker = armed ? Math.max(0, alpha + K.kickerPitchRateLeadS.value * Math.max(0, q) - maxAlpha) * K.kickerGainDegPerDeg.value : 0;
+      // AOA/G meter: maximum-g memory and overstress against the structural limits (indication only —
+      // the MiG-29's mechanical controls have no g limiter).
+      nzMax = Math.max(nzMax, s.nzG);
+      const gLimit = s.mach > 0.85 ? K.structuralLimitSupersonicG.value : K.structuralLimitSubsonicG.value;
+      const overG = s.nzG > gLimit;
       const stick = pilot.pitch >= 0 ? -upAuth * pilot.pitch : -downAuth * pilot.pitch;
       const elevator = clamp(stick + trim + damp * K.pitchDamperDegPerDegS.value * q + kicker, -upAuth, downAuth);
       // Roll: ailerons (reduced above 18° AoA) + differential tailerons only with LEF retracted.
@@ -80,7 +88,8 @@ export function mig29ControlSystem(): FlightControlSystem & { setSau(mode: SauMo
       const rudder = clamp(-K.rudderLimitDeg.value * pilot.yaw + damp * K.yawDamperDegPerDegS.value * r * clamp(s.dynamicPressurePa / 20_000, 0.2, 1) + ari, -K.rudderLimitDeg.value, K.rudderLimitDeg.value);
       return {
         mode: `SAU ${sau}`,
-        annunciations: [...(sau === "OFF" ? ["SAU OFF (TEST)"] : !sauPowered ? ["SAU OFF (NO POWER)"] : []), ...(kicker > 0 ? ["AOA LIMIT"] : [])],
+        annunciations: [...(sau === "OFF" ? ["SAU OFF (TEST)"] : !sauPowered ? ["SAU OFF (NO POWER)"] : []), ...(kicker > 0 ? ["AOA LIMIT"] : []), ...(overG ? ["G OVERSTRESS"] : [])],
+        telemetry: { nzG: s.nzG, nzMaxG: nzMax, gLimitG: gLimit, alphaDeg: alpha, alphaLimitDeg: maxAlpha, kickerDeg: kicker, kickerArmed: armed ? 1 : 0, stabAuthorityUpDeg: upAuth, stabAuthorityDownDeg: downAuth, trimDeg: trim, sauPowered: sauPowered ? 1 : 0 },
         commands: { elevator, aileron, differentialStabilator, rudder, speedbrake: speedbrake ? 60 : 0 }
       };
     }

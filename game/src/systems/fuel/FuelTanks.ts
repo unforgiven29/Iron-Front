@@ -43,6 +43,9 @@ export interface FuelComponents {
   readonly valves: readonly { readonly id: string; readonly open: boolean }[];
   /** Actual transfers this step, kg/s (including engine feed, with `to` = an engine id). */
   readonly flows: readonly { readonly from: string; readonly to: string; readonly kgS: number }[];
+  /** Feed accumulator contents and capacity, kg (if the system has one). */
+  readonly accumulatorKg?: number;
+  readonly accumulatorCapacityKg?: number;
 }
 
 /** An aircraft's own fuel system, built from TankSet. */

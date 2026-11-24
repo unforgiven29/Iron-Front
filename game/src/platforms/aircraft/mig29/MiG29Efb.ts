@@ -63,7 +63,9 @@ function fuelPage(s: Snap): string {
     ${text(20, 130, `CG ${(s.cgFractionMac * 100).toFixed(1)} % MAC`, { size: 13 })}
     ${text(20, 152, `active-fuel pump ${pumpOn(s, "activeFuel") ? "ON" : "OFF"}`, { size: 11, color: pumpOn(s, "activeFuel") ? COLORS.ok : COLORS.warn })}
     ${kg(s, "tank2") < 550 ? text(20, 176, "550 KG REMAIN", { size: 13, color: COLORS.caution, weight: 700 }) : ""}
-    ${acc ? text(20, 198, "ACCUMULATOR FEED (low g)", { size: 12, color: COLORS.caution, weight: 700 }) : ""}
+    ${hbar(20, 214, 170, "ACCUMULATOR (tank 3)", (s.fuelComponents?.accumulatorKg ?? 0) / (s.fuelComponents?.accumulatorCapacityKg ?? 1), `${num(s.fuelComponents?.accumulatorKg, 0)} kg`, acc ? COLORS.caution : COLORS.ok)}
+    ${acc ? text(20, 198, "ACCUMULATOR FEED (near-zero g)", { size: 12, color: COLORS.caution, weight: 700 }) : ""}
+    ${text(20, 240, `boost pumps ${pumpOn(s, "boost") ? "ON" : "OFF"}`, { size: 11, color: pumpOn(s, "boost") ? COLORS.ok : COLORS.warn })}
     ${pipe([[300, 110], [300, 130]], { flow: flowing(s, "tank1", "tank2") })}
     ${pipe([[350, 300], [350, 262], [390, 262], [390, 170], [360, 170]], { flow: flowing(s, "tank3", "tank2") })}
     ${pipe([[250, 300], [250, 262], [210, 262], [210, 75], [240, 75]], { flow: flowing(s, "tank3", "tank1") })}

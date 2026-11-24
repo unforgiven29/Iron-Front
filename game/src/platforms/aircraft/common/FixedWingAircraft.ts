@@ -137,6 +137,8 @@ export class FixedWingAircraft {
   private faults: string[] = [];
   private ground: GroundStatus = { kind: "terrain-unknown", reason: "not sampled" };
   private last!: AircraftSnapshot;
+  private previous: AircraftSnapshot | undefined;
+  private interpolationAlpha = 0;
   private air = { alpha: 0, beta: 0, tas: 0, eas: 0, mach: 0, outside: false, reasons: [] as readonly string[] };
 
   public constructor(public readonly definition: AircraftDefinition, private readonly terrain: TerrainSurface, private readonly env: EnvironmentConfig, start: StartState) {
@@ -164,7 +166,7 @@ export class FixedWingAircraft {
     this.reset(start);
     this.scheduler.register({ id: `${definition.manifest.id}.flight`, phase: "integration", run: (ctx) => this.step(ctx.stepSeconds) });
     this.scheduler.register({ id: `${definition.manifest.id}.ground`, phase: "commit-events", run: () => this.checkGround() });
-    this.scheduler.register({ id: `${definition.manifest.id}.snapshot`, phase: "publish", run: (ctx) => { this.last = this.snapshotAt(ctx.tick); } });
+    this.scheduler.register({ id: `${definition.manifest.id}.snapshot`, phase: "publish", run: (ctx) => { this.previous = this.last; this.last = this.snapshotAt(ctx.tick); } });
   }
 
   /** Keyboard keys the package binds to switches. */
@@ -213,6 +215,7 @@ export class FixedWingAircraft {
     this.annunciations = [];
     this.ground = { kind: "terrain-unknown", reason: "not sampled" };
     this.checkGround();
+    this.previous = undefined;
     this.last = this.snapshotAt(this.scheduler.currentTick);
   }
 
@@ -225,7 +228,29 @@ export class FixedWingAircraft {
   }
 
   public advanceFrame(frameDeltaSeconds: number): void {
-    for (const f of this.scheduler.advanceFrame(frameDeltaSeconds).faults) this.faults.push(`${f.source}@${f.phase} tick ${f.tick}: ${f.message}`);
+    const adv = this.scheduler.advanceFrame(frameDeltaSeconds);
+    this.interpolationAlpha = adv.interpolationAlpha;
+    for (const f of adv.faults) this.faults.push(`${f.source}@${f.phase} tick ${f.tick}: ${f.message}`);
+  }
+
+  /**
+   * Snapshot for DRAWING only: position and attitude blended between the last two fixed steps by the
+   * scheduler's interpolation fraction, so motion is smooth when the display rate and the 120 Hz
+   * simulation rate do not divide evenly. Simulation state is unaffected.
+   */
+  public renderSnapshot(): AircraftSnapshot {
+    const a = this.interpolationAlpha, p = this.previous, c = this.last;
+    if (!p || a <= 0) return c;
+    const lerp = (x: number, y: number) => x + (y - x) * a;
+    let [qx, qy, qz, qw] = c.bodyToWorld;
+    const [px, py, pz, pw] = p.bodyToWorld;
+    if (px * qx + py * qy + pz * qz + pw * qw < 0) { qx = -qx; qy = -qy; qz = -qz; qw = -qw; }
+    const bx = lerp(px, qx), by = lerp(py, qy), bz = lerp(pz, qz), bw = lerp(pw, qw), n = Math.hypot(bx, by, bz, bw) || 1;
+    return {
+      ...c,
+      positionEnuM: [lerp(p.positionEnuM[0], c.positionEnuM[0]), lerp(p.positionEnuM[1], c.positionEnuM[1]), lerp(p.positionEnuM[2], c.positionEnuM[2])],
+      bodyToWorld: [bx / n, by / n, bz / n, bw / n]
+    };
   }
 
   public stepTick(): void {
@@ -291,7 +316,7 @@ export class FixedWingAircraft {
     const beta = V > 1 ? Math.asin(clamp(v / V, -1, 1)) : 0;
     const att = attitude(st.bodyToWorld);
     const sensors: FlightSensors = {
-      nzG: this.nz, nyG: this.ny, weightOnWheels: this.gear?.state.weightOnWheels ?? false, alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
+      nzG: this.nz, nyG: this.ny, weightOnWheels: this.gear?.state.weightOnWheels ?? false, ...(this.gear ? { gearUpLocked: this.gear.state.extension <= 0 } : {}), alphaRad: alpha, betaRad: beta, ratesRadps: st.angularVelocityBodyRadps,
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll,
       ...(this.electrical ? { electricalBuses: Object.fromEntries(this.electrical.snapshot.buses.map((b) => [b.id, { powered: b.powered, shed: b.shed }])) } : {})

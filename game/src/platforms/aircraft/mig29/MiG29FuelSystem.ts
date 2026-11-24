@@ -44,8 +44,16 @@ export function mig29TankSpecs(withCenterline: boolean): TankSpec[] {
  * two-engine maximum-afterburner fuel flow (≈ 9 kg/s).
  */
 const PUMP = { tank1Turbo: 12, tank3Turbo: 12, jet: 2.5, centerline: 5, gravity: 0.4 };
-/** Fuel accumulator in tank 3 for near-zero / negative g (ESTIMATED size), kg. */
-const ACCUMULATOR_KG = 12;
+/**
+ * Fuel boost and accumulator (GAF T.O. "Fuel boost system"): two turbo boost pumps in tank 2 are
+ * arranged so at least one stays submerged in positive AND negative g; a membrane accumulator in
+ * tank 3 (pressurised by air) supplies the engines only in NEAR-ZERO g, when boost pressure is
+ * insufficient, and is refilled by the boost pumps whenever they deliver. Size, refill rate and the
+ * near-zero-g band are ESTIMATED.
+ */
+const ACCUMULATOR_KG = 30;
+const ACCUMULATOR_REFILL_KGS = 4;
+const NEAR_ZERO_G = 0.25;
 
 export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } = {}): FuelSystemModel {
   const withCl = options.centerlineTank ?? false;
@@ -65,7 +73,7 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
       fromTank1 = 0; fromTank3 = 0; pausePhaseKg = 0; phase = "tank1"; feedOk = true; accumulator = ACCUMULATOR_KG; flows = []; pumps = []; valves = [];
     },
     engineFuelAvailable: () => feedOk,
-    components: () => ({ pumps, valves, flows }),
+    components: () => ({ pumps, valves, flows, accumulatorKg: accumulator, accumulatorCapacityKg: ACCUMULATOR_KG }),
     annunciations: () => [
       ...(tanks.kg("tank2") < 550 ? ["550 KG REMAIN"] : []),
       ...(withCl && tanks.isEmpty("centerline") ? ["CL TANK EMPTY"] : []),
@@ -112,31 +120,42 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
         // No GBX drive (pumps stopped): tank 1 gravity-feeds tank 2 only (GAF T.O.), slowly.
         move("tank1", "tank2", PUMP.gravity);
       }
-      // Engines burn from the feed tank; at near-zero / negative g the accumulator carries them briefly.
+      // Engines burn from the feed tank through the boost pumps (positive or negative g); only near
+      // zero g, when boost pressure fails, does the accumulator carry them. It refills automatically.
       let demand = 0;
       for (const v of Object.values(input.engineFlowKgS)) demand += v * dt;
+      const boost = active && !tanks.isEmpty("tank2");
+      const nearZeroG = Math.abs(input.nzG) < NEAR_ZERO_G;
+      const fromAccumulator = nearZeroG || !boost;
       let got: number;
-      if (input.nzG < 0.2) {
+      if (fromAccumulator && accumulator > 0) {
         got = Math.min(demand, accumulator);
         accumulator -= got;
+        // Without boost but in positive g, the engine pumps can still suck from tank 2 (ESTIMATED).
+        if (got < demand && !nearZeroG && input.nzG > 0) got += tanks.draw("tank2", demand - got);
+      } else if (fromAccumulator) {
+        got = !nearZeroG && input.nzG > 0 ? tanks.draw("tank2", demand) : 0;
       } else {
         got = tanks.draw("tank2", demand);
-        accumulator = Math.min(ACCUMULATOR_KG, accumulator + tanks.draw("tank2", Math.min(ACCUMULATOR_KG - accumulator, 1 * dt)));
+        const refill = tanks.draw("tank2", Math.min(ACCUMULATOR_KG - accumulator, ACCUMULATOR_REFILL_KGS * dt));
+        accumulator += refill;
+        if (refill > 0) flows.push({ from: "tank2", to: "accumulator", kgS: refill / dt });
       }
-      for (const [eng, v] of Object.entries(input.engineFlowKgS)) if (v > 0) flows.push({ from: input.nzG < 0.2 ? "accumulator" : "tank2", to: eng, kgS: v });
-      feedOk = got >= demand - 1e-9 && (input.nzG < 0.2 ? accumulator > 0 : !tanks.isEmpty("tank2"));
+      for (const [eng, v] of Object.entries(input.engineFlowKgS)) if (v > 0) flows.push({ from: fromAccumulator && got > 0 && accumulator >= 0 && nearZeroG ? "accumulator" : "tank2", to: eng, kgS: v });
+      feedOk = got >= demand - 1e-9;
       pumps = [
         { id: "activeFuel", running: active, flowKgS: 0 },
         { id: "tank1Turbo", running: t1Turbo, flowKgS: flows.filter((f) => f.from === "tank1" && f.to === "tank2").reduce((a, f) => a + f.kgS, 0) },
         { id: "tank3Turbo", running: t3Turbo, flowKgS: flows.filter((f) => f.from === "tank3" && f.to === "tank2").reduce((a, f) => a + f.kgS, 0) },
         { id: "tank3Jet", running: jetT3, flowKgS: flows.filter((f) => f.from === "tank3" && f.to === "tank1").reduce((a, f) => a + f.kgS, 0) },
+        { id: "boost", running: boost, flowKgS: demand / dt },
         { id: "outerJet", running: jetOuter, flowKgS: flows.filter((f) => f.to === "tank3").reduce((a, f) => a + f.kgS, 0) }
       ];
       valves = [
         { id: "clTransfer", open: clValve },
         { id: "tank1Level", open: t1Turbo },
         { id: "tank3Level", open: t3Turbo || jetT3 },
-        { id: "accumulatorFeed", open: input.nzG < 0.2 }
+        { id: "accumulatorFeed", open: fromAccumulator && accumulator > 0 }
       ];
     }
   };

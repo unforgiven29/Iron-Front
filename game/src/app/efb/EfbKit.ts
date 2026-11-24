@@ -98,13 +98,15 @@ export function engineCutaway(cx: number, top: number, e: EngineSnapshot, side: 
     <defs><radialGradient id="plume-${side}" cx="50%" cy="20%" r="80%"><stop offset="0" stop-color="#fff2b0" stop-opacity="${plume}"/><stop offset="0.45" stop-color="${e.afterburnerLit ? "#ff7a1a" : "#c0581a"}" stop-opacity="${plume * 0.9}"/><stop offset="1" stop-color="#b8860b" stop-opacity="0"/></radialGradient></defs>
     <ellipse cx="${cx}" cy="${top + 300}" rx="${exitW / 2 + 6}" ry="${60 + 50 * e.afterburnerFraction}" fill="url(#plume-${side})"/>
     <path d="M${cx - exitW / 2},${top + 330} l-6,24 M${cx + exitW / 2},${top + 330} l6,24" stroke="#ccc" stroke-width="2"/>
-    ${L(top + 14, rpmLabel, `${num(e.spoolSpeed * 100, 1)} % spool`)}
-    ${L(top + 52, `${num(e.airflowKgS, 1)} kg/s`, `T2 ${degC(s?.Tt2K)} · P2 ${num((s?.pt2Pa ?? Number.NaN) / 1000, 0)} kPa`)}
-    ${L(top + 100, `T3 ${degC(s?.Tt3K)}`, `P3 ${num((s?.pt3Pa ?? Number.NaN) / 1e5, 1)} bar · PR ${num((s?.pt3Pa ?? Number.NaN) / (s?.pt2Pa ?? Number.NaN), 1)}:1`)}
-    ${L(top + 152, `TIT ${degC(s?.Tt4K)}`, `f/a ${num((s?.fuelAirRatio ?? Number.NaN) * 1000, 1)} g/kg`)}
+    ${L(top + 14, rpmLabel, `NH ${num(e.spoolSpeed * 100, 1)} % · NL ${num(e.fanSpeed * 100, 1)} %`)}
+    ${L(top + 52, `${num(e.airflowKgS, 1)} kg/s`, `core ${num(s?.coreFlowKgS, 1)} · bypass ${num(s?.bypassFlowKgS, 1)} (BPR ${num(s?.bypassRatio, 2)})`)}
+    ${text(lx, top + 82, `T2 ${degC(s?.Tt2K)} · P2 ${num((s?.pt2Pa ?? Number.NaN) / 1000, 0)} kPa`, { anchor, size: 11, color: COLORS.dim })}
+    ${L(top + 104, `T3 ${degC(s?.Tt3K)}`, `P3 ${num((s?.pt3Pa ?? Number.NaN) / 1e5, 1)} bar · P3/P2 ${num((s?.pt3Pa ?? Number.NaN) / (s?.pt2Pa ?? Number.NaN), 1)}`)}
+    ${L(top + 150, `TIT ${degC(s?.Tt4K)}`, `main ${num((s?.mainFuelKgS ?? Number.NaN) * 3600)} kg/h · f/a ${num((s?.fuelAirRatio ?? Number.NaN) * 1000, 1)} g/kg`)}
     ${L(top + 192, `T5 ${degC(s?.Tt5K)}`, e.exhaustGasTemperatureK !== undefined ? `EGT ${degC(e.exhaustGasTemperatureK)}` : `mixer ${degC(s?.Tt6K)}`)}
-    ${L(top + 262, `T7 ${degC(s?.Tt7K)}`, `${e.afterburnerLit ? "AB " + num(e.afterburnerFraction * 100) + " %" : "AB off"} · noz ${Number.isFinite(e.nozzle.position) ? num(e.nozzle.position * 100) + " %" : "fixed"}`)}
-    ${L(top + 340, `${num(e.netThrustN / 1000, 1)} kN`, `${num(e.fuelFlowKgS * 3600)} kg/h`)}
+    ${L(top + 236, `T7 ${degC(s?.Tt7K)}`, `AB ${e.afterburnerLit ? num(e.afterburnerFraction * 100) + " %" : "off"} · ${num((s?.afterburnerFuelKgS ?? 0) * 3600)} kg/h`)}
+    ${Number.isFinite(e.nozzleActualPosition) ? L(top + 280, `A8 ${num(e.nozzle.throatAreaM2, 3)} m²`, `A9 ${num(e.nozzle.exitAreaM2, 3)} m² · cmd ${num(e.nozzleCommandPosition * 100)} % act ${num(e.nozzleActualPosition * 100)} %`) : L(top + 280, "nozzle fixed", "")}
+    ${L(top + 340, `${num(e.netThrustN / 1000, 1)} kN`, `total ${num(e.fuelFlowKgS * 3600)} kg/h · f/a ${num((s?.totalFuelAirRatio ?? Number.NaN) * 1000, 1)} g/kg`)}
     ${e.flameout ? text(cx, top + 290, "FLAMEOUT", { anchor: "middle", size: 12, color: COLORS.warn, weight: 700 }) : ""}`;
 }
 
