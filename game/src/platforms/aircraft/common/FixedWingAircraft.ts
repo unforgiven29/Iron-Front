@@ -72,6 +72,8 @@ export interface AircraftSnapshot {
   readonly fcsMode: string;
   readonly annunciations: readonly string[];
   readonly cgFractionMac: number;
+  /** Buffet intensity 0..1 from the aero model (0 when the model has none). */
+  readonly buffet: number;
   readonly outsideAeroEnvelope: boolean;
   readonly aeroEnvelopeReasons: readonly string[];
   readonly ground: GroundStatus;
@@ -118,6 +120,7 @@ export class FixedWingAircraft {
   private pilot: PilotInputs = { pitch: 0, roll: 0, yaw: 0 };
   private throttle = 0.5;
   private nz = 1;
+  private buffet = 0;
   private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
@@ -302,7 +305,8 @@ export class FixedWingAircraft {
     this.fcsMode = fcs.mode;
     this.annunciations = [...fcs.annunciations, ...(this.fuelSystem?.annunciations() ?? [])];
 
-    const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber };
+    const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber,
+      inletCondition: { weightOnWheels: this.gear?.state.weightOnWheels ?? false, equivalentAirspeedMps: Math.sqrt((2 * flow.dynamicPressurePa) / 1.225) } };
     const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
     const flows: Record<string, number> = {}, speeds: Record<string, number> = {};
@@ -339,10 +343,11 @@ export class FixedWingAircraft {
 
     const aero = this.systems.aero.compute({
       alphaRad: alpha, betaRad: beta, trueAirspeedMps: V, dynamicPressurePa: flow.dynamicPressurePa, mach: flow.machNumber,
-      ratesRadps: st.angularVelocityBodyRadps, surfaces: this.surfacePositions(), cgFractionMac: this.cgFractionMac,
+      ratesRadps: st.angularVelocityBodyRadps, surfaces: this.surfacePositions(), cgFractionMac: this.cgFractionMac, stepSeconds: dt,
       ...this.heightAboveGround(st.positionEnuM)
     });
     forces.push({ sourceId: "aero.force", frame: "body.frd" as const, forceN: aero.forceBodyN });
+    this.buffet = aero.buffet ?? 0;
     if (this.gear) {
       const result = this.gear.step(dt, st, (x, y) => { const g = this.terrain.sample(x, y); return g.status === "valid" ? g.heightM : undefined; }, {
         handleDown: this.gearHandleDown, brakes: this.pilot.brakes ?? 0, steering: this.pilot.yaw,
@@ -414,6 +419,7 @@ export class FixedWingAircraft {
       fcsMode: this.fcsMode,
       annunciations: this.annunciations,
       cgFractionMac: this.cgFractionMac,
+      buffet: this.buffet,
       outsideAeroEnvelope: this.air.outside,
       aeroEnvelopeReasons: this.air.reasons,
       ground: this.ground,

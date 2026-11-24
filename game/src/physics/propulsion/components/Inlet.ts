@@ -3,10 +3,16 @@
  * pt2/pt0 for a flight Mach number. Engine packages pick the inlet their airframe actually has.
  */
 
+export interface InletCondition {
+  readonly weightOnWheels: boolean;
+  /** Equivalent (≈ indicated) airspeed, m/s. */
+  readonly equivalentAirspeedMps: number;
+}
+
 export interface InletModel {
   readonly kind: string;
-  /** Total-pressure recovery pt2/pt0 at a freestream Mach number. */
-  recovery(mach: number): number;
+  /** Total-pressure recovery pt2/pt0 at a freestream Mach number (and optional airframe condition). */
+  recovery(mach: number, condition?: InletCondition): number;
 }
 
 /** Total-pressure ratio across a normal shock (γ = 1.4), exact. 1 at or below Mach 1. */

@@ -132,7 +132,11 @@ export class ThreeCockpitView {
     const up = enuToThree(rotateVector(q, [0, 0, -1]));
     const back = enuToThree(rotateVector(q, [-1, 0, 0]));
     this.rig.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, back));
-    this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch, this.lookYaw, 0, "YXZ"));
+    // Buffet cue (visual only): small view shake proportional to the aero model's buffet intensity.
+    const b = "buffet" in s ? Math.max(0, Math.min(1, (s as { buffet: number }).buffet)) : 0;
+    const t = performance.now() / 1000, amp = 0.006 * b;
+    const shake = amp === 0 ? [0, 0] : [amp * (Math.sin(t * 71) + 0.6 * Math.sin(t * 113)), amp * 0.6 * Math.sin(t * 97)];
+    this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch + shake[0]!, this.lookYaw + shake[1]!, 0, "YXZ"));
     this.rig.updateMatrixWorld(true);
     const eyeWorld = rotateVector(q, this.layout.eyeFromCgM as Vector3);
     const eye = enuToThree([s.positionEnuM[0] + eyeWorld[0], s.positionEnuM[1] + eyeWorld[1], s.positionEnuM[2] + eyeWorld[2]]);
