@@ -132,8 +132,39 @@ export const F16_HYDRAULICS = Object.freeze({
   rollDisplacementM3PerDeg: { value: 0.9 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate", note: "Flaperon + differential-tail roll control" } as Parameter,
   rudderDisplacementM3PerDeg: { value: 0.35 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate" } as Parameter,
   speedbrakeDisplacementM3PerDeg: { value: 0.6 * IN3, unit: "m³/deg", status: "estimated", source: "project estimate", note: "System A only (manual)" } as Parameter,
-  designLoadFraction: { value: 1 / 3, unit: "fraction of full-pressure force", status: "estimated", source: "project estimate", note: "Constant hinge-load assumption; gives ≈70 % rate on one system (manual: 'reduced')" } as Parameter,
+  hingeLoadFractionAtReference: { value: 0.6, unit: "fraction of full-pressure (two-system) force", status: "estimated", source: "project estimate", note: "Hinge load at full deflection and the reference dynamic pressure; no F-16 hinge-moment data. Gives ≈ full rate at low q̄ and reduced rate at high q̄, more so on one system (manual: 'reduced')" } as Parameter,
+  hingeReferenceDynamicPressurePa: { value: 60_000, unit: "Pa", status: "estimated", source: "project estimate", note: "≈ M0.9 at sea level" } as Parameter,
+  lefDisplacementM3PerDeg: { value: 0.5 * IN3, unit: "m³/deg per system", status: "estimated", source: "project estimate", note: "Leading-edge flap drive, fed by A and B (manual)" } as Parameter,
   cautionBelowPa: { value: 1000 * PSI, unit: "Pa", status: "estimated", source: "project estimate", note: "HYD/OIL PRESS caution threshold not verified for Block 50" } as Parameter
+});
+
+/**
+ * Landing gear (physics/ground-handling). Tricycle gear: track and wheelbase are published F-16
+ * dimensions; everything else (CG-relative stations, strut/tyre/brake/steering values) is
+ * estimated — no F-16 gear data is public in this project yet.
+ */
+const GEAR_EST = "project estimate";
+export const F16_GEAR = Object.freeze({
+  wheelTrackM: { value: 2.36, unit: "m", status: "secondary-reported", source: "Published F-16 dimensions (wheel track 7 ft 9 in)" } as Parameter,
+  wheelbaseM: { value: 4.0, unit: "m", status: "secondary-reported", source: "Published F-16 dimensions (wheelbase ≈13 ft 1.5 in)" } as Parameter,
+  noseLoadFraction: { value: 0.12, unit: "fraction of weight", status: "estimated", source: GEAR_EST, note: "Places the mains 0.48 m aft of the CG and the nose gear 3.52 m ahead" } as Parameter,
+  contactBelowCgM: { value: 1.75, unit: "m", status: "estimated", source: GEAR_EST, note: "Tyre contact below the CG, struts extended" } as Parameter,
+  mainStrokeM: { value: 0.3, unit: "m", status: "estimated", source: GEAR_EST } as Parameter,
+  noseStrokeM: { value: 0.25, unit: "m", status: "estimated", source: GEAR_EST } as Parameter,
+  mainSpringNPerM: { value: 430_000, unit: "N/m", status: "estimated", source: GEAR_EST, note: "≈0.12 m static compression at 12 t" } as Parameter,
+  mainDamperNsPerM: { value: 210_000, unit: "N·s/m", status: "estimated", source: GEAR_EST, note: "≈0.7 critical damping" } as Parameter,
+  noseSpringNPerM: { value: 200_000, unit: "N/m", status: "estimated", source: GEAR_EST, note: "Keeps the strut off its stop under maximum braking load transfer" } as Parameter,
+  noseDamperNsPerM: { value: 75_000, unit: "N·s/m", status: "estimated", source: GEAR_EST } as Parameter,
+  rollingFriction: { value: 0.02, unit: "-", status: "estimated", source: "Typical rolling resistance of aircraft tyres on concrete (reference value)" } as Parameter,
+  peakFriction: { value: 0.6, unit: "-", status: "estimated", source: "Typical dry-concrete tyre friction (reference value)" } as Parameter,
+  corneringStiffnessPerRad: { value: 6, unit: "N per N per rad", status: "estimated", source: GEAR_EST } as Parameter,
+  brakeMaxForceN: { value: 45_000, unit: "N per main wheel", status: "estimated", source: GEAR_EST, note: "Ideal anti-skid limits braking to the tyre friction" } as Parameter,
+  antiSkidFraction: { value: 0.8, unit: "fraction of tyre friction limit", status: "estimated", source: GEAR_EST, note: "Anti-skid efficiency; leaves ≈60 % of side grip while braking" } as Parameter,
+  nwsMaxAngleDeg: { value: 32, unit: "deg", status: "estimated", source: GEAR_EST, note: "Nose-wheel steering authority; engaged automatically with weight on the nose wheel (the real NWS has a pilot button)" } as Parameter,
+  nwsRateDegS: { value: 30, unit: "deg/s", status: "estimated", source: GEAR_EST } as Parameter,
+  transitTimeS: { value: 5, unit: "s", status: "estimated", source: GEAR_EST, note: "Gear extension/retraction with full System B pressure" } as Parameter,
+  maxSinkRateMps: { value: 4.6, unit: "m/s", status: "estimated", source: "MIL-A-8862 land-based design sink rate 10 ft/s (3.05 m/s) × 1.5 ultimate factor; F-16 value not verified" } as Parameter,
+  dragCoefficient: { value: 0.02, unit: "ΔCD on S_ref", status: "estimated", source: GEAR_EST, note: "Gear down; no F-16 data" } as Parameter
 });
 
 /** Speedbrakes: split fuselage-mounted panels (F-16 manual family). */
@@ -153,6 +184,6 @@ export const F16_FLCS_LIMITS = Object.freeze({
 
 /** Every parameter, for listing and audit. */
 export function allF16Parameters(): { group: string; name: string; parameter: Parameter }[] {
-  const groups = { geometry: F16_GEOMETRY, mass: F16_MASS, actuators: F16_ACTUATORS, engine: F16_ENGINE, engineControl: F16_ENGINE_CONTROL, hydraulics: F16_HYDRAULICS, speedbrake: F16_SPEEDBRAKE, flcs: F16_FLCS_LIMITS };
+  const groups = { geometry: F16_GEOMETRY, mass: F16_MASS, actuators: F16_ACTUATORS, engine: F16_ENGINE, engineControl: F16_ENGINE_CONTROL, hydraulics: F16_HYDRAULICS, gear: F16_GEAR, speedbrake: F16_SPEEDBRAKE, flcs: F16_FLCS_LIMITS };
   return Object.entries(groups).flatMap(([group, g]) => Object.entries(g).map(([name, parameter]) => ({ group, name, parameter: parameter as Parameter })));
 }

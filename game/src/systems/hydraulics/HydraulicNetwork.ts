@@ -12,15 +12,19 @@
  * Actuator chambers draw flow = displacement × surface speed from their own circuit.
  *
  * Actuator authority (servo-valve physics): a valve meters flow ∝ √(supply − load pressure).
- * With force capacity F (mean of its chambers' pressure fractions) and a design hinge-load
- * fraction L, the achievable speed relative to nominal is √(max(0, 1 − L/F)) / √(1 − L). One
- * of two chambers lost (F = ½) therefore gives a reduced but non-zero rate, as described for
- * the F-16; with no pressure the surface holds (hydraulic lock).
+ * With force capacity F (mean of its chambers' pressure fractions, 1 = all chambers at nominal)
+ * and the aerodynamic hinge load L as a fraction of full-pressure force, the achievable speed
+ * relative to the no-load rating is √(max(0, 1 − L/F)), capped at 1. L comes from the actuator's
+ * hinge-load spec: L = k·(q̄/q̄_ref)·(|δ|/δ_max), positive (opposing) when the surface moves away
+ * from neutral and negative (aiding) when it moves back. So rates fall at high dynamic pressure
+ * and large deflection, a lost chamber (F = ½) costs most where loads are high, and with no
+ * pressure the surface holds (hydraulic lock; blow-back is not modelled).
  *
  * Not modelled (declared envelope): line resistance and transients between components, valve
  * spool dynamics, reservoir level/cavitation, fluid temperature and cooling, contamination,
  * hinge-moment loads from the aero model (a constant design load fraction is used instead),
- * electrically operated valves and the EPU's electrical half.
+ * electrically operated valves, the EPU's electrical half, surface blow-back under load, and
+ * hinge moments from the aero model (the hinge load uses the linear estimate above).
  */
 
 export interface CircuitSpec {
@@ -67,8 +71,8 @@ export interface EmergencyUnitSpec {
 export interface ActuatorHydraulics {
   /** Chambers and the circuit that feeds each; displacement = fluid volume per degree of surface travel, m³/deg. */
   readonly chambers: readonly { readonly circuitId: string; readonly displacementM3PerDeg: number }[];
-  /** Hinge load at design conditions as a fraction of full-pressure force capacity (see header). */
-  readonly designLoadFraction: number;
+  /** Aerodynamic hinge load: fraction k of full-pressure force capacity at q̄_ref and full deflection (see header). */
+  readonly hingeLoad: { readonly loadFractionAtReference: number; readonly referenceDynamicPressurePa: number };
 }
 
 export interface HydraulicInstallation {
@@ -98,12 +102,28 @@ export interface HydraulicSnapshot {
 
 const SUBSTEPS = 8;
 
-/** Achievable actuator speed fraction from chamber pressure fractions (see header). */
-export function actuatorRateFraction(pressureFractions: readonly number[], designLoadFraction: number): number {
+/** Achievable actuator speed fraction from chamber pressure fractions and a signed hinge-load fraction (see header). */
+export function actuatorRateFraction(pressureFractions: readonly number[], loadFraction: number): number {
   if (pressureFractions.length === 0) return 1;
   const F = pressureFractions.reduce((a, p) => a + Math.max(0, Math.min(1, p)), 0) / pressureFractions.length;
-  if (F <= designLoadFraction) return 0;
-  return Math.sqrt(1 - designLoadFraction / F) / Math.sqrt(1 - designLoadFraction);
+  if (F <= 1e-6) return 0;
+  return Math.min(1, Math.sqrt(Math.max(0, 1 - loadFraction / F)));
+}
+
+/** Flight condition the hinge load depends on. */
+export interface HingeContext {
+  readonly dynamicPressurePa: number;
+  readonly deflectionDeg: number;
+  readonly limitDeg: number;
+  /** True when the commanded motion increases |deflection| (load opposes); false when returning (load aids). */
+  readonly movingAwayFromNeutral: boolean;
+}
+
+/** Signed hinge-load fraction for an actuator in a flight condition. */
+export function hingeLoadFraction(a: ActuatorHydraulics, c: HingeContext | undefined): number {
+  if (!c) return 0;
+  const magnitude = a.hingeLoad.loadFractionAtReference * (Math.max(0, c.dynamicPressurePa) / a.hingeLoad.referenceDynamicPressurePa) * Math.min(1, Math.abs(c.deflectionDeg) / Math.max(1e-6, c.limitDeg));
+  return c.movingAwayFromNeutral ? magnitude : -magnitude;
 }
 
 export class HydraulicNetwork {
@@ -132,12 +152,12 @@ export class HydraulicNetwork {
     return this.pressure.get(circuitId) ?? 0;
   }
 
-  /** Speed fraction available to an actuator from its chambers' circuits right now. */
-  public rateFraction(surfaceId: string): number {
+  /** Speed fraction available to an actuator from its chambers' circuits right now, under its hinge load. */
+  public rateFraction(surfaceId: string, hinge?: HingeContext): number {
     const a = this.installation.actuators[surfaceId];
     if (!a) return 1;
     const circuits = new Map(this.installation.circuits.map((c) => [c.id, c]));
-    return actuatorRateFraction(a.chambers.map((ch) => this.pressurePa(ch.circuitId) / (circuits.get(ch.circuitId)?.nominalPressurePa ?? 1)), a.designLoadFraction);
+    return actuatorRateFraction(a.chambers.map((ch) => this.pressurePa(ch.circuitId) / (circuits.get(ch.circuitId)?.nominalPressurePa ?? 1)), hingeLoadFraction(a, hinge));
   }
 
   /**

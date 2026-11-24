@@ -12,6 +12,7 @@
 import * as THREE from "three";
 import type { Quaternion, Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { rotateVector } from "../../physics/rigidbody/RigidBody.js";
+import type { AirfieldSpec } from "../../world/infrastructure/Airfield.js";
 import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
 
@@ -73,7 +74,8 @@ export class ThreeCockpitView {
     private readonly layout: CockpitLayout,
     terrain: TerrainSurface,
     terrainBounds: { readonly minM: readonly [number, number]; readonly maxM: readonly [number, number]; readonly stepM: number },
-    private readonly source: CockpitViewSource
+    private readonly source: CockpitViewSource,
+    airfields: readonly AirfieldSpec[] = []
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -98,6 +100,7 @@ export class ThreeCockpitView {
     this.rig.add(cockpitLight);
 
     this.world.add(buildTerrainMesh(terrain, terrainBounds));
+    for (const a of airfields) this.world.add(buildAirfield(a));
     this.buildCockpit();
     this.renderer.domElement.addEventListener("click", (e) => this.onClick(e));
     // Head look: hold the right mouse button and drag; wheel zooms.
@@ -368,6 +371,32 @@ export class ThreeCockpitView {
     g.restore();
 
   }
+}
+
+/** Runways as flat quads just above the flattened terrain, with centreline, edge and threshold markings. */
+function buildAirfield(a: AirfieldSpec): THREE.Group {
+  const group = new THREE.Group();
+  const asphalt = new THREE.MeshLambertMaterial({ color: "#3a3d40" });
+  const paint = new THREE.MeshBasicMaterial({ color: "#e8e8e0" });
+  for (const r of a.runways) {
+    const rw = new THREE.Group();
+    // Local runway frame: +Z along the runway heading, +X to the right, Y up.
+    const quad = (w: number, l: number, x: number, z: number, mat: THREE.Material, lift: number) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), mat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, lift, z);
+      rw.add(m);
+    };
+    quad(r.widthM, r.lengthM, 0, 0, asphalt, 0.25);
+    for (let z = -r.lengthM / 2 + 120; z < r.lengthM / 2 - 120; z += 60) quad(0.9, 30, 0, z, paint, 0.3);
+    for (const side of [-1, 1]) quad(0.9, r.lengthM, side * (r.widthM / 2 - 1), 0, paint, 0.3);
+    for (const end of [-1, 1]) for (let i = -6; i <= 6; i++) if (i !== 0) quad(1.8, 30, i * (r.widthM / 14), end * (r.lengthM / 2 - 25), paint, 0.3);
+    // Three.js world: x east, y up, z = −north. Runway heading h from north, clockwise.
+    rw.position.set(r.centreEnuM[0], a.elevationM, -r.centreEnuM[1]);
+    rw.rotation.y = Math.PI - r.headingRad;
+    group.add(rw);
+  }
+  return group;
 }
 
 function buildTerrainMesh(terrain: TerrainSurface, b: { readonly minM: readonly [number, number]; readonly maxM: readonly [number, number]; readonly stepM: number }): THREE.Mesh {

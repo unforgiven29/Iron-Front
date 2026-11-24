@@ -1,6 +1,6 @@
 # Aircraft ground handling, landing gear, tires and braking
 
-**Owner:** physics/ground-handling. This is the shared physical interface for aircraft ground motion. Aircraft packages provide exact gear layout, strut/tire/brake/steering configuration and limitations; game/systems owners provide hydraulic/electrical supply and anti-skid/control interfaces; physics/collision provides contact geometry; rigidbody integrates chassis motion. **Status:** architecture only; no ground-handling runtime exists.
+**Owner:** physics/ground-handling. This is the shared physical interface for aircraft ground motion. Aircraft packages provide exact gear layout, strut/tire/brake/steering configuration and limitations; game/systems owners provide hydraulic/electrical supply and anti-skid/control interfaces; physics/collision provides contact geometry; rigidbody integrates chassis motion. **Status:** first runtime in `game/src/physics/ground-handling/LandingGear.ts` (tests `game/tests/unit/LandingGear.test.ts`): strut spring/damper with bottoming, tyre rolling/brake/cornering forces on a friction circle with anti-skid fraction, nose-wheel steering, hydraulically powered gear transit, squat interlock, weight-on-wheels, gear collapse and airframe-strike detection. Wheel inertia/spin-up, tyre relaxation, surface classes, brake thermal, doors, emergency extension and shimmy are not implemented.
 
 ## Purpose and boundary
 

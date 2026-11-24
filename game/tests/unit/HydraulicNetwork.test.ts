@@ -22,10 +22,14 @@ describe("Hydraulic network (shared) with the F-16 A/B installation", () => {
     expect(s.emergencyUnit?.state).toBe("off");
   });
 
-  it("servo-valve authority: full with both systems, reduced (≈70 %) on one, none with neither", () => {
-    expect(actuatorRateFraction([1, 1], 1 / 3)).toBeCloseTo(1, 9);
-    expect(actuatorRateFraction([1, 0], 1 / 3)).toBeCloseTo(Math.SQRT1_2, 6);
-    expect(actuatorRateFraction([0, 0], 1 / 3)).toBe(0);
+  it("servo-valve authority: rate falls with hinge load, more on one system; aiding loads don't slow it; no pressure holds", () => {
+    expect(actuatorRateFraction([1, 1], 0)).toBe(1);
+    expect(actuatorRateFraction([1, 0], 0)).toBe(1); // unloaded: one tandem chamber still moves the surface at full rate
+    expect(actuatorRateFraction([1, 1], 0.3)).toBeCloseTo(Math.sqrt(0.7), 9);
+    expect(actuatorRateFraction([1, 0], 0.3)).toBeCloseTo(Math.sqrt(0.4), 9);
+    expect(actuatorRateFraction([1, 0], 0.6)).toBe(0); // stalled: one chamber cannot overcome the load
+    expect(actuatorRateFraction([1, 1], -0.3)).toBe(1); // load aiding the motion
+    expect(actuatorRateFraction([0, 0], 0)).toBe(0);
   });
 
   it("a failed pump bleeds its system down; dual-fed surfaces keep reduced rate, A-only speedbrake stops", () => {
@@ -35,8 +39,10 @@ describe("Hydraulic network (shared) with the F-16 A/B installation", () => {
     const s = run(net, 300);
     expect(psi(s, "A")).toBeLessThan(1000);
     expect(psi(s, "B")).toBeGreaterThan(2900);
-    expect(net.rateFraction("elevator")).toBeGreaterThan(0.5);
-    expect(net.rateFraction("elevator")).toBeLessThan(0.75);
+    const loaded = { dynamicPressurePa: 30_000, deflectionDeg: 12, limitDeg: 25, movingAwayFromNeutral: true };
+    const healthy = new HydraulicNetwork(F16_HYDRAULIC_INSTALLATION);
+    expect(net.rateFraction("elevator", loaded)).toBeGreaterThan(0.5);
+    expect(net.rateFraction("elevator", loaded)).toBeLessThan(healthy.rateFraction("elevator", loaded) - 0.05);
     expect(net.rateFraction("speedbrake")).toBeLessThan(0.2);
   });
 
@@ -67,26 +73,50 @@ describe("Hydraulic network (shared) with the F-16 A/B installation", () => {
   });
 });
 
+describe("Hinge loads and the hydraulic leading-edge flaps", () => {
+  it("surfaces move slower against air load at high dynamic pressure and large deflection, not when returning", () => {
+    const net = new HydraulicNetwork(F16_HYDRAULIC_INSTALLATION);
+    const at = (q: number, defl: number, away: boolean) => net.rateFraction("elevator", { dynamicPressurePa: q, deflectionDeg: defl, limitDeg: 25, movingAwayFromNeutral: away });
+    expect(at(2_000, 20, true)).toBeGreaterThan(0.98);
+    expect(at(60_000, 20, true)).toBeLessThan(0.75);
+    expect(at(60_000, 20, true)).toBeLessThan(at(60_000, 5, true));
+    expect(at(60_000, 20, false)).toBe(1);
+  });
+
+  it("the F-16 leading-edge flaps are a hydraulic actuator following the TP-1538 schedule", () => {
+    const terrain = new TerrainSurface();
+    terrain.addTile(generateSyntheticTile({ seed: 1, tileId: "t", originEnuM: [-60000, -60000], spacingM: 1000, columns: 121, rows: 121, baseHeightM: 0, reliefM: 10, featureSizeM: 20000 }));
+    const a = createF16Aircraft(terrain, { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("c", [0, 0, 0]) }, { positionEnuM: [0, 0, 4000], headingRad: 0, speedMps: 150, throttle: 0.8 });
+    a.setPilotInputs({ pitch: 1, roll: 0, yaw: 0 });
+    let lefMax = 0, lastLef = 0, lefRate = 0;
+    for (let i = 0; i < 120 * 4; i++) { a.stepTick(); const l = a.snapshot().surfaces["lef"] ?? 0; lefRate = Math.max(lefRate, Math.abs(l - lastLef) * 120); lastLef = l; lefMax = Math.max(lefMax, l); }
+    expect(lefMax).toBeGreaterThan(15); // deflects at high alpha
+    expect(lefRate).toBeLessThanOrEqual(25 + 1e-6); // 25°/s actuator (TP-1538)
+    expect(a.snapshot().hydraulics?.circuits.every((c) => c.pressurePa > 2000 * PSI)).toBe(true);
+  });
+});
+
 describe("Hydraulics in the flying F-16", () => {
   const terrain = new TerrainSurface();
   terrain.addTile(generateSyntheticTile({ seed: 1, tileId: "t", originEnuM: [-60000, -60000], spacingM: 1000, columns: 121, rows: 121, baseHeightM: 0, reliefM: 10, featureSizeM: 20000 }));
   const env = { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("c", [0, 0, 0]) };
-  /** Fastest roll-surface movement on a full roll input, after `waitS` with the fault set. */
-  const surfaceRate = (fault: string, waitS: number) => {
-    const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 220, throttle: 0.7 });
+  /** Time for the roll surface to reach 15° on a full roll input at high dynamic pressure, after `waitS` with the fault set. */
+  const timeTo15 = (fault: string, waitS: number) => {
+    const a = createF16Aircraft(terrain, env, { positionEnuM: [0, 0, 1000], headingRad: 0, speedMps: 300, throttle: 0.8 });
     a.controls.request(F16_SWITCHES.hydraulicFault, fault, "test");
     for (let i = 0; i < 120 * waitS; i++) a.stepTick();
+    // DIRECT (test) mode: full stick commands full roll-surface deflection regardless of roll rate.
+    a.controls.request(F16_SWITCHES.flcsMode, "DIRECT", "test");
     a.setPilotInputs({ pitch: 0, roll: 1, yaw: 0 });
-    let last = a.snapshot().surfaces["aileron"] ?? 0, rate = 0;
-    for (let i = 0; i < 60; i++) { a.stepTick(); const now = a.snapshot().surfaces["aileron"] ?? 0; rate = Math.max(rate, Math.abs(now - last) * 120); last = now; }
-    return { rate, snap: a.snapshot() };
+    let t = 0;
+    while (Math.abs(a.snapshot().surfaces["aileron"] ?? 0) < 15 && t < 3) { a.stepTick(); t += 1 / 120; }
+    return { t, snap: a.snapshot() };
   };
 
-  it("reports both systems in the snapshot; with one system bled down the roll surfaces move ≈70 % as fast", () => {
-    const normal = surfaceRate("NORMAL", 1), single = surfaceRate("B PUMP FAIL", 300);
+  it("reports both systems in the snapshot; under high air load the roll surfaces move slower on one system", () => {
+    const normal = timeTo15("NORMAL", 1), single = timeTo15("B PUMP FAIL", 300);
     expect(normal.snap.hydraulics?.circuits.length).toBe(2);
-    expect(normal.rate).toBeGreaterThan(60); // the shaped roll command, not the 80°/s actuator limit, sets this
-    expect(single.rate).toBeLessThan(0.8 * normal.rate);
-    expect(single.rate).toBeGreaterThan(0.6 * normal.rate);
+    expect(normal.t).toBeLessThan(1);
+    expect(single.t).toBeGreaterThan(1.1 * normal.t);
   });
 });

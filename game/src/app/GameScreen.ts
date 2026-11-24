@@ -25,13 +25,16 @@ export function mountGameScreen(root: HTMLElement): void {
   const status = el("p", "game-status", "");
   const fly = el("button", "game-button primary", "Fly");
   fly.type = "button";
+  fly.title = "Start lined up on the runway, engine at idle";
+  const airStart = el("button", "game-button", "Air start");
+  airStart.type = "button";
   const restart = el("button", "game-button", "Restart");
   restart.type = "button";
   restart.hidden = true;
   const controls = el("div", "game-controls");
   for (const [k, v] of [
     ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw"], ["Shift / Ctrl", "Throttle"],
-    ["F", "Fly-by-wire NORM / DIRECT (test)"], ["B", "Speedbrake"], ["N", "Engine control PRI / SEC"], ["H", "Hydraulic fault (test)"], ["C", "CG test setting"], ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
+    ["F", "Fly-by-wire NORM / DIRECT (test)"], ["B", "Speedbrake"], ["N", "Engine control PRI / SEC"], ["G", "Landing gear"], ["Space", "Wheel brakes"], ["H", "Hydraulic fault (test)"], ["C", "CG test setting"], ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
   ] as const) {
     const row = el("div", "game-control-row");
     row.append(el("kbd", undefined, k), el("span", undefined, v));
@@ -40,7 +43,7 @@ export function mountGameScreen(root: HTMLElement): void {
   const note = el("p", "game-note", definition.dataNote);
   const debug = el("a", "game-link", "Developer tools →");
   debug.href = "#debug";
-  card.append(title, subtitle, status, fly, restart, controls, note, debug);
+  card.append(title, subtitle, status, fly, airStart, restart, controls, note, debug);
   menu.append(card);
   screen.append(frame, menu);
   root.append(screen);
@@ -49,13 +52,14 @@ export function mountGameScreen(root: HTMLElement): void {
   const showMenu = (paused: boolean) => {
     menu.hidden = false;
     fly.textContent = paused ? "Resume" : "Fly";
+    airStart.hidden = paused;
     restart.hidden = !paused;
     status.textContent = paused ? "Paused" : "";
     fly.focus();
   };
   const hideMenu = () => { menu.hidden = true; frame.focus(); };
 
-  fly.addEventListener("click", async () => {
+  const start = async (mode: "runway" | "air") => {
     if (session) {
       session.setPaused(false);
       hideMenu();
@@ -65,7 +69,7 @@ export function mountGameScreen(root: HTMLElement): void {
     status.textContent = "Loading…";
     try {
       const { ThreeCockpitView } = await import("../rendering/three/ThreeCockpitView.js");
-      session = startAircraftSession(ThreeCockpitView, frame, definition);
+      session = startAircraftSession(ThreeCockpitView, frame, definition, mode);
       status.textContent = "";
       hideMenu();
     } catch (e) {
@@ -73,7 +77,9 @@ export function mountGameScreen(root: HTMLElement): void {
     } finally {
       fly.disabled = false;
     }
-  });
+  };
+  fly.addEventListener("click", () => { void start("runway"); });
+  airStart.addEventListener("click", () => { void start("air"); });
   restart.addEventListener("click", () => {
     session?.restart();
     session?.setPaused(false);

@@ -7,18 +7,23 @@
 export class SurfaceActuator {
   private position = 0;
 
-  public constructor(private readonly limitDeg: number, private readonly rateDegS: number, private readonly bandwidthRadS: number) {}
+  private readonly minDeg: number;
+
+  /** Travel is [−limitDeg, +limitDeg] unless `minDeg` is given (e.g. 0 for a flap that only deflects one way). */
+  public constructor(private readonly limitDeg: number, private readonly rateDegS: number, private readonly bandwidthRadS: number, minDeg?: number) {
+    this.minDeg = minDeg ?? -limitDeg;
+  }
 
   public get positionDeg(): number {
     return this.position;
   }
 
   public reset(positionDeg = 0): void {
-    this.position = Math.max(-this.limitDeg, Math.min(this.limitDeg, positionDeg));
+    this.position = Math.max(this.minDeg, Math.min(this.limitDeg, positionDeg));
   }
 
   public step(commandDeg: number, dt: number, rateFraction = 1): number {
-    const target = Math.max(-this.limitDeg, Math.min(this.limitDeg, commandDeg));
+    const target = Math.max(this.minDeg, Math.min(this.limitDeg, commandDeg));
     const maxRate = this.rateDegS * Math.max(0, Math.min(1, rateFraction));
     const rate = Math.max(-maxRate, Math.min(maxRate, (target - this.position) * this.bandwidthRadS));
     const next = this.position + rate * dt;
