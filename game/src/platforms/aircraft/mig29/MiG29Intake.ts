@@ -53,9 +53,12 @@ export function mig29IntakeSystem(engineIds: readonly string[]) {
         // Louvers: sucked open while the duct is (nearly) closed; in flight intermittently at low Mach and power.
         const power = clamp01(ctx.throttle / 0.77);
         const auxOpen = running && (r > 0.8 || (!s.weightOnWheels && s.mach < 0.3 + 0.3 * power && kias < 250));
-        // Distortion: high AoA / sideslip and a ramp off its schedule (ESTIMATED index).
+        // Distortion: high AoA / sideslip and a ramp off its schedule (ESTIMATED index). Flow angles
+        // only mean something with real airflow: at taxi speeds a light wind gives α/β of tens of
+        // degrees that the intake never sees, so the angle terms fade in between 20 and 50 m/s TAS.
+        const airflow = clamp01((s.trueAirspeedMps - 20) / 30);
         const offSchedule = !s.weightOnWheels && !ctx.gearDown ? Math.abs(r - rampSchedule(s.mach).extension) : 0;
-        const distortion = clamp01(Math.max(0, Math.abs(s.alphaRad * DEG) - 20) / 25 + Math.max(0, Math.abs(s.betaRad * DEG) - 6) / 15 + (s.mach > 1 ? 2 * offSchedule : 0));
+        const distortion = clamp01(airflow * (Math.max(0, Math.abs(s.alphaRad * DEG) - 20) / 25 + Math.max(0, Math.abs(s.betaRad * DEG) - 6) / 15) + (s.mach > 1 ? 2 * offSchedule : 0));
         out[id] = { rampExtension: r, rampScheduled: target, auxOpen, mode, distortion };
       }
       return out;

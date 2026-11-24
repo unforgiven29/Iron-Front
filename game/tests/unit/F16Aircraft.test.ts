@@ -96,13 +96,16 @@ describe("F-16C Block 50 vertical slice (provisional data, NASA TP-1538 control 
       fly(a, 0.1);
       a.setPilotInputs({ pitch: 0, roll: 0, yaw: 0 });
       let maxDev = 0;
-      fly(a, 3, (s) => { maxDev = Math.max(maxDev, Math.abs(s.alphaRad - a0) * D2); });
+      // 3.5 s window: the divergence is exponential; with F-1/F-2 as separate tanks (higher pitch
+      // inertia) it passes 20° about 0.05 s later than with one lumped forward tank.
+      fly(a, 3.5, (s) => { maxDev = Math.max(maxDev, Math.abs(s.alphaRad - a0) * D2); });
       return { maxDev, mode: a.snapshot().fcsMode };
     };
     const norm = growth("NORM"), direct = growth("DIRECT");
     expect(direct.mode).toBe("DIRECT");
     expect(norm.maxDev).toBeLessThan(2);
     expect(direct.maxDev).toBeGreaterThan(20);
+    expect(direct.maxDev).toBeGreaterThan(100 * norm.maxDev);
   });
 
   it("reset returns the FLCS to NORM", () => {

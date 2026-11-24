@@ -21,7 +21,7 @@ import { ElectricalNetwork, type ElectricalSnapshot } from "../../../systems/ele
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
-import type { AircraftDefinition, AircraftSystems, FlightSensors, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
+import type { AircraftDefinition, AircraftSystems, FlightSensors, MonitorOutput, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
 import { SurfaceActuator } from "./SurfaceActuator.js";
 
 export type GroundStatus =
@@ -78,6 +78,10 @@ export interface AircraftSnapshot {
   /** Flight-control internals reported by the package's FCS (empty if none). */
   readonly fcsTelemetry: Readonly<Record<string, number>>;
   readonly annunciations: readonly string[];
+  /** Lights from the package's systems monitor (caution panel / warning lights). */
+  readonly lights: readonly { readonly text: string; readonly level: "caution" | "warning" }[];
+  /** Numeric indications from the package's systems monitor (SI units). */
+  readonly indications: Readonly<Record<string, number>>;
   readonly cgFractionMac: number;
   /** Buffet intensity 0..1 from the aero model (0 when the model has none). */
   readonly buffet: number;
@@ -129,6 +133,7 @@ export class FixedWingAircraft {
   private throttle = 0.5;
   private nz = 1;
   private buffet = 0;
+  private monitorOut: MonitorOutput = { indications: {}, lights: [] };
   private ny = 0;
   private devicePositions: SurfacePositions = {};
   private fcsMode = "";
@@ -196,6 +201,8 @@ export class FixedWingAircraft {
     this.drives = {};
     this.inlets = {};
     this.systems.intakes?.reset();
+    this.systems.monitor?.reset();
+    this.monitorOut = { indications: {}, lights: [] };
     this.gearHandleDown = start.gearDown ?? start.onGround ?? false;
     this.gear?.reset(this.gearHandleDown);
     this.gearCrash = undefined;
@@ -364,7 +371,13 @@ export class FixedWingAircraft {
     }
     if (this.fuelSystem) {
       const elecNow = this.electrical?.snapshot;
-      this.fuelSystem.step({ engineFlowKgS: flows, engineSpeed: speeds, nzG: this.nz, altitudeM: this.env.originAltitudeMslM + st.positionEnuM[2], ...(elecNow && elecNow.buses.length ? { busPowered: (id: string) => elecNow.buses.find((b) => b.id === id)?.powered ?? false } : {}) }, dt);
+      const hydNow = this.hydraulics;
+      this.fuelSystem.step({
+        engineFlowKgS: flows, engineSpeed: speeds, nzG: this.nz, altitudeM: this.env.originAltitudeMslM + st.positionEnuM[2],
+        switches: this.controls.snapshot(), weightOnWheels: wow, totalTemperatureK: env.atmosphere.temperatureK * (1 + 0.2 * flow.machNumber * flow.machNumber),
+        ...(hydNow ? { hydraulicPressurePa: (id: string) => hydNow.pressurePa(id) } : {}),
+        ...(elecNow && elecNow.buses.length ? { busPowered: (id: string) => elecNow.buses.find((b) => b.id === id)?.powered ?? false } : {})
+      }, dt);
       this.fuelKg = this.fuelSystem.tanks.totalKg();
     } else {
       this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
@@ -381,6 +394,17 @@ export class FixedWingAircraft {
     const elec = this.electrical?.step(dt, drive);
     const coupling = this.definition.systemsCoupling?.({ ...(elec ? { electrical: elec } : {}), ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}) });
     if (coupling?.startEmergencyUnit) this.hydraulics?.commandEmergencyStart();
+    if (this.systems.monitor) {
+      const fc = this.fuelSystem?.components?.();
+      this.monitorOut = this.systems.monitor.step({
+        sensors, pilot: this.pilot, switches: this.controls.snapshot(),
+        engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
+        ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
+        ...(elec ? { electrical: elec } : {}),
+        ...(fc ? { fuelComponents: fc } : {}),
+        ...(this.fuelSystem ? { fuelTanks: this.fuelSystem.tanks.states() } : {})
+      }, dt);
+    }
     // Mass properties change only between integration steps.
     this.body.setMassProperties(this.massProperties());
 
@@ -464,6 +488,8 @@ export class FixedWingAircraft {
       fcsMode: this.fcsMode,
       fcsTelemetry: this.fcsTelemetry,
       annunciations: this.annunciations,
+      lights: this.monitorOut.lights,
+      indications: this.monitorOut.indications,
       cgFractionMac: this.cgFractionMac,
       buffet: this.buffet,
       outsideAeroEnvelope: this.air.outside,

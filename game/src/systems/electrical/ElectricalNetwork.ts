@@ -48,7 +48,7 @@ export interface BusState {
 
 export interface ElectricalSnapshot {
   readonly buses: readonly BusState[];
-  readonly sources: readonly { readonly id: string; readonly online: boolean; readonly loadW: number; readonly tripped: boolean; readonly chargeAh?: number }[];
+  readonly sources: readonly { readonly id: string; readonly online: boolean; /** Able to supply (drive up to speed, not failed/tripped/off, battery not flat), whether or not a bus uses it. */ readonly available: boolean; readonly loadW: number; readonly tripped: boolean; readonly chargeAh?: number }[];
 }
 
 export class ElectricalNetwork {
@@ -120,7 +120,7 @@ export class ElectricalNetwork {
     }
     this.last = {
       buses: [...busOut.values()],
-      sources: this.installation.sources.map((s) => ({ id: s.id, online: [...busOut.values()].some((b) => b.sourceId === s.id), loadW: load.get(s.id) ?? 0, tripped: this.tripped.has(s.id), ...(s.kind === "battery" ? { chargeAh: this.charge.get(s.id) ?? 0 } : {}) }))
+      sources: this.installation.sources.map((s) => ({ id: s.id, available: available(s.id), online: [...busOut.values()].some((b) => b.sourceId === s.id), loadW: load.get(s.id) ?? 0, tripped: this.tripped.has(s.id), ...(s.kind === "battery" ? { chargeAh: this.charge.get(s.id) ?? 0 } : {}) }))
     };
     return this.last;
   }

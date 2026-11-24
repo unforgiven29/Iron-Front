@@ -35,6 +35,13 @@ export interface FuelStepInput {
   readonly altitudeM: number;
   /** Electrical bus availability (valves and electric pumps need power); absent = all powered. */
   readonly busPowered?: (busId: string) => boolean;
+  /** Hydraulic circuit pressure, Pa (hydraulically driven pumps need it); absent = no hydraulics. */
+  readonly hydraulicPressurePa?: (circuitId: string) => number;
+  /** Cockpit switch positions by switch id (the package reads its own fuel controls). */
+  readonly switches?: Readonly<Record<string, string>>;
+  readonly weightOnWheels?: boolean;
+  /** Free-stream total (stagnation) temperature, K (skin/fuel heating). */
+  readonly totalTemperatureK?: number;
 }
 
 /** Live component states a package reports for displays (UI reads these; it never infers them). */
@@ -46,6 +53,8 @@ export interface FuelComponents {
   /** Feed accumulator contents and capacity, kg (if the system has one). */
   readonly accumulatorKg?: number;
   readonly accumulatorCapacityKg?: number;
+  /** Package-specific numeric indications (fuel temperature, gauge pointers, timers…), SI units. */
+  readonly indications?: Readonly<Record<string, number>>;
 }
 
 /** An aircraft's own fuel system, built from TankSet. */

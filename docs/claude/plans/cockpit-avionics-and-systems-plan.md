@@ -24,7 +24,7 @@ These feed the cockpit indications, so they come first.
 
 ### F-16 (from T.O. GR1F-16CJ-1)
 
-1. **Fuel system rebuild** (`F16FuelSystem.ts`): tanks F-1, F-2, forward and aft reservoirs, A-1,
+1. **[done, PR batch-b-1; external tanks wait for a stores model] Fuel system rebuild** (`F16FuelSystem.ts`): tanks F-1, F-2, forward and aft reservoirs, A-1,
    wings, centerline, external wings with fig. 1-22 JP-8 quantities (C model: wings 550 each, F-1/F-2/
    FWD RSVR 3250, AFT RSVR/A-1 2810, reservoirs 480 each, CL 1890, 370-gal wings 2420 each).
    Components per figs. 1-19/1-20: electrical boost pumps, fuel-pressure-driven transfer pumps,
@@ -33,13 +33,13 @@ These feed the cockpit indications, so they come first.
    external-tank transfer by bleed-air pressurisation, ENG FEED knob (NORM/AFT/FWD/OFF), FUEL MASTER,
    AIR REFUEL switch, tank inerting, fuel/oil heat exchanger with FUEL/OIL HOT caution, FWD/AFT FUEL
    LOW lights, FUEL QTY SEL indications.
-2. **Hydraulics**: systems A and B with their actual consumer split (FLCS actuators both;
+2. **[partly done: consumer split shown, brake/JFS accumulators, HYD/OIL PRESS logic] Hydraulics**: systems A and B with their actual consumer split (FLCS actuators both;
    utilities on B: gear, brakes, NWS, gun, AR door; speedbrakes on A), brake/JFS accumulators, EPU
    pump on A, HYD PRESS indicators and HYD/OIL PRESS warning logic.
-3. **Electrical**: main generator on the ADG with CSD, standby generator, EPU generator, FLCS PMG
+3. **[done except MAIN PWR switch, overcurrent contactors, 4 FLCS branches] Electrical**: main generator on the ADG with CSD, standby generator, EPU generator, FLCS PMG
    and FLCS power supplies, main and FLCS batteries, the real bus list (AC/DC essential, non-essential,
    emergency, battery buses), ELEC panel cautions.
-4. **F110-GE-129 control**: DEC (PRI) / SEC modes per the manual, IGV schedule, nozzle control,
+4. **[partly done: SEC caution, IGVs, ignition, VSV reset, FTIT/oil/ENGINE warnings; DEC→HYB/SEC auto transfer and PFLs remain] F110-GE-129 control**: DEC (PRI) / SEC modes per the manual, IGV schedule, nozzle control,
    ignition and relight, gearboxes and engine alternator, FTIT indication, oil system and the
    HYD/OIL PRESS warning, ENGINE warning light logic, ENGINE FAULT/EEC/SEC/BUC cautions.
 5. **F-16 engine module breakdown** (structure only; the GE deck stays the thrust source): inlet & fan,

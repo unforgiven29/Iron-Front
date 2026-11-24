@@ -191,6 +191,33 @@ export interface AircraftSystems {
     step(ctx: IntakeContext, dt: number): Readonly<Record<string, import("../../../physics/propulsion/components/Inlet.js").InletState>>;
     reset(): void;
   };
+  /**
+   * The aircraft's own stateful systems monitor (caution/warning logic with time delays, engine
+   * accessory indications such as oil pressure, ignition, IGVs). Runs every tick after the engines,
+   * fuel, hydraulic and electrical systems; it observes them and never changes them.
+   */
+  readonly monitor?: {
+    step(ctx: MonitorContext, dt: number): MonitorOutput;
+    reset(): void;
+  };
+}
+
+export interface MonitorContext {
+  readonly sensors: FlightSensors;
+  readonly engines: readonly import("./FixedWingAircraft.js").EngineSnapshot[];
+  readonly hydraulics?: import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicSnapshot;
+  readonly electrical?: import("../../../systems/electrical/ElectricalNetwork.js").ElectricalSnapshot;
+  readonly fuelComponents?: import("../../../systems/fuel/FuelTanks.js").FuelComponents;
+  readonly fuelTanks?: readonly import("../../../systems/fuel/FuelTanks.js").TankState[];
+  readonly switches: Readonly<Record<string, string>>;
+  readonly pilot: PilotInputs;
+}
+
+export interface MonitorOutput {
+  /** Numeric indications for displays, SI units, keyed by the package's own ids. */
+  readonly indications: Readonly<Record<string, number>>;
+  /** Lights currently on (caution panel / warning lights), with their level. */
+  readonly lights: readonly { readonly text: string; readonly level: "caution" | "warning" }[];
 }
 
 export interface IntakeContext {

@@ -84,24 +84,36 @@ describe("MiG-29 systems (GAF T.O. 1F-MIG29-1)", () => {
   });
 });
 
-describe("F-16 systems (secondary-reported electrical layout)", () => {
-  it("main generator loss: standby generator takes the essential bus, ELEC SYS caution, no EPU", () => {
+describe("F-16 electrical system (T.O. GR1F-16CJ-1 Section I bus behaviour)", () => {
+  it("main generator loss: standby generator powers the essential and emergency AC buses (and all DC but non-essential); ELEC SYS; no EPU", () => {
     const a = new FixedWingAircraft(createF16Definition(), terrain, env, { positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.6 });
     a.controls.request(F16_SWITCHES.electricalFault, "MAIN GEN FAIL", "test");
     const s = fly(a, 5);
     expect(bus(s, "ac.essential").sourceId).toBe("gen.standby");
+    expect(bus(s, "ac.emergency1").sourceId).toBe("gen.standby");
     expect(bus(s, "ac.nonessential").powered).toBe(false);
+    expect(bus(s, "dc.nonessential").powered).toBe(false);
+    for (const id of ["dc.essential", "dc.emergency1", "dc.emergency2", "dc.battery1", "dc.battery2"]) expect(bus(s, id).powered).toBe(true);
     expect(s.hydraulics!.emergencyUnit!.state).toBe("off");
-    expect(createF16Definition().annunciate!(s).map((x) => x.text)).toContain("ELEC SYS");
+    expect(s.lights.map((x) => x.text)).toContain("ELEC SYS");
+    expect(s.indications["elecMainGen"]).toBe(1);
+    expect(s.indications["elecStbyGen"]).toBe(0);
   });
 
-  it("main + standby generator loss starts the EPU, whose generator then carries the essential bus; FLCS stays powered", () => {
+  it("main + standby generator loss starts the EPU: its generator carries only the emergency AC buses; essential/non-essential DC drop; FLCS stays powered", () => {
     const a = new FixedWingAircraft(createF16Definition(), terrain, env, { positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.6 });
     a.controls.request(F16_SWITCHES.electricalFault, "MAIN+STBY GEN FAIL", "test");
     const s = fly(a, 10);
     expect(s.hydraulics!.emergencyUnit!.state).toBe("running");
-    expect(bus(s, "ac.essential").sourceId).toBe("gen.epu");
+    expect(bus(s, "ac.emergency1").sourceId).toBe("gen.epu");
+    expect(bus(s, "ac.emergency2").sourceId).toBe("gen.epu");
+    expect(bus(s, "ac.essential").powered).toBe(false);
+    expect(bus(s, "dc.essential").powered).toBe(false);
+    expect(bus(s, "dc.nonessential").powered).toBe(false);
+    expect(bus(s, "dc.emergency1").powered).toBe(true);
+    expect(bus(s, "dc.battery1").sourceId).toBe("conv.dc.emergency1");
     expect(bus(s, "flcs").powered).toBe(true);
     expect(s.annunciations).not.toContain("FLCS POWER LOST");
+    expect(s.indications["elecStbyGen"]).toBe(1);
   });
 });
