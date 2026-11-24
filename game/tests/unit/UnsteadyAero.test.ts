@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LaggedFlowState } from "../../src/physics/aerodynamics/UnsteadyFlow.js";
 import { createF16Definition } from "../../src/platforms/aircraft/f16c-block50/F16Definition.js";
 import { createMiG29Definition } from "../../src/platforms/aircraft/mig29/MiG29Definition.js";
-import { mig29Intake } from "../../src/platforms/aircraft/mig29/MiG29Engines.js";
+import { mig29Intake } from "../../src/platforms/aircraft/mig29/MiG29Intake.js";
 
 const D = Math.PI / 180;
 const staticX = (a: number) => Math.max(0, Math.min(1, 1 - (a / D - 15) / 20));

@@ -33,6 +33,16 @@ export interface FuelStepInput {
   readonly engineSpeed: Readonly<Record<string, number>>;
   readonly nzG: number;
   readonly altitudeM: number;
+  /** Electrical bus availability (valves and electric pumps need power); absent = all powered. */
+  readonly busPowered?: (busId: string) => boolean;
+}
+
+/** Live component states a package reports for displays (UI reads these; it never infers them). */
+export interface FuelComponents {
+  readonly pumps: readonly { readonly id: string; readonly running: boolean; readonly flowKgS: number }[];
+  readonly valves: readonly { readonly id: string; readonly open: boolean }[];
+  /** Actual transfers this step, kg/s (including engine feed, with `to` = an engine id). */
+  readonly flows: readonly { readonly from: string; readonly to: string; readonly kgS: number }[];
 }
 
 /** An aircraft's own fuel system, built from TankSet. */
@@ -46,6 +56,8 @@ export interface FuelSystemModel {
   readonly tanks: TankSet;
   /** Pilot indications from this package's logic (e.g. low-level captions). */
   annunciations(): readonly string[];
+  /** Pumps, valves and flows from the last step (optional). */
+  components?(): FuelComponents;
 }
 
 export class TankSet {

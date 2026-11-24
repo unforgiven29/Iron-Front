@@ -14,6 +14,7 @@ import { mig29FuelSystem, mig29TankSpecs } from "./MiG29FuelSystem.js";
 import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_MASS as M } from "./MiG29Data.js";
+import { mig29IntakeSystem } from "./MiG29Intake.js";
 import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
 import { mig29AccessoryDrives, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
@@ -126,7 +127,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
         { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: ["NORMAL", "AC GEN FAIL", "DC GEN FAIL", "BOTH GEN FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch: generator failures" }, onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "AC GEN FAIL" ? ["gen.ac"] : to === "DC GEN FAIL" ? ["gen.dc"] : ["gen.ac", "gen.dc"]); return { accepted: true }; } },
         { key: "l", definition: { id: MIG29_SWITCHES.leftEngine, ownerId: "mig29.engines", label: "L ENGINE (TEST)", positions: ["RUN", "CUT"], defaultPosition: "RUN", provenance: "Simulation test switch: shuts off fuel to the left engine" }, onChange: (to, ctx) => { ctx.setEngineFuelCutoff("left", to === "CUT"); return { accepted: true }; } }
       ];
-      return { aero: mig29Aerodynamics(), fcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives() };
+      return { aero: mig29Aerodynamics(), fcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]) };
     }
   };
 }

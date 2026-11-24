@@ -38,24 +38,34 @@ export function mig29TankSpecs(withCenterline: boolean): TankSpec[] {
     ...(withCenterline ? [t("centerline", 1500, L(25))] : [])];
 }
 
-/** Pump capacities, kg/s (ESTIMATED: comfortably above two-engine max-afterburner burn). */
-const PUMP = { tank1Turbo: 6, tank3Turbo: 6, jet: 2, centerline: 4 };
+/**
+ * Pump capacities, kg/s (ESTIMATED). GAF T.O.: transfer to the feed tank exceeds consumption (the
+ * excess is dumped back to tank 1 through a relief valve), so the turbo pumps are sized above the
+ * two-engine maximum-afterburner fuel flow (≈ 9 kg/s).
+ */
+const PUMP = { tank1Turbo: 12, tank3Turbo: 12, jet: 2.5, centerline: 5, gravity: 0.4 };
+/** Fuel accumulator in tank 3 for near-zero / negative g (ESTIMATED size), kg. */
+const ACCUMULATOR_KG = 12;
 
 export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } = {}): FuelSystemModel {
   const withCl = options.centerlineTank ?? false;
   const tanks = new TankSet(mig29TankSpecs(withCl));
-  let fromTank1 = 0, fromTank3 = 0, pausePhaseKg = 0;
+  let fromTank1 = 0, fromTank3 = 0, pausePhaseKg = 0, accumulator = ACCUMULATOR_KG;
   let phase: "tank1" | "tank3" | "pause" | "tank3-final" = "tank1";
   let feedOk = true;
+  let flows: { from: string; to: string; kgS: number }[] = [];
+  let pumps: { id: string; running: boolean; flowKgS: number }[] = [];
+  let valves: { id: string; open: boolean }[] = [];
   const cap = (id: string) => tanks.spec(id).capacityKg;
   const outerEmpty = () => ["tank3A1", "tank3A2", "wingL", "wingR"].every((id) => tanks.isEmpty(id));
   return {
     tanks,
     reset: () => {
       for (const s of mig29TankSpecs(withCl)) tanks.set(s.id, s.capacityKg);
-      fromTank1 = 0; fromTank3 = 0; pausePhaseKg = 0; phase = "tank1"; feedOk = true;
+      fromTank1 = 0; fromTank3 = 0; pausePhaseKg = 0; phase = "tank1"; feedOk = true; accumulator = ACCUMULATOR_KG; flows = []; pumps = []; valves = [];
     },
     engineFuelAvailable: () => feedOk,
+    components: () => ({ pumps, valves, flows }),
     annunciations: () => [
       ...(tanks.kg("tank2") < 550 ? ["550 KG REMAIN"] : []),
       ...(withCl && tanks.isEmpty("centerline") ? ["CL TANK EMPTY"] : []),
@@ -63,46 +73,71 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
       ...(!feedOk ? ["NO BOOST"] : [])
     ],
     step: (input: FuelStepInput, dt: number) => {
-      const rpm = Math.max(0, ...Object.values(input.engineSpeed));
-      const running = rpm > 0.5;
-      // External: CL tank → tank 1 above 80 % RPM, not at negative g, not above 30,000 ft.
-      if (withCl && rpm >= 0.8 && input.nzG > 0 && input.altitudeM < 30000 * 0.3048) tanks.transfer("centerline", "tank1", PUMP.centerline, dt);
-      if (running) {
-        // Tanks 3A and wing tanks feed tank 3 once ≈200 L have left it.
-        // Jet pumps run together; they share tank 3's free space so left and right drain evenly.
+      flows = [];
+      const move = (from: string, to: string, rate: number) => { const kg = tanks.transfer(from, to, rate, dt); if (kg > 0) flows.push({ from, to, kgS: kg / dt }); return kg; };
+      // The GBX follows the faster engine (same freewheel rule as the hydraulics/electrics).
+      const l = input.engineSpeed["left"] ?? 0, r = input.engineSpeed["right"] ?? 0;
+      const gbx = l >= r + 0.07 ? l : r, rpm = Math.max(l, r);
+      const active = gbx > 0.5; // active-fuel centrifugal pump on the GBX drives jet pumps and valves
+      const dcPower = input.busPowered ? input.busPowered("dc") : true;
+      const clValve = withCl && dcPower && rpm >= 0.8 && input.nzG > 0 && input.altitudeM < 30000 * 0.3048 && !tanks.isEmpty("centerline");
+      if (clValve) move("centerline", "tank1", PUMP.centerline);
+      let t1Turbo = false, t3Turbo = false, jetOuter = false, jetT3 = false;
+      if (active) {
         if (fromTank3 >= L(200)) {
+          // Jet pumps run together and share tank 3's free space, so left and right drain evenly.
           const outer = ["tank3A1", "tank3A2", "wingL", "wingR"].filter((id) => !tanks.isEmpty(id));
           const room = tanks.spaceKg("tank3");
-          for (const id of outer) tanks.transfer(id, "tank3", Math.min(PUMP.jet, room / dt / outer.length), dt);
+          for (const id of outer) if (move(id, "tank3", Math.min(PUMP.jet, room / dt / Math.max(1, outer.length))) > 0) jetOuter = true;
         }
         if (phase === "tank1" && fromTank1 >= L(250)) phase = "tank3";
         if (phase === "tank3" && outerEmpty() && fromTank3 >= L(600)) phase = "pause";
         if (phase === "pause" && pausePhaseKg >= L(280)) phase = "tank3-final";
-        const tank3Pumping = phase === "tank3" || phase === "tank3-final";
+        const tank3Pumping = (phase === "tank3" || phase === "tank3-final") && !tanks.isEmpty("tank3");
         if (tank3Pumping) {
-          // Tank 3 keeps tank 2 full and holds tank 1 at its level (jet pump to tank 1).
           const holdTank1 = phase === "tank3" ? cap("tank1") - L(250) : cap("tank1") - L(250) - L(280);
           const before3 = tanks.kg("tank3");
-          tanks.transfer("tank3", "tank2", PUMP.tank3Turbo, dt);
-          if (tanks.kg("tank1") < holdTank1) tanks.transfer("tank3", "tank1", PUMP.jet, dt);
+          t3Turbo = move("tank3", "tank2", PUMP.tank3Turbo) > 0 || tanks.spaceKg("tank2") < 1;
+          if (tanks.kg("tank1") < holdTank1) jetT3 = move("tank3", "tank1", PUMP.jet) > 0;
           fromTank3 += before3 - tanks.kg("tank3");
-          if (tanks.isEmpty("tank3")) phase = "tank3-final";
         }
-        // Tank 1 turbo pump keeps tank 2 full whenever tank 3 is not doing so (or tank 3 is empty).
-        if (!tank3Pumping || tanks.isEmpty("tank3")) {
-          const moved = tanks.transfer("tank1", "tank2", PUMP.tank1Turbo, dt);
+        // Tank 1 turbo pump keeps the feed tank full whenever tank 3 is not doing so.
+        if (!tank3Pumping || tanks.spaceKg("tank2") > 1) {
+          const moved = move("tank1", "tank2", PUMP.tank1Turbo);
+          t1Turbo = moved > 0 || (!tanks.isEmpty("tank1") && tanks.spaceKg("tank2") < 1);
           fromTank1 += moved;
           if (phase === "pause") pausePhaseKg += moved;
         }
       } else {
-        // Pump failure / engines stopped: tank 1 gravity-feeds tank 2 (slowly; ESTIMATED rate).
-        tanks.transfer("tank1", "tank2", 0.5, dt);
+        // No GBX drive (pumps stopped): tank 1 gravity-feeds tank 2 only (GAF T.O.), slowly.
+        move("tank1", "tank2", PUMP.gravity);
       }
-      // Engines burn from the feed tank only.
+      // Engines burn from the feed tank; at near-zero / negative g the accumulator carries them briefly.
       let demand = 0;
       for (const v of Object.values(input.engineFlowKgS)) demand += v * dt;
-      const got = tanks.draw("tank2", demand);
-      feedOk = !tanks.isEmpty("tank2") || got >= demand - 1e-9;
+      let got: number;
+      if (input.nzG < 0.2) {
+        got = Math.min(demand, accumulator);
+        accumulator -= got;
+      } else {
+        got = tanks.draw("tank2", demand);
+        accumulator = Math.min(ACCUMULATOR_KG, accumulator + tanks.draw("tank2", Math.min(ACCUMULATOR_KG - accumulator, 1 * dt)));
+      }
+      for (const [eng, v] of Object.entries(input.engineFlowKgS)) if (v > 0) flows.push({ from: input.nzG < 0.2 ? "accumulator" : "tank2", to: eng, kgS: v });
+      feedOk = got >= demand - 1e-9 && (input.nzG < 0.2 ? accumulator > 0 : !tanks.isEmpty("tank2"));
+      pumps = [
+        { id: "activeFuel", running: active, flowKgS: 0 },
+        { id: "tank1Turbo", running: t1Turbo, flowKgS: flows.filter((f) => f.from === "tank1" && f.to === "tank2").reduce((a, f) => a + f.kgS, 0) },
+        { id: "tank3Turbo", running: t3Turbo, flowKgS: flows.filter((f) => f.from === "tank3" && f.to === "tank2").reduce((a, f) => a + f.kgS, 0) },
+        { id: "tank3Jet", running: jetT3, flowKgS: flows.filter((f) => f.from === "tank3" && f.to === "tank1").reduce((a, f) => a + f.kgS, 0) },
+        { id: "outerJet", running: jetOuter, flowKgS: flows.filter((f) => f.to === "tank3").reduce((a, f) => a + f.kgS, 0) }
+      ];
+      valves = [
+        { id: "clTransfer", open: clValve },
+        { id: "tank1Level", open: t1Turbo },
+        { id: "tank3Level", open: t3Turbo || jetT3 },
+        { id: "accumulatorFeed", open: input.nzG < 0.2 }
+      ];
     }
   };
 }
