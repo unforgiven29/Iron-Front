@@ -102,6 +102,8 @@ export interface AeroInput {
   readonly cgFractionMac: number;
   /** Height of the CG above the terrain directly below, m (undefined when unknown or not applicable). */
   readonly heightAboveGroundM?: number;
+  /** Simulation step, s, for stateful (unsteady) models. Absent = quasi-steady evaluation. */
+  readonly stepSeconds?: number;
 }
 
 export interface AeroOutput {
@@ -110,6 +112,8 @@ export interface AeroOutput {
   readonly momentBodyNm: Vector3;
   readonly outsideEnvelope: boolean;
   readonly envelopeReasons: readonly string[];
+  /** Buffet intensity 0..1 (separation / shock buffet), for cues; not a force. */
+  readonly buffet?: number;
 }
 
 /** The aircraft's own aerodynamic model. */

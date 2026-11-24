@@ -3,7 +3,8 @@
  * AircraftDefinition contract. The shared FixedWingAircraft runtime flies it.
  */
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
-import { groundEffect, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
+import { groundEffect, groundEffectPitchIncrement, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
+import { buffetIntensity, LaggedFlowState, smoothStep } from "../../../physics/aerodynamics/UnsteadyFlow.js";
 import type { AeroModel, AircraftDefinition, FlightControlSystem, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { F16_COCKPIT_LAYOUT } from "./F16CockpitLayout.js";
@@ -61,11 +62,27 @@ function applyGroundEffect(c: { cx: number; cz: number; cm: number }, alphaRad: 
   const clGe = cl0 + (cl - cl0) * (1 + (ge.liftSlopeFactor - 1) * attached);
   const ideal = (x: number) => (x * x) / (Math.PI * F16_WING.aspectRatio);
   const cdGe = cd - ideal(cl) + ge.inducedDragFactor * ideal(clGe);
-  return { cx: -cdGe * ca + clGe * sa, cz: -clGe * ca - cdGe * sa, cm: c.cm };
+  // Tail downwash falls near the ground → nose-down increment (DATCOM approach; k estimated).
+  return { cx: -cdGe * ca + clGe * sa, cz: -clGe * ca - cdGe * sa, cm: c.cm + groundEffectPitchIncrement(ge, clGe, F16_UNSTEADY.groundEffectTailSensitivity) };
 }
+
+/**
+ * Unsteady separation on top of the STATIC NASA tables (shared physics/aerodynamics/UnsteadyFlow.ts):
+ * ΔCL = CLα·α·(x − x0(α)), zero in steady flight, so the measured data are reproduced exactly.
+ * ESTIMATED (no F-16 identification values in the repo): x0 departs from attached flow over
+ * 15–40° (where the TP-1538 lift curve bends), τ1 = 12 c/V, τ2 = 4 c/V (Goman–Khrabrov range),
+ * the transient lift acts at ≈25 % MAC (0.10 MAC ahead of the 0.35 reference), shock-buffet onset CL.
+ */
+export const F16_UNSTEADY = Object.freeze({
+  tau1Chords: 12, tau2Chords: 4, separationOnsetDeg: 15, separationWidthDeg: 25, transientLiftArmMac: 0.10,
+  buffetOnsetClLowMach: 1.0, buffetOnsetClM095: 0.55, groundEffectTailSensitivity: 0.35
+});
 
 /** Aero adapter: maps the shared named surfaces onto the F-16 coefficient assembly. */
 function f16Aero(model: F16AeroModelId): AeroModel {
+  const U = F16_UNSTEADY;
+  const attachment = new LaggedFlowState({ tau1Chords: U.tau1Chords, tau2Chords: U.tau2Chords });
+  const x0 = (a: number) => 1 - smoothStep((Math.abs(a) * 180 / Math.PI - U.separationOnsetDeg) / U.separationWidthDeg);
   return {
     id: model === "hifi" ? "f16.nasa-tp1538.hifi" : "f16.stevens-lewis.lofi",
     compute: (input) => {
@@ -73,7 +90,10 @@ function f16Aero(model: F16AeroModelId): AeroModel {
       const base = { ...input, surfaces };
       const out = model === "hifi" ? f16HifiAerodynamics({ ...base, lefDeg: input.surfaces["lef"] ?? 0, controlEffectiveness: controlEffectiveness(input.mach) }) : f16Aerodynamics(base);
       // Compressibility (NASA TP-3355 supersonic data; transonic estimated) on the low-speed tables.
-      const c = applyGroundEffect(applyCompressibility(out.coefficients, input.alphaRad, input.mach), input.alphaRad, input.mach, input.heightAboveGroundM);
+      const cs = applyGroundEffect(applyCompressibility(out.coefficients, input.alphaRad, input.mach), input.alphaRad, input.mach, input.heightAboveGroundM);
+      const x = attachment.step(input.alphaRad, x0, F16_GEOMETRY.meanChordM.value, input.trueAirspeedMps, input.stepSeconds);
+      const dCl = LOW_SPEED_REFERENCE.clAlphaPerDeg * compressibilityFactors(input.mach).liftScale * (input.alphaRad * 180 / Math.PI) * (x - x0(input.alphaRad));
+      const c = { cx: cs.cx + dCl * Math.sin(input.alphaRad), cz: cs.cz - dCl * Math.cos(input.alphaRad), cm: cs.cm + U.transientLiftArmMac * dCl };
       // Speedbrake drag along the air-relative velocity (estimated ΔCD; see F16_SPEEDBRAKE).
       const sb = Math.max(0, Math.min(1, (input.surfaces["speedbrake"] ?? 0) / F16_SPEEDBRAKE.maxDeflectionDeg.value));
       // Plus landing-gear drag in proportion to extension (estimated ΔCD; see F16_GEAR).
@@ -89,7 +109,9 @@ function f16Aero(model: F16AeroModelId): AeroModel {
         forceBodyN: [qS * cx, out.forceBodyN[1], qS * cz],
         momentBodyNm: [out.momentBodyNm[0], qS * F16_GEOMETRY.meanChordM.value * c.cm, out.momentBodyNm[2]],
         outsideEnvelope: reasons.length > 0,
-        envelopeReasons: reasons
+        envelopeReasons: reasons,
+        buffet: buffetIntensity(x, -c.cz * Math.cos(input.alphaRad) + c.cx * Math.sin(input.alphaRad), input.mach,
+          (m) => (m >= 1.1 ? 0 : m <= 0.6 ? U.buffetOnsetClLowMach : U.buffetOnsetClLowMach + (U.buffetOnsetClM095 - U.buffetOnsetClLowMach) * Math.min(1, (m - 0.6) / 0.35)))
       };
     }
   };

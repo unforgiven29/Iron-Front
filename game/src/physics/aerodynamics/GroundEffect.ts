@@ -51,3 +51,13 @@ export function groundEffect(wing: WingPlanform, heightM: number | undefined, ma
   const aEff = Math.min(30, wing.aspectRatio / phi);
   return { inducedDragFactor: phi, liftSlopeFactor: helmboldSlope(aEff, mach, wing.midChordSweepRad) / helmboldSlope(wing.aspectRatio, mach, wing.midChordSweepRad) };
 }
+
+/**
+ * Ground-effect pitching-moment increment (DATCOM approach): near the ground the wing's downwash
+ * at the tail falls roughly like the induced-drag factor φ, so the tail sees a higher angle of
+ * attack and the aircraft pitches nose-down:  ΔCm = −k · (1 − φ) · CL.  k (> 0) lumps tail volume,
+ * tail lift-curve slope and dε/dCL; each package supplies its own estimate.
+ */
+export function groundEffectPitchIncrement(ge: GroundEffectFactors, cl: number, tailDownwashSensitivity: number): number {
+  return -tailDownwashSensitivity * (1 - ge.inducedDragFactor) * cl;
+}

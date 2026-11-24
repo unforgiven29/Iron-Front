@@ -61,6 +61,15 @@ export const MIG29_AERO = Object.freeze({
   highLiftDragBreakCl: P(0.9, "CL", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form (separation above the break CL)"),
   highLiftDragFactor: P(0.3, "ΔCD per (CL − CLbreak)²", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-3 (sustained g, max AB NPM, clean, 13,000 kg): least-squares fit", "Raymer two-segment drag polar form"),
   zeroLiftAlphaDeg: P(0, "deg", "derived", "GAF fig. A8-13 7 g curves: a non-zero offset worsened the fit at every altitude", "Body AoA at zero lift (camber/incidence)"),
+  /** Unsteady separation (Goman–Khrabrov) and vortex breakdown: ESTIMATED from the literature range (no MiG-29 identification published). */
+  separationLagChords: P(12, "c/V", "estimated", "Goman & Khrabrov 1994; fighter identifications report τ1 ≈ 10–30 c/V", "Relaxation time of the separation state"),
+  separationDelayChords: P(4, "c/V", "estimated", "Goman & Khrabrov 1994", "Delay τ2 applied through dα/dt"),
+  vortexBurstOnsetDeg: P(26, "deg", "estimated", EST, "LERX vortex breakdown reaches the wing; set at the AoA limit so the fitted steady lift (fig. A8-13, ≤26°) is unchanged"),
+  vortexBurstWidthDeg: P(12, "deg", "estimated", EST),
+  vortexLagChords: P(6, "c/V", "estimated", EST, "Burst-point convection lag"),
+  buffetOnsetClLowMach: P(1.1, "CL", "estimated", EST, "Shock-buffet onset CL below M0.6"),
+  buffetOnsetClM095: P(0.6, "CL", "estimated", EST, "Shock-buffet onset CL at M0.95"),
+  groundEffectTailSensitivity: P(0.4, "-", "estimated", "DATCOM ground-effect downwash change; tail volume estimate", "ΔCm = −k(1−φ)CL"),
   stallAlphaDeg: P(20.2, "deg", "derived", "GAF T.O. 1F-MIG29-1 fig. A8-13: 9 g at 26° AoA at M0.54 SL / M0.64 9,840 ft / M0.74 16,400 ft (assumed 13,000 kg)", "Lift-break onset with LEF retracted; +0.2° per degree of LEF; Polhamus vortex factor kept at 1.0"),
   staticMarginSubsonic: P(0.05, "MAC fraction", "estimated", EST, "Conventionally stable; no relaxed stability"),
   staticMarginSupersonic: P(0.20, "MAC fraction", "estimated", "Aerodynamic-centre shift to ≈half chord supersonic (textbook)"),
@@ -98,6 +107,8 @@ export const MIG29_ENGINE = Object.freeze({
   afterburnerLightDelayS: P(2.5, "s", "primary-published", GAF_TO, "Time for ignition of AB is 2 to 3 sec"),
   limitedPowerMilitaryThrustN: P(4680 * 9.80665, "N", "primary-published", GAF_TO, "LPM: ECU limits max EGT ≈20 °C lower; MIL 4,680 kp"),
   limitedPowerMaxAfterburnerThrustN: P(7520 * 9.80665, "N", "primary-published", GAF_TO, "LPM max AB 7,520 kp"),
+  intakeRampOpenKias: P(108, "KIAS", "primary-published", GAF_TO, "Forward ramp retracts to fully open at ≈108 KIAS on takeoff; extends (closes the duct) below 108 KIAS after landing"),
+  louverModeRecovery: P(0.93, "pt2/pt0", "estimated", EST, "Total-pressure recovery when breathing through the upper wing-root louvers (ramps closed); not published"),
   afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST)
 });
 

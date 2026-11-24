@@ -24,6 +24,7 @@
  * instead keeps the throat large enough, and slows the engine when it cannot), inlet distortion, relight.
  */
 
+import type { InletCondition } from "./components/Inlet.js";
 import { evaluateGasGenerator, type GasGeneratorDeck } from "./components/GasGeneratorDeck.js";
 import type { InletModel } from "./components/Inlet.js";
 import type { NozzleModel, NozzleResult, ThroatCommand } from "./components/Nozzle.js";
@@ -72,6 +73,8 @@ export interface Ambient {
   readonly temperatureK: number;
   readonly pressurePa: number;
   readonly mach: number;
+  /** Airframe condition some inlets schedule on (e.g. FOD-protection modes). Optional. */
+  readonly inletCondition?: InletCondition;
 }
 
 export interface CycleResult {
@@ -123,7 +126,7 @@ export function solveCycle(d: TurbofanDesign, amb: Ambient, correctedSpeed: numb
   const V0 = M * Math.sqrt(G_COLD * R * T0);
   const Tt0 = T0 * (1 + 0.2 * M * M);
   const pt0 = p0 * (1 + 0.2 * M * M) ** 3.5;
-  const Tt2 = Tt0, pt2 = pt0 * d.inlet.recovery(M);
+  const Tt2 = Tt0, pt2 = pt0 * d.inlet.recovery(M, amb.inletCondition);
   const theta = Tt2 / T_STD, delta = pt2 / P_STD;
   const Nc = Math.max(0.2, Math.min(1.05, correctedSpeed));
   if (d.gasGenerator) return deckCycle(d, d.gasGenerator, amb, V0, Tt2, pt2, Nc, abFraction, tab, opts);
