@@ -137,6 +137,8 @@ export interface MassProperties {
   readonly referenceMassKg: number;
   readonly cgFractionMac: number;
   readonly internalFuelKg: number;
+  /** Mean aerodynamic chord, m: converts a CG movement (m) into a MAC fraction. Required with a fuel system. */
+  readonly macM?: number;
 }
 
 /** Mutable aircraft state a package's switches may change, through these setters only. */
@@ -180,6 +182,12 @@ export interface AircraftDefinition {
   readonly landingGear?: import("../../../physics/ground-handling/LandingGear.js").LandingGearSpec;
   /** Optional hydraulic power network; surfaces listed in it are rate-limited by their supply. */
   readonly hydraulics?: HydraulicInstallation;
+  /**
+   * Optional fuel system owned by the package (tanks, pumps, transfer sequence). With it, fuel
+   * mass, CG (as a MAC-fraction shift from `mass.cgFractionMac`, the zero-fuel CG) and inertia
+   * follow the tank contents; without it, fuel is a single quantity at the CG.
+   */
+  readonly createFuelSystem?: () => import("../../../systems/fuel/FuelTanks.js").FuelSystemModel;
   readonly cockpit: CockpitLayout;
   /** Aircraft-specific cautions and warnings built from the snapshot (e.g. hydraulic pressure lights). */
   readonly annunciate?: (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[];

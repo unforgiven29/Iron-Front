@@ -17,6 +17,8 @@ export interface PerformanceOptions {
   readonly pitchSurfaceId: string;
   readonly pitchSurfaceLimitDeg: number;
   /** Steady-state scheduled devices for a trimmed condition, e.g. leading-edge flaps. */
+  /** CG for the calculation (MAC fraction); defaults to the definition's zero-fuel CG. */
+  readonly cgFractionMac?: number;
   readonly devices?: (alphaRad: number, dynamicPressurePa: number, staticPressurePa: number) => Readonly<Record<string, number>>;
 }
 
@@ -48,7 +50,7 @@ export function levelFlightPoint(def: AircraftDefinition, options: PerformanceOp
   }, 0);
   const forces = (alpha: number, trim: number) => {
     const surfaces = { ...(options.devices?.(alpha, q, atm.pressurePa) ?? {}), [options.pitchSurfaceId]: trim };
-    const o = aero.compute({ alphaRad: alpha, betaRad: 0, trueAirspeedMps: V, dynamicPressurePa: q, mach, ratesRadps: [0, 0, 0], surfaces, cgFractionMac: def.mass.cgFractionMac });
+    const o = aero.compute({ alphaRad: alpha, betaRad: 0, trueAirspeedMps: V, dynamicPressurePa: q, mach, ratesRadps: [0, 0, 0], surfaces, cgFractionMac: options.cgFractionMac ?? def.mass.cgFractionMac });
     const [fx, , fz] = o.forceBodyN;
     const lift = -fz * Math.cos(alpha) + fx * Math.sin(alpha);
     const drag = -fx * Math.cos(alpha) - fz * Math.sin(alpha);

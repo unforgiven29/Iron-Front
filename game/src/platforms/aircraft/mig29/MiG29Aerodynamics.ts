@@ -17,7 +17,7 @@
  */
 import { groundEffect, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
 import type { AeroModel, AeroOutput } from "../common/AircraftDefinition.js";
-import { MIG29_AERO as A, MIG29_GEOMETRY as G, MIG29_LIFT_SLOPE_MACH_FACTOR as LF } from "./MiG29Data.js";
+import { MIG29_AERO as A, MIG29_GEOMETRY as G, MIG29_MASS as MM, MIG29_LIFT_SLOPE_MACH_FACTOR as LF } from "./MiG29Data.js";
 
 const DEG = Math.PI / 180;
 const S = G.wingAreaM2.value, B = G.spanM.value, C = G.meanChordM.value;
@@ -92,7 +92,8 @@ export function mig29Aerodynamics(): AeroModel {
       // Moments.
       const elev = (s["elevator"] ?? 0) * DEG, ail = s["aileron"] ?? 0, rud = s["rudder"] ?? 0;
       const c2v = C / (2 * V), b2v = B / (2 * V);
-      const cm = -staticMargin(M) * cl + A.stabilatorPowerPerRad.value * elev * eta + A.pitchDampingPerRad.value * q * c2v - 0.05 * sep;
+      // Static margin is defined at the reference CG; an aft CG reduces it one-for-one (MAC fractions).
+      const cm = -(staticMargin(M) - (input.cgFractionMac - MM.aeroReferenceCgFractionMac.value)) * cl + A.stabilatorPowerPerRad.value * elev * eta + A.pitchDampingPerRad.value * q * c2v - 0.05 * sep;
       const cnb = A.yawStabilityPerRad.value * (1 - 0.8 * smooth((Math.abs(a) / DEG - 20) / 15));
       const cy = A.sideForcePerRad.value * b + 0.003 * -rud * eta;
       const cRoll = A.dihedralEffectPerRad.value * b + A.rollDampingPerRad.value * p * b2v + 0.1 * r * b2v + (A.rollPowerPerDeg.value * ail + A.differentialStabilatorRollPerDeg.value * (s["differentialStabilator"] ?? 0)) * eta * (1 - 0.5 * smooth((Math.abs(a) / DEG - 15) / 15));

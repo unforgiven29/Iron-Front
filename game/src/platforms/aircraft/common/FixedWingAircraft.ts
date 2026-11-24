@@ -15,6 +15,7 @@ import { localAirflow, sampleEnvironment, standardAtmosphere, type EnvironmentCo
 import { Fadec, type FadecOutput } from "../../../physics/propulsion/Fadec.js";
 import { MixedFlowTurbofan, type TurbofanState } from "../../../physics/propulsion/MixedFlowTurbofan.js";
 import { RigidBody, rotateVector, type Matrix3 } from "../../../physics/rigidbody/RigidBody.js";
+import type { FuelSystemModel, TankState } from "../../../systems/fuel/FuelTanks.js";
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
@@ -58,6 +59,8 @@ export interface AircraftSnapshot {
   readonly surfaces: SurfacePositions;
   readonly engines: readonly EngineSnapshot[];
   readonly fuelKg: number;
+  /** Per-tank contents (absent without a package fuel system). */
+  readonly fuelTanks?: readonly TankState[];
   readonly massKg: number;
   /** Landing gear state (absent when the aircraft has none). */
   readonly gear?: GearStepResult & { readonly handleDown: boolean };
@@ -103,6 +106,9 @@ export class FixedWingAircraft {
   private engines: { id: string; control: Fadec; core: MixedFlowTurbofan; install: AircraftDefinition["engines"][number] }[] = [];
   private body!: RigidBody;
   private fuelKg = 0;
+  private readonly fuelSystem: FuelSystemModel | undefined;
+  /** Zero-fuel CG (MAC fraction); the fuel system shifts the actual CG from it. */
+  private cgBaseFractionMac: number;
   private cgFractionMac: number;
   private pilot: PilotInputs = { pitch: 0, roll: 0, yaw: 0 };
   private throttle = 0.5;
@@ -118,7 +124,10 @@ export class FixedWingAircraft {
 
   public constructor(public readonly definition: AircraftDefinition, private readonly terrain: TerrainSurface, private readonly env: EnvironmentConfig, start: StartState) {
     this.systems = definition.createSystems();
+    this.cgBaseFractionMac = definition.mass.cgFractionMac;
     this.cgFractionMac = definition.mass.cgFractionMac;
+    this.fuelSystem = definition.createFuelSystem?.();
+    if (this.fuelSystem && !(definition.mass.macM && definition.mass.macM > 0)) throw new Error(`${definition.manifest.id}: a fuel system needs mass.macM`);
     this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS, s.minDeg)]));
     this.hydraulics = definition.hydraulics ? new HydraulicNetwork(definition.hydraulics) : undefined;
     this.gear = definition.landingGear ? new LandingGear(definition.landingGear) : undefined;
@@ -127,7 +136,7 @@ export class FixedWingAircraft {
       setGearHandle: (down: boolean) => { this.gearHandleDown = down; },
       setEngineFuelCutoff: (engineId: string, cutoff: boolean) => { if (cutoff) this.fuelCutoff.add(engineId); else this.fuelCutoff.delete(engineId); },
       setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
-      setCgFractionMac: (v: number) => { this.cgFractionMac = v; },
+      setCgFractionMac: (v: number) => { this.cgBaseFractionMac = v; this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
     };
     for (const sw of this.systems.switches) {
@@ -147,7 +156,8 @@ export class FixedWingAircraft {
   public reset(start: StartState): void {
     const yaw = -start.headingRad + Math.PI / 2;
     const q = mul([0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)], [1, 0, 0, 0]);
-    this.fuelKg = this.definition.mass.internalFuelKg;
+    this.fuelSystem?.reset();
+    this.fuelKg = this.fuelSystem ? this.fuelSystem.tanks.totalKg() : this.definition.mass.internalFuelKg;
     this.body = new RigidBody(
       this.massProperties(),
       { positionEnuM: start.positionEnuM, velocityEnuMps: rotateVector(q, [start.speedMps, 0, 0]), bodyToWorld: q, angularVelocityBodyRadps: [0, 0, 0] }
@@ -220,6 +230,20 @@ export class FixedWingAircraft {
   /** Current mass properties: empty mass + fuel, inertia scaled with mass (see MassProperties). */
   private massProperties(): { massKg: number; inertiaKgM2: Matrix3 } {
     const m = this.definition.mass;
+    if (this.fuelSystem) {
+      // Zero-fuel mass at the reference point (its inertia: reference inertia scaled to empty mass,
+      // an estimate); fuel as point masses at the tank centroids. CG and inertia about the CG follow.
+      const tanks = this.fuelSystem.tanks;
+      const fuel = tanks.totalKg(), massKg = m.emptyMassKg + fuel;
+      const mo = tanks.momentKgM();
+      const c: Vector3 = [mo[0] / massKg, mo[1] / massKg, mo[2] / massKg];
+      this.cgFractionMac = this.cgBaseFractionMac - c[0] / (m.macM as number);
+      const k = m.emptyMassKg / m.referenceMassKg, I = m.inertiaKgM2, F = tanks.inertiaAbout(c), e = m.emptyMassKg;
+      const c2 = c[0] * c[0] + c[1] * c[1] + c[2] * c[2];
+      const dry = (i: number, j: number) => I[i]![j]! * k + e * ((i === j ? c2 : 0) - c[i]! * c[j]!);
+      const row = (i: number): Vector3 => [dry(i, 0) + F[i]![0]!, dry(i, 1) + F[i]![1]!, dry(i, 2) + F[i]![2]!];
+      return { massKg, inertiaKgM2: [row(0), row(1), row(2)] };
+    }
     const massKg = m.emptyMassKg + this.fuelKg;
     const k = massKg / m.referenceMassKg;
     const I = m.inertiaKgM2;
@@ -266,20 +290,28 @@ export class FixedWingAircraft {
       this.surfaceRates[id] = (actuator.positionDeg - before) / dt;
     }
     this.fcsMode = fcs.mode;
-    this.annunciations = fcs.annunciations;
+    this.annunciations = [...fcs.annunciations, ...(this.fuelSystem?.annunciations() ?? [])];
 
     const ambient = { temperatureK: env.atmosphere.temperatureK, pressurePa: env.atmosphere.pressurePa, mach: flow.machNumber };
     const forces: { sourceId: string; frame: "body.frd" | "world.enu"; forceN: Vector3; applicationPointBodyM?: Vector3 }[] = [];
     let totalFlow = 0;
+    const flows: Record<string, number> = {}, speeds: Record<string, number> = {};
     for (const e of this.engines) {
-      const fuel = this.fuelKg > 0 && !this.fuelCutoff.has(e.id);
+      const fuel = (this.fuelSystem ? this.fuelSystem.engineFuelAvailable(e.id) : this.fuelKg > 0) && !this.fuelCutoff.has(e.id);
       const cmd = e.control.step(this.throttle, { ambient, spoolSpeed: e.core.state.spoolSpeed, fuelAvailable: fuel }, dt);
       const s = e.core.step({ speed: cmd.speedDemand, afterburner: cmd.afterburnerDemand, throat: cmd.throat }, ambient, fuel, dt);
       totalFlow += s.fuelFlowKgS;
+      flows[e.id] = s.fuelFlowKgS;
+      speeds[e.id] = s.spoolSpeed;
       const a = e.install.thrustAxisBody;
       forces.push({ sourceId: `engine.${e.id}`, frame: "body.frd" as const, forceN: [a[0] * s.netThrustN, a[1] * s.netThrustN, a[2] * s.netThrustN] as Vector3, applicationPointBodyM: e.install.positionBodyM });
     }
-    this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
+    if (this.fuelSystem) {
+      this.fuelSystem.step({ engineFlowKgS: flows, engineSpeed: speeds, nzG: this.nz, altitudeM: this.env.originAltitudeMslM + st.positionEnuM[2] }, dt);
+      this.fuelKg = this.fuelSystem.tanks.totalKg();
+    } else {
+      this.fuelKg = Math.max(0, this.fuelKg - totalFlow * dt);
+    }
     this.hydraulics?.step(dt, (engineId) => this.engineCoreSpeed(engineId), this.surfaceRates);
     // Mass properties change only between integration steps.
     this.body.setMassProperties(this.massProperties());
@@ -353,6 +385,7 @@ export class FixedWingAircraft {
       surfaces: Object.freeze(this.surfacePositions()),
       engines: this.engines.map((e) => ({ ...e.core.state, id: e.id, control: e.control.output })),
       fuelKg: this.fuelKg,
+      ...(this.fuelSystem ? { fuelTanks: this.fuelSystem.tanks.states() } : {}),
       massKg: this.body.massProperties.massKg,
       ...(this.gear ? { gear: { ...this.gear.state, handleDown: this.gearHandleDown } } : {}),
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),

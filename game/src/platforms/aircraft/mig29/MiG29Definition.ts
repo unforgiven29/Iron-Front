@@ -9,6 +9,7 @@ import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import type { AircraftDefinition, ScheduledDevices, SwitchBinding } from "../common/AircraftDefinition.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { mig29Aerodynamics } from "./MiG29Aerodynamics.js";
+import { mig29FuelSystem, mig29TankSpecs } from "./MiG29FuelSystem.js";
 import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_MASS as M } from "./MiG29Data.js";
@@ -70,6 +71,7 @@ export function lefSchedule(): ScheduledDevices {
 export const MIG29_PERFORMANCE_OPTIONS: PerformanceOptions = {
   pitchSurfaceId: "elevator",
   pitchSurfaceLimitDeg: K.stabilatorNoseUpDeg.value,
+  cgFractionMac: M.aeroReferenceCgFractionMac.value,
   devices: (alpha, q, ps) => {
     const mach = Math.sqrt(q / (0.7 * ps)); // q = 0.7·p·M²
     return { lef: alpha * 180 / Math.PI >= K.lefExtendAlphaDeg.value && mach < K.lefMachLimit.value ? K.lefMaxDeg.value : 0 };
@@ -82,7 +84,7 @@ export function createMiG29Definition(): AircraftDefinition {
     manifest: MIG29_MANIFEST,
     displayName: "MiG-29 (provisional)",
     dataNote: "PROVISIONAL: weights, RD-33 ratings, control travel, feel-unit schedule, LEF and AoA-limiter logic from the GAF MiG-29G flight manual (9.13 applicability unverified); aerodynamic coefficients are still textbook estimates.",
-    mass: { emptyMassKg: M.emptyMassKg.value, inertiaKgM2: inertia(referenceMass), referenceMassKg: referenceMass, cgFractionMac: M.cgFractionMac.value, internalFuelKg: M.internalFuelKg.value },
+    mass: { emptyMassKg: M.emptyMassKg.value, inertiaKgM2: inertia(referenceMass), referenceMassKg: referenceMass, cgFractionMac: M.cgFractionMac.value, internalFuelKg: mig29TankSpecs(false).reduce((s, t) => s + t.capacityKg, 0), macM: G.meanChordM.value },
     surfaces: [
       { id: "elevator", limitDeg: K.stabilatorNoseDownDeg.value, minDeg: -K.stabilatorNoseUpDeg.value, rateDegS: K.stabilatorRateDegS.value, bandwidthRadS: 20 },
       { id: "aileron", limitDeg: K.aileronLimitDeg.value, rateDegS: K.aileronRateDegS.value, bandwidthRadS: 20 },
@@ -94,6 +96,7 @@ export function createMiG29Definition(): AircraftDefinition {
     engines: MIG29_ENGINES,
     hydraulics: MIG29_HYDRAULIC_INSTALLATION,
     landingGear: MIG29_LANDING_GEAR,
+    createFuelSystem: () => mig29FuelSystem(),
     cockpit: MIG29_COCKPIT_LAYOUT,
     mfdPages: { "panel-left": enginePanel, "panel-right": systemsPanel },
     annunciate: (s) => {
