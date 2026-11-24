@@ -28,6 +28,8 @@ export const F16_GEOMETRY = Object.freeze({
   wingAreaM2: { value: 300 * FT * FT, unit: "m²", status: "secondary-reported", source: SL, note: "300 ft² reference area" } as Parameter,
   spanM: { value: 30 * FT, unit: "m", status: "secondary-reported", source: SL, note: "30 ft reference span" } as Parameter,
   meanChordM: { value: 11.32 * FT, unit: "m", status: "secondary-reported", source: SL, note: "11.32 ft mean aerodynamic chord" } as Parameter,
+  midChordSweepDeg: { value: 32, unit: "deg", status: "estimated", source: "project estimate from the published 40° leading-edge sweep and taper", note: "Used for subsonic lift-slope (DATCOM/Helmbold) and ground effect" } as Parameter,
+  wingHeightAboveCgM: { value: 0, unit: "m", status: "estimated", source: "project estimate", note: "Mid-wing: the wing's quarter-chord is taken at CG height for ground effect" } as Parameter,
   referenceCgFractionMac: { value: 0.35, unit: "MAC fraction", status: "secondary-reported", source: SL, note: "Moment reference of the aero tables" } as Parameter
 });
 

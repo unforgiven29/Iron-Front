@@ -98,6 +98,8 @@ export interface AeroInput {
   /** Achieved control-surface and device positions, degrees. */
   readonly surfaces: SurfacePositions;
   readonly cgFractionMac: number;
+  /** Height of the CG above the terrain directly below, m (undefined when unknown or not applicable). */
+  readonly heightAboveGroundM?: number;
 }
 
 export interface AeroOutput {

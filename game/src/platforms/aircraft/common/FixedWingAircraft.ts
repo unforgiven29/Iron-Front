@@ -200,6 +200,12 @@ export class FixedWingAircraft {
     return this.last;
   }
 
+  /** CG height above the terrain below (for ground effect); omitted when the terrain is unknown. */
+  private heightAboveGround(p: Vector3): { heightAboveGroundM?: number } {
+    const g = this.terrain.sample(p[0], p[1]);
+    return g.status === "valid" ? { heightAboveGroundM: p[2] - g.heightM } : {};
+  }
+
   /** Engine core (gearbox drive) speed as a fraction of its reference, for engine-driven pumps. */
   private engineCoreSpeed(engineId: string): number {
     const e = this.engines.find((x) => x.id === engineId);
@@ -277,7 +283,8 @@ export class FixedWingAircraft {
 
     const aero = this.systems.aero.compute({
       alphaRad: alpha, betaRad: beta, trueAirspeedMps: V, dynamicPressurePa: flow.dynamicPressurePa, mach: flow.machNumber,
-      ratesRadps: st.angularVelocityBodyRadps, surfaces: this.surfacePositions(), cgFractionMac: this.cgFractionMac
+      ratesRadps: st.angularVelocityBodyRadps, surfaces: this.surfacePositions(), cgFractionMac: this.cgFractionMac,
+      ...this.heightAboveGround(st.positionEnuM)
     });
     forces.push({ sourceId: "aero.force", frame: "body.frd" as const, forceN: aero.forceBodyN });
     if (this.gear) {
