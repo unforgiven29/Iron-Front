@@ -19,6 +19,7 @@ import type { InletState } from "../../../physics/propulsion/components/Inlet.js
 import type { FuelComponents, FuelSystemModel, TankState } from "../../../systems/fuel/FuelTanks.js";
 import { ElectricalNetwork, type ElectricalSnapshot } from "../../../systems/electrical/ElectricalNetwork.js";
 import { HydraulicNetwork, type HydraulicSnapshot } from "../../../systems/hydraulics/HydraulicNetwork.js";
+import { PneumaticNetwork, type PneumaticSnapshot } from "../../../systems/pneumatics/PneumaticNetwork.js";
 import { LandingGear, type GearStepResult } from "../../../physics/ground-handling/LandingGear.js";
 import type { TerrainSurface } from "../../../world/terrain/Terrain.js";
 import type { AircraftDefinition, AircraftSystems, EngineControlOutput, FlightSensors, MonitorOutput, PilotInputs, SurfacePositions } from "./AircraftDefinition.js";
@@ -74,6 +75,8 @@ export interface AircraftSnapshot {
   readonly electrical?: ElectricalSnapshot;
   /** Hydraulic network state (absent when the aircraft has none). */
   readonly hydraulics?: HydraulicSnapshot;
+  /** Pneumatic network state (absent when the aircraft has none). */
+  readonly pneumatics?: PneumaticSnapshot;
   readonly fcsMode: string;
   /** Flight-control internals reported by the package's FCS (empty if none). */
   readonly fcsTelemetry: Readonly<Record<string, number>>;
@@ -116,6 +119,8 @@ export class FixedWingAircraft {
   private readonly actuators: ReadonlyMap<string, SurfaceActuator>;
   private readonly hydraulics: HydraulicNetwork | undefined;
   private readonly electrical: ElectricalNetwork | undefined;
+  private readonly pneumatics: PneumaticNetwork | undefined;
+  private gearAlternate: { readonly alternateExtensionRatePerS?: Readonly<Record<string, number>>; readonly normalActuationIsolated?: boolean } = {};
   private drives: Readonly<Record<string, number>> = {};
   private inlets: Readonly<Record<string, InletState>> = {};
   private readonly surfaceLimits: ReadonlyMap<string, number>;
@@ -158,12 +163,14 @@ export class FixedWingAircraft {
     this.actuators = new Map(definition.surfaces.map((s) => [s.id, new SurfaceActuator(s.limitDeg, s.rateDegS, s.bandwidthRadS, s.minDeg)]));
     this.hydraulics = definition.hydraulics ? new HydraulicNetwork(definition.hydraulics) : undefined;
     this.electrical = definition.electrical ? new ElectricalNetwork(definition.electrical) : undefined;
+    this.pneumatics = definition.pneumatics ? new PneumaticNetwork(definition.pneumatics) : undefined;
     this.gear = definition.landingGear ? new LandingGear(definition.landingGear) : undefined;
     this.surfaceLimits = new Map(definition.surfaces.map((s) => [s.id, Math.max(Math.abs(s.limitDeg), Math.abs(s.minDeg ?? s.limitDeg))]));
     const context = {
       setGearHandle: (down: boolean) => { this.gearHandleDown = down; },
       setEngineFuelCutoff: (engineId: string, cutoff: boolean) => { if (cutoff) this.fuelCutoff.add(engineId); else this.fuelCutoff.delete(engineId); },
       setHydraulicFaults: (faults: readonly import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicFault[]) => { this.hydraulics?.setFaults(faults); },
+      setPneumaticFaults: (faults: readonly import("../../../systems/pneumatics/PneumaticNetwork.js").PneumaticFault[]) => { this.pneumatics?.setFaults(faults); },
       setElectricalSourcesOff: (ids: readonly string[]) => { this.electrical?.setSourcesOff(ids); },
       setCgFractionMac: (v: number) => { this.cgBaseFractionMac = v; this.cgFractionMac = v; },
       setEngineControlMode: (engineId: string, mode: "primary" | "backup") => { this.engines.find((e) => e.id === engineId)?.control.setMode(mode); }
@@ -201,6 +208,9 @@ export class FixedWingAircraft {
     for (const a of this.actuators.values()) a.reset();
     this.hydraulics?.reset(true, sampleEnvironment(this.env, this.body.state.positionEnuM, 0).atmosphere.temperatureK);
     this.electrical?.reset();
+    this.pneumatics?.reset();
+    this.systems.pneumaticLoads?.reset();
+    this.gearAlternate = {};
     this.drives = {};
     this.inlets = {};
     this.systems.intakes?.reset();
@@ -282,6 +292,13 @@ export class FixedWingAircraft {
     return g.status === "valid" ? { heightAboveGroundM: p[2] - g.heightM } : {};
   }
 
+  private pneumaticPressures(): Record<string, number> {
+    const p = this.pneumatics!.snapshot(), out: Record<string, number> = {};
+    for (const s of p.systems) out[s.id] = s.pressurePa;
+    for (const r of p.regulators) out[r.id] = r.outletPa;
+    return out;
+  }
+
   private hydraulicPressures(): Record<string, number> {
     const h = this.hydraulics!.snapshot(), out: Record<string, number> = {};
     for (const c of h.circuits) out[c.id] = c.pressurePa;
@@ -342,7 +359,8 @@ export class FixedWingAircraft {
       dynamicPressurePa: flow.dynamicPressurePa, staticPressurePa: env.atmosphere.pressurePa, mach: flow.machNumber, trueAirspeedMps: V,
       pitchRad: att.pitch, rollRad: att.roll,
       ...(this.electrical ? { electricalBuses: Object.fromEntries(this.electrical.snapshot.buses.map((b) => [b.id, { powered: b.powered, shed: b.shed }])) } : {}),
-      ...(this.hydraulics ? { hydraulicPressuresPa: this.hydraulicPressures() } : {})
+      ...(this.hydraulics ? { hydraulicPressuresPa: this.hydraulicPressures() } : {}),
+      ...(this.pneumatics ? { pneumaticPressuresPa: this.pneumaticPressures() } : {})
     };
 
     const fcs = this.systems.fcs.step(this.pilot, sensors, this.surfacePositions(), dt);
@@ -421,6 +439,18 @@ export class FixedWingAircraft {
     }) ?? {};
     const drive = (id: string) => this.drives[id] ?? this.engineCoreSpeed(id);
     let hydOpts: import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicStepOptions = { ambientK: env.atmosphere.temperatureK };
+    // Stored gas first: reservoir pressurisation sets the hydraulic pump inlet condition this tick.
+    if (this.pneumatics) {
+      const pn = this.pneumatics;
+      const out = this.systems.pneumaticLoads?.step({
+        sensors, pilot: this.pilot, switches: this.controls.snapshot(),
+        ...(this.gear ? { gear: { extension: this.gear.state.extension, legExtension: this.gear.state.legExtension, handleDown: this.gearHandleDown, weightOnWheels: this.gear.state.weightOnWheels } } : {}),
+        pressurePa: (id) => pn.pressurePa(id), supplyFraction: (id) => pn.supplyFraction(id)
+      }, dt) ?? {};
+      pn.step(dt, { ...(out.demand ? { demand: out.demand } : {}), ...(out.actuations ? { actuations: out.actuations } : {}), ambientK: env.atmosphere.temperatureK });
+      this.gearAlternate = out.gear ?? {};
+      if (out.hydraulicPumpInlet) hydOpts = { ...hydOpts, pumpInletFraction: out.hydraulicPumpInlet };
+    }
     if (this.hydraulics && this.systems.hydraulicLoads) {
       const fc = this.fuelSystem?.components?.();
       const loads = this.systems.hydraulicLoads({
@@ -463,7 +493,9 @@ export class FixedWingAircraft {
     if (this.gear) {
       const result = this.gear.step(dt, st, (x, y) => { const g = this.terrain.sample(x, y); return g.status === "valid" ? g.heightM : undefined; }, {
         handleDown: this.gearHandleDown, brakes: this.pilot.brakes ?? 0, steering: this.pilot.yaw,
-        hydraulicFraction: (id) => (!id || !this.hydraulics ? 1 : this.hydraulics.supplyFraction(id))
+        // A function's supply id names a hydraulic circuit/branch or a pneumatic consumer.
+        hydraulicFraction: (id) => (!id ? 1 : this.pneumatics?.has(id) ? this.pneumatics.supplyFraction(id) : !this.hydraulics ? 1 : this.hydraulics.supplyFraction(id)),
+        ...this.gearAlternate
       });
       for (const f of result.forces) forces.push(f);
       if (result.crash) this.gearCrash = result.crash;
@@ -529,6 +561,7 @@ export class FixedWingAircraft {
       massKg: this.body.massProperties.massKg,
       ...(this.gear ? { gear: { ...this.gear.state, handleDown: this.gearHandleDown } } : {}),
       ...(this.hydraulics ? { hydraulics: this.hydraulics.snapshot() } : {}),
+      ...(this.pneumatics ? { pneumatics: this.pneumatics.snapshot() } : {}),
       ...(this.electrical ? { electrical: this.electrical.snapshot } : {}),
       fcsMode: this.fcsMode,
       fcsTelemetry: this.fcsTelemetry,

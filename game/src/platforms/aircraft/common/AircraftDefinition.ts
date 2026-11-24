@@ -66,6 +66,8 @@ export interface FlightSensors {
   readonly electricalBuses?: Readonly<Record<string, { readonly powered: boolean; readonly shed: boolean }>>;
   /** Hydraulic circuit and branch pressures, Pa (pressure transmitters; absent without hydraulics). */
   readonly hydraulicPressuresPa?: Readonly<Record<string, number>>;
+  /** Pneumatic system and regulator-outlet pressures, Pa (pressure gauges; absent without pneumatics). */
+  readonly pneumaticPressuresPa?: Readonly<Record<string, number>>;
 }
 
 export interface FcsOutput {
@@ -166,6 +168,8 @@ export interface AircraftControlContext {
   setGearHandle(down: boolean): void;
   /** Inject hydraulic faults (test/training switches). */
   setHydraulicFaults(faults: readonly HydraulicFault[]): void;
+  /** Inject pneumatic faults (test/training switches). */
+  setPneumaticFaults(faults: readonly import("../../../systems/pneumatics/PneumaticNetwork.js").PneumaticFault[]): void;
 }
 
 export interface SwitchBinding {
@@ -213,6 +217,15 @@ export interface AircraftSystems {
     readonly cooling?: Readonly<Record<string, { readonly sinkK: number; readonly conductanceWPerK: number }>>;
   };
   /**
+   * The aircraft's own pneumatic (stored-gas) utility logic, stepped before the hydraulic network
+   * and the landing gear: consumer demand and actuations, the hydraulic pump inlet condition that
+   * reservoir pressurisation gives, and any alternate gear extension it drives.
+   */
+  readonly pneumaticLoads?: {
+    step(ctx: PneumaticLoadContext, dt: number): PneumaticLoadOutput;
+    reset(): void;
+  };
+  /**
    * The aircraft's own engine-control logic above the shared FADEC: mode selection and automatic
    * transfers (e.g. primary → hybrid → secondary on detected failures), authority overrides, and
    * the fault lists/lights it raises. Stepped every tick before the engines.
@@ -250,6 +263,27 @@ export interface HydraulicLoadContext {
   readonly ambientTemperatureK: number;
   /** Variable-intake states (ramp positions drive their actuators' flow). */
   readonly inlets?: Readonly<Record<string, import("../../../physics/propulsion/components/Inlet.js").InletState>>;
+}
+
+export interface PneumaticLoadContext {
+  readonly sensors: FlightSensors;
+  readonly pilot: PilotInputs;
+  readonly switches: Readonly<Record<string, string>>;
+  /** Gear extension per leg and handle, when the aircraft has gear. */
+  readonly gear?: { readonly extension: number; readonly legExtension: Readonly<Record<string, number>>; readonly handleDown: boolean; readonly weightOnWheels: boolean };
+  /** Pressure of a pneumatic system, regulator outlet or consumer supply, Pa. */
+  pressurePa(id: string): number;
+  /** A pneumatic consumer's supply fraction (0..1). */
+  supplyFraction(consumerId: string): number;
+}
+
+export interface PneumaticLoadOutput {
+  readonly demand?: Readonly<Record<string, number>>;
+  readonly actuations?: Readonly<Record<string, number>>;
+  /** Hydraulic pump inlet fraction by circuit (see HydraulicStepOptions.pumpInletFraction). */
+  readonly hydraulicPumpInlet?: Readonly<Record<string, number>>;
+  /** Alternate gear extension driven by this system. */
+  readonly gear?: { readonly alternateExtensionRatePerS?: Readonly<Record<string, number>>; readonly normalActuationIsolated?: boolean };
 }
 
 export interface EngineControlOutput {
@@ -295,6 +329,8 @@ export interface AircraftDefinition {
   readonly landingGear?: import("../../../physics/ground-handling/LandingGear.js").LandingGearSpec;
   /** Optional hydraulic power network; surfaces listed in it are rate-limited by their supply. */
   readonly hydraulics?: HydraulicInstallation;
+  /** Optional stored-gas (pneumatic) network; consumers can power brakes (`landingGear.brakeCircuitId`). */
+  readonly pneumatics?: import("../../../systems/pneumatics/PneumaticNetwork.js").PneumaticInstallation;
   /**
    * Optional fuel system owned by the package (tanks, pumps, transfer sequence). With it, fuel
    * mass, CG (as a MAC-fraction shift from `mass.cgFractionMac`, the zero-fuel CG) and inertia

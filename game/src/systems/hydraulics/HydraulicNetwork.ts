@@ -31,7 +31,8 @@
  * from neutral and negative (aiding) when it moves back. With no pressure the surface holds.
  *
  * Not modelled (declared envelope): line resistance and transients between components, valve
- * spool dynamics, pump-inlet (reservoir) pressure other than empty/not empty, fluid viscosity
+ * spool dynamics, pump-inlet (reservoir) pressure other than empty/not empty and the
+ * package-supplied inlet fraction, fluid viscosity
  * changes with temperature, contamination and filter bypass, electrically operated valves other
  * than isolation valves the package drives, surface blow-back, and hinge moments from the aero
  * model (the hinge load uses the linear estimate above).
@@ -183,6 +184,12 @@ export interface HydraulicStepOptions {
   /** Cooler per circuit: heat-sink temperature and conductance (e.g. fuel flow × cp). */
   readonly cooling?: (circuitId: string) => { readonly sinkK: number; readonly conductanceWPerK: number } | undefined;
   readonly ambientK?: number;
+  /**
+   * Pump inlet condition per circuit, 0..1: the fraction of full displacement the pump can fill
+   * from its reservoir (1 = fully fed; less = inlet starvation/cavitation, e.g. an unpressurised
+   * reservoir under low or negative g). Absent = 1.
+   */
+  readonly pumpInletFraction?: Readonly<Record<string, number>>;
 }
 
 const SUBSTEPS = 8;
@@ -333,7 +340,8 @@ export class HydraulicNetwork {
           if (pu.circuitId !== c.id || failedPumps.has(pu.id)) continue;
           const speed = pu.drive.kind === "engine" ? Math.max(0, driveSpeed(pu.drive.engineId)) / pu.drive.ratedSpeedFraction : this.eu.state === "running" ? 1 : 0;
           const disp = Math.max(0, Math.min(1, (pu.compensatorPressurePa - p) / pu.compensatorBandPa));
-          const qp = pu.ratedFlowM3s * speed * disp;
+          const inlet = Math.max(0, Math.min(1, opts.pumpInletFraction?.[c.id] ?? 1));
+          const qp = pu.ratedFlowM3s * speed * disp * inlet;
           q += qp;
           // Compensated pumps still churn at zero stroke: losses scale with speed and pressure (ESTIMATED 5 % of rated power).
           power += qp * p + 0.05 * pu.ratedFlowM3s * speed * p;

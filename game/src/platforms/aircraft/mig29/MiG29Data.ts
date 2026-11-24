@@ -177,6 +177,24 @@ export const MIG29_HYDRAULICS = Object.freeze({
   fuelCoolingWPerK: P(600, "W/K", "estimated", EST, "Reservoirs in fuel tank 3: 'adequate cooling by heat exchange with fuel'; no thermal bypass")
 });
 
+export const MIG29_PNEUMATICS = Object.freeze({
+  mainChargePa: P(15e6, "Pa", "primary-published", GAF_TO, "Main nitrogen system bottles charged to 150 kp/cm²; not charged in flight"),
+  emergencyChargePa: P(15e6, "Pa", "primary-published", GAF_TO, "Emergency nitrogen system bottles charged to 150 kp/cm²; check valves prevent crossfeed with the main system"),
+  chuteChargePa: P(6.3e6, "Pa", "primary-published", GAF_TO, "Additional bottle near the drag-chute compartment, 63 kp/cm²"),
+  mainVolumeM3: P(0.012, "m³", "estimated", EST, "Main bottle group total water volume; not given in the GAF T.O."),
+  emergencyVolumeM3: P(0.006, "m³", "estimated", EST, "Emergency bottle group total water volume; not given"),
+  chuteVolumeM3: P(0.002, "m³", "estimated", EST, "Drag-chute bottle water volume; not given"),
+  brakePressurePa: P(3e6, "Pa", "estimated", EST, "Normal wheel-brake regulated pressure for full braking; not given"),
+  brakeStrokeVolumeM3: P(3e-4, "m³ at brake pressure", "estimated", EST, "Gas per full application, both main wheels"),
+  reservoirPressurePa: P(0.25e6, "Pa", "estimated", EST, "Hydraulic reservoir headspace pressurisation (regulated from the main system); value not given"),
+  reservoirMakeupM3s: P(2e-6, "m³/s at reservoir pressure", "estimated", EST, "Headspace make-up/venting flow"),
+  emergencyGearMinPa: P(6e6, "Pa", "estimated", EST, "Emergency-system pressure for full-rate emergency extension"),
+  emergencyNoseTransitS: P(4, "s", "estimated", EST, "Pneumatic nose-gear extension time"),
+  emergencyMainTransitS: P(6, "s", "estimated", EST, "Pneumatic main-gear extension time"),
+  emergencyGearFlowM3s: P(4e-4, "m³/s at supply pressure", "estimated", EST, "Gas flow while an emergency-extension jack is moving"),
+  gasThermalTimeConstantS: P(600, "s", "estimated", EST, "Bottle gas temperature relaxation towards ambient")
+});
+
 export const MIG29_ELECTRICAL = Object.freeze({
   acGeneratorW: P(30_000, "VA", "primary-published", GAF_TO, "Three-phase 115/200 V 400 Hz, constant-speed drive on the GBX"),
   dcGeneratorW: P(12_000, "W", "primary-published", GAF_TO, "28.5 V, 400 A, on the GBX"),
