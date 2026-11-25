@@ -18,7 +18,7 @@ const STEPS: readonly { id: Step; label: string }[] = [
   { id: "aircraft", label: "Aircraft" }, { id: "mission", label: "Mission" }, { id: "loadout", label: "Loadout" }, { id: "briefing", label: "Briefing" }
 ];
 
-const KEY_NAMES: Record<string, string> = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", enter: "Enter", backspace: "Backspace", pageup: "PgUp", pagedown: "PgDn", home: "Home", end: "End", insert: "Ins", delete: "Del" };
+const KEY_NAMES: Record<string, string> = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", enter: "Enter", backspace: "Backspace", pageup: "PgUp or .", pagedown: "PgDn or ,", home: "Home or H", end: "End or M", insert: "Ins or T", delete: "Del or Z" };
 
 function button(text: string, cls = "menu-btn"): HTMLButtonElement {
   const b = el("button", cls, text);
@@ -260,7 +260,7 @@ export function mountGameScreen(root: HTMLElement): void {
     }
     const tips = el("ul", "tips");
     for (const t of s.hostile
-      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile.", "A MISSILE warning gives the clock position: turn to put it on your beam and dive.", "Press C for the external view, ` for radar/weapon debug info, Esc to pause."]
+      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile. No Home/End/PgUp/PgDn/Ins/Del keys? Use H / M / . / , / T / Z.", "Watch the RWR display on the panel: a lock or a missile means turn to put the threat on your beam and dive. MiG-29: the SPO-15 front sectors are blind while your radar transmits (Home / H for standby).", "Press C for the external view, ` for radar/weapon debug info, Esc to pause."]
       : ["Shift/Ctrl set throttle; W/S/A/D fly. Press C for the external view.", "` shows radar/weapon debug info. Esc pauses the game."]) tips.append(el("li", undefined, t));
     p.append(facts, tips);
     return p;
