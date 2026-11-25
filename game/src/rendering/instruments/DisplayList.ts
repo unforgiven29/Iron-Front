@@ -12,7 +12,7 @@
 export type DisplayFrame = "screen" | "angle";
 
 export type DisplayPrimitive =
-  | { readonly kind: "line"; readonly frame: DisplayFrame; readonly points: readonly (readonly [number, number])[]; readonly closed?: boolean; readonly dash?: boolean; readonly width?: number; readonly color?: string }
+  | { readonly kind: "line"; readonly frame: DisplayFrame; readonly points: readonly (readonly [number, number])[]; readonly closed?: boolean; readonly dash?: boolean; readonly width?: number; readonly color?: string; /** Fill the closed polygon with this colour (then stroke with `color`). */ readonly fill?: string }
   | { readonly kind: "circle"; readonly frame: DisplayFrame; readonly at: readonly [number, number]; /** Radius in screen units (fraction of the half-size). */ readonly radius: number; readonly dash?: boolean; readonly fill?: boolean; readonly color?: string }
   | { readonly kind: "text"; readonly frame: DisplayFrame; readonly at: readonly [number, number]; readonly text: string; readonly align?: "left" | "center" | "right"; /** Text height in screen units. */ readonly size?: number; readonly color?: string };
 
@@ -46,7 +46,8 @@ export function drawDisplayList(g: CanvasRenderingContext2D, list: DisplayList, 
         if (started) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]);
         started = true;
       }
-      if (d.closed) g.closePath();
+      if (d.closed || d.fill) g.closePath();
+      if (d.fill) { g.fillStyle = d.fill; g.fill(); }
       g.stroke();
     } else if (d.kind === "circle") {
       const q = P(d.frame, d.at);
