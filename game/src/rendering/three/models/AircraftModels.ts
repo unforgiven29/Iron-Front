@@ -72,6 +72,7 @@ const mirrorX = (pts: readonly (readonly [number, number])[]) => pts.map(([x, z]
 function canopy(at: readonly [number, number, number], size: readonly [number, number, number], color: string): THREE.Mesh {
   const g = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
   const m = new THREE.Mesh(g, mat(color, "glass"));
+  m.name = "canopy";
   m.scale.set(size[0], size[1], size[2]);
   m.position.set(at[0], at[1], at[2]);
   return m;
@@ -104,6 +105,7 @@ function store(x: number, y: number, z: number, length: number, r: number, color
   const fins2 = fins.clone();
   fins2.rotation.z = Math.PI / 2;
   g.add(body, nose, fins, fins2);
+  g.name = "store";
   g.position.set(x, y, z);
   return g;
 }

@@ -18,6 +18,7 @@ import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import { drawInstrument } from "../instruments/Gauges.js";
 import { drawDisplayList, type DisplayList } from "../instruments/DisplayList.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
+import { Explosions, type ExplosionRequest } from "./Explosions.js";
 import { buildAircraftModel } from "./models/AircraftModels.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
@@ -62,6 +63,8 @@ export interface CockpitViewSource {
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
+  /** Explosions that started since the last call (visual effects only). */
+  explosions?(): readonly ExplosionRequest[];
   worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly modelId?: string; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
@@ -86,6 +89,9 @@ export class ThreeCockpitView {
   private readonly raycaster = new THREE.Raycaster();
   private readonly others = new Map<string, THREE.Group>();
   private frame = 0;
+  private ownModelExt: boolean | null = null;
+  private explosionFx: Explosions | null = null;
+  private lastFrameS: number | null = null;
   /** External (chase) camera instead of the cockpit eye. */
   private external = false;
   private ownModel: THREE.Group | null = null;
@@ -126,7 +132,13 @@ export class ThreeCockpitView {
     this.buildCockpit();
     if (ownModelId) {
       this.ownModel = buildAircraftModel(ownModelId);
-      this.ownModel.visible = false;
+      // Decorative stores do not follow the real stores state (missiles leave the pylons), so the
+      // ownship model is drawn clean.
+      this.ownModel.traverse((o) => {
+        if (o.name === "store") o.visible = false;
+        // Own copies of the shared materials, so the cockpit view can cull interior faces.
+        if (o instanceof THREE.Mesh) o.material = (o.material as THREE.Material).clone();
+      });
       this.rig.add(this.ownModel);
     }
     this.renderer.domElement.addEventListener("click", (e) => this.onClick(e));
@@ -166,7 +178,17 @@ export class ThreeCockpitView {
     const ext = this.external && this.ownModel !== null;
     this.cockpit.visible = !ext;
     if (this.ownModel) {
-      this.ownModel.visible = ext;
+      // In the cockpit the rig origin is the eye, so the airframe (origin near the CG) is shifted by
+      // −eyeFromCg: the pilot sees the nose, wings and tails around the cockpit.
+      if (this.ownModelExt !== ext) {
+        this.ownModelExt = ext;
+        // From the eye (inside the fuselage) only outward faces are drawn, and the exterior canopy is hidden.
+        this.ownModel.traverse((o) => {
+          if (o.name === "canopy") o.visible = ext;
+          if (o instanceof THREE.Mesh && o.name !== "canopy") (o.material as THREE.Material).side = ext ? THREE.DoubleSide : THREE.FrontSide;
+        });
+      }
+      this.ownModel.position.copy(ext ? new THREE.Vector3() : this.bodyToCamera(this.layout.eyeFromCgM).multiplyScalar(-1));
       this.ownModel.traverse((o) => { if (o.name === "afterburner") o.visible = s.throttle > 0.9; });
     }
     if (ext) {
@@ -188,7 +210,31 @@ export class ThreeCockpitView {
     if (this.frame % 2 === 0) this.drawInstruments();
     this.drawOthers();
     this.drawSmoke();
-    this.renderer.render(this.scene, this.camera);
+    this.explosionFx ??= new Explosions(this.world);
+    for (const e of this.source.explosions?.() ?? []) this.explosionFx.spawn(e);
+    const nowS = performance.now() / 1000;
+    this.explosionFx.update(this.lastFrameS === null ? 0 : Math.min(0.1, nowS - this.lastFrameS));
+    this.lastFrameS = nowS;
+    if (ext || !this.ownModel) this.renderer.render(this.scene, this.camera);
+    else {
+      // The cockpit sits inside the exterior model's fuselage, so the shell is drawn first and the
+      // interior is drawn over it after a depth clear (the interior is always nearer the eye).
+      this.cockpit.visible = false;
+      this.renderer.render(this.scene, this.camera);
+      this.cockpit.visible = true;
+      this.ownModel.visible = false;
+      this.world.visible = false;
+      const auto = this.renderer.autoClear;
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      const bg = this.scene.background;
+      this.scene.background = null;
+      this.renderer.render(this.scene, this.camera);
+      this.scene.background = bg;
+      this.renderer.autoClear = auto;
+      this.world.visible = true;
+      this.ownModel.visible = true;
+    }
     if (ext) this.drawExternalHud();
     else this.drawHud(s);
   }

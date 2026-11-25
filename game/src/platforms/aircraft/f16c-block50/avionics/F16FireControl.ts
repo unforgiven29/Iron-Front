@@ -11,7 +11,7 @@
 import type { DisplayList, DisplayPrimitive } from "../../../../rendering/instruments/DisplayList.js";
 import { DEG, type RasterPattern } from "../../../../sensors/common/ScanGeometry.js";
 import { PulseDopplerRadar, type RadarProfile, type WaveformSpec } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import { decodeStores, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
+import { decodeStores, stationLaunchPoint, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
 import { F16_STORES } from "../F16Stores.js";
 import { RadarWarningReceiver } from "../../../../sensors/rwr/RadarWarningReceiver.js";
 import { ALR56M_PROFILE, alr56mDisplay } from "./ALR56M.js";
@@ -133,8 +133,9 @@ export class F16FireControl implements AvionicsSuite {
     const cue = () => { const c = this.ctx; const l = c ? radar.lock(c.own) : null; return l ? { positionEnuM: l.positionEnuM, velocityEnuMps: l.velocityEnuMps } : null; };
     const at = lock ? { positionEnuM: lock.positionEnuM, velocityEnuMps: lock.velocityEnuMps } : null;
     let first = true;
-    port.launchNotional(w, [ctx.own.positionEnuM[0], ctx.own.positionEnuM[1], ctx.own.positionEnuM[2] - 1.5], ctx.own.velocityEnuMps, () => { if (first) { first = false; return at; } return cue(); });
-    this.stores[this.stores.findIndex((x) => x?.id === w.id)] = null;
+    const station = this.stores.findIndex((x) => x?.id === w.id);
+    port.launchNotional(w, stationLaunchPoint(F16_STORES, station, ctx.own), ctx.own.velocityEnuMps, () => { if (first) { first = false; return at; } return cue(); });
+    this.stores[station] = null;
     if (!this.weapon) this.cycleWeapon();
   }
 
@@ -242,5 +243,9 @@ export class F16FireControl implements AvionicsSuite {
     if (id === "rwr") return alr56mDisplay(this.rwr.contacts(), this.rwr.isPowered, Math.floor(this.rwrTime * 4) % 2 === 0);
     return id === "mfd-left" ? this.bscope() : undefined; }
 
-  public status(): Readonly<Record<string, string | number>> { return { mode: this.mode, radar: this.radar.state, plots: this.radar.recentPlots.length }; }
+  public status(): Readonly<Record<string, string | number>> {
+    const own = this.ctx?.own, lock = own ? this.radar.lock(own) : null;
+    return { mode: this.mode, radar: this.radar.state, plots: this.radar.recentPlots.length, tracks: own ? this.radar.tracks(own).length : 0,
+      lockRangeM: lock ? Math.round(lock.rangeM) : Number.NaN, weapon: this.weapon?.display ?? "", stores: Object.entries(this.inventory).map(([k, v]) => `${v}×${k}`).join(" ") };
+  }
 }

@@ -8,6 +8,7 @@
  */
 import type { SensorScene } from "../../../physics/sensing/SensorScene.js";
 import type { DisplayList } from "../../../rendering/instruments/DisplayList.js";
+import { rotateVector } from "../../../physics/rigidbody/RigidBody.js";
 import type { SensorOwnship } from "../../../sensors/common/ScanGeometry.js";
 import type { AircraftSnapshot } from "./FixedWingAircraft.js";
 
@@ -40,6 +41,15 @@ export interface StationDefinition {
   readonly allowed: readonly string[];
   /** Why the station carries nothing air-to-air here (e.g. tanks/air-to-ground only, not modelled). */
   readonly note?: string;
+  /** Launch point (pylon/rail), body FRD metres from the CG. Missiles leave from here. */
+  readonly launchPointM?: readonly [number, number, number];
+}
+
+/** World (ENU) launch point of station `index`; without station geometry, 1.5 m below the CG. */
+export function stationLaunchPoint(plan: Pick<StoresPlan, "stations">, index: number, own: SensorOwnship): import("../../../core/coordinates/CoordinateFrames.js").Vector3 {
+  const p = plan.stations[index]?.launchPointM ?? [0, 0, 1.5];
+  const d = rotateVector(own.bodyToWorld, [p[0], p[1], p[2]]);
+  return [own.positionEnuM[0] + d[0], own.positionEnuM[1] + d[1], own.positionEnuM[2] + d[2]];
 }
 
 /**

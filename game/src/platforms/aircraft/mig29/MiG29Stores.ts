@@ -14,8 +14,9 @@ const family = (s: string) => (s === "R-27R" || s === "R-27ER" ? "radar" : s ===
 
 export const MIG29_STORES: StoresPlan = {
   stations: [
-    { id: "p1", label: "Pylon 1 (L outboard)", allowed: SHORT }, { id: "p2", label: "Pylon 2 (L middle)", allowed: SHORT }, { id: "p3", label: "Pylon 3 (L inboard)", allowed: R27 },
-    { id: "p4", label: "Pylon 4 (R inboard)", allowed: R27 }, { id: "p5", label: "Pylon 5 (R middle)", allowed: SHORT }, { id: "p6", label: "Pylon 6 (R outboard)", allowed: SHORT }
+    // Launch points: ESTIMATED from the general arrangement (pylon spans and depth not measured).
+    { id: "p1", label: "Pylon 1 (L outboard)", allowed: SHORT, launchPointM: [-1.3, -4.1, 0.45] }, { id: "p2", label: "Pylon 2 (L middle)", allowed: SHORT, launchPointM: [-1.0, -3.3, 0.5] }, { id: "p3", label: "Pylon 3 (L inboard)", allowed: R27, launchPointM: [-0.6, -2.6, 0.6] },
+    { id: "p4", label: "Pylon 4 (R inboard)", allowed: R27, launchPointM: [-0.6, 2.6, 0.6] }, { id: "p5", label: "Pylon 5 (R middle)", allowed: SHORT, launchPointM: [-1.0, 3.3, 0.5] }, { id: "p6", label: "Pylon 6 (R outboard)", allowed: SHORT, launchPointM: [-1.3, 4.1, 0.45] }
   ],
   presets: [
     { id: "standard", label: "2 × R-27R + 4 × R-73", description: "Semi-active radar pair inboard, close-combat IR outboard.", stations: ["R-73", "R-73", "R-27R", "R-27R", "R-73", "R-73"] },
