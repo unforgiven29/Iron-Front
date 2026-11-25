@@ -651,13 +651,10 @@ export class MiG29WeaponControl implements AvionicsSuite {
   private footer(out: DisplayPrimitive[], own: SensorOwnship, hud: boolean): DisplayPrimitive[] {
     const s = this.s;
     const T = (x: number, y: number, text: string, align: "left" | "center" | "right" = "left", size = 0.05) => { out.push({ kind: "text", frame: "screen", at: [x, y], text, align, size }); };
-    // Selected missile and count; IR seeker lock cue (conformal) for heat seekers.
+    // Selected missile type (BP-29 figs 20, 22, 43 show the type only, e.g. «27Р», «60М»).
     const w = this.weapon;
-    T(-0.95, -0.82, w ? `${MISSILE_RU[w.id] ?? w.display} ${this.remaining}` : "НЕТ", "left", 0.065);
-    if (w && hud && this.ctx && w.seeker.value.kind === "ir") {
-      const los = this.irSeekerLos(this.ctx, w);
-      if (los) { const b = bodyAngles(own, los); out.push({ kind: "circle", frame: "angle", at: [b.az, b.el], radius: 0.05 }); }
-    }
+    T(-0.95, -0.82, w ? (MISSILE_RU[w.id] ?? w.display) : "НЕТ", "left", 0.065);
+    // IR seeker lock is not drawn on the ИЛС: BP-29 fig.16 gives it as the helmet symbol with the audio tone.
     if (this.killCue && own.timeS - this.killCue.t < 2.5) T(0, 0.55, this.killCue.text, "center", 0.1);
     const em = s.emission;
     const tags = [s.emission !== "ИЗЛ" ? em : "", s.interaction ? "ТОРМ" : "", s.snp !== "ОТКЛ" ? `СНП ${s.snp}` : "", s.compensation ? "" : "БЕЗ КОМП"].filter(Boolean);
