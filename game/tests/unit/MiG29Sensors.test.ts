@@ -323,15 +323,15 @@ describe("N019 behaviours from the N-019EB description (N019-WEB)", { timeout: 1
     for (const t of times) expect(recent.filter((p) => p.timeS === t).length).toBe(1);
   });
   it("guard channel: with КОМПЕНС on, a close strong target outside the beam is blanked; off, it appears as a ghost in the beam", () => {
-    const side: AirTargetSpec[] = [{ id: "s", label: "s", signature: SIGNATURES.bomber, positionEnuM: [-80, 3000, 4000], headingRad: Math.PI, speedMps: 240, throttle: 0.8 }];
-    // Beam scans 4° centred 10° left; the bomber sits at −1.5°, ≈ 8.5° (2.4 beamwidths) from the beam centre.
-    const stare = { ...searchV, bars: 1, widthRad: 4 * DEG, center: { az: -10 * DEG, el: 0 } };
+    const side: AirTargetSpec[] = [{ id: "s", label: "s", signature: SIGNATURES.bomber, positionEnuM: [-180, 7000, 4000], headingRad: Math.PI, speedMps: 240, throttle: 0.8 }];
+    // One bar 4° below the bomber (main-lobe skirt, −15 dB, beyond the guard limit of one beamwidth).
+    const stare = { ...searchV, bars: 1, widthRad: 20 * DEG, center: { az: 0, el: -4 * DEG } };
     const on = fly(side, (x) => { x.setCompensation(true); x.setSearch({ pattern: stare, waveformIds: ["HPRF"], tws: false, plotPersistenceS: 30, rangeScaleM: 150000 }); }, 4000, 6, 1);
     const off = fly(side, (x) => { x.setCompensation(false); x.setSearch({ pattern: stare, waveformIds: ["HPRF"], tws: false, plotPersistenceS: 30, rangeScaleM: 150000 }); }, 4000, 6, 1);
     expect(on.recentPlots.filter((p) => !p.falseAlarm).length).toBe(0);
     const ghosts = off.recentPlots.filter((p) => !p.falseAlarm);
     expect(ghosts.length).toBeGreaterThan(0);
-    for (const g of ghosts) expect(Math.abs(g.look.az / DEG + 10)).toBeLessThan(4); // plotted in the beam, not at the target's 31°
+    for (const g of ghosts) expect(g.look.el / DEG).toBeLessThan(-2.5); // plotted at the beam's elevation, not the target's 0°
   });
   it("mode Д at low altitude over ground produces clutter false targets; at altitude looking level it does not", () => {
     const pat = (el: number) => ({ ...searchV, bars: 3, barSpacingRad: 4 * DEG, widthRad: 40 * DEG, center: { az: 0, el } });

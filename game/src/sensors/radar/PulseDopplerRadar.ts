@@ -156,8 +156,11 @@ export function deriveHardware(p: RadarProfile): RadarHardware {
 }
 
 /** Receiver sensitivity: the echo power at the detection threshold in one coherent filter, dBW. */
+const noiseTempCache = new WeakMap<RadarProfile, number>();
 export function receiverSensitivityDbw(p: RadarProfile, coherentS: number): number {
-  const hw = deriveHardware(p);
+  let ts = noiseTempCache.get(p);
+  if (ts === undefined) { ts = deriveHardware(p).systemNoiseTempK; noiseTempCache.set(p, ts); }
+  const hw = { systemNoiseTempK: ts };
   const threshold = -Math.log(p.falseAlarmProbability.value);
   return 10 * Math.log10(1.380649e-23 * hw.systemNoiseTempK * (1 / coherentS) * threshold);
 }
@@ -246,6 +249,7 @@ export class PulseDopplerRadar {
   private bars = 0;
   private time = 0;
   private tactPhase = 0;
+  private lastDwellKey = "";
 
   public constructor(public readonly profile: RadarProfile, seed: number, startWarm = true) {
     this.hw = deriveHardware(profile);
@@ -394,8 +398,17 @@ export class PulseDopplerRadar {
     const fluct = echo.swerling === 1 ? this.expo() : (this.expo() + this.expo()) / 2;
     const confirmN = confirm ? this.profile.timing.value.confirmTacts : 0;
     let eclipsed = 0, clutterLimited = 0, uncovered = 0;
+    // Tracking (no confirmation tacts): the radar knows the target's range and picks the PRF that keeps the
+    // echo in the transparency zone (RLPK slide 47: period compression during lock-on and track).
+    let clearPrf: number | undefined;
+    if (!confirm) {
+      const isClear = (f: number) => { const pri = 1 / f, d = ((2 * echo.rangeM) / C) % pri; return d >= wf.pulseWidthS.value && d <= pri - wf.pulseWidthS.value * 0.5; };
+      const lo = Math.min(...prfs), hi = Math.max(...prfs);
+      clearPrf = prfs.find(isClear);
+      for (let f = lo; clearPrf === undefined && f <= hi; f += (hi - lo) / 60 || 1) if (isClear(f)) clearPrf = f;
+    }
     const tactDetect = (i: number): boolean => {
-      const prf = prfs[(this.tactPhase + i) % prfs.length] as number;
+      const prf = clearPrf ?? (prfs[(this.tactPhase + i) % prfs.length] as number);
       const pri = 1 / prf;
       const delay = ((2 * echo.rangeM) / C) % pri;
       if (delay < wf.pulseWidthS.value || delay > pri - wf.pulseWidthS.value * 0.5) { eclipsed++; return false; }
@@ -469,26 +482,29 @@ export class PulseDopplerRadar {
     const echoes = scene.radar({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamFrom: from, beamTo: to, look, integrationTimeS: T.searchCoherentS, reportFloorSnr: 0.05, maxRangeM: Math.min(cmd.rangeScaleM, this.profile.instrumentedRangeM.value) });
     const clutter = echoes.length || this.profile.clutterThresholdSuppressionDb ? this.clutter(own, scene, to, look, T.searchCoherentS, wf.id) : [];
     const found: RadarPlot[] = [];
-    for (const e of echoes) {
+    // Range resolution acts on the echoes themselves: returns in this beam closer in range than the
+    // resolution are one echo to the receiver (power-summed, at the power-weighted range).
+    const res = wf.rangeResolutionM?.value ?? 0;
+    const sorted = [...echoes].sort((x, y) => x.rangeM - y.rangeM);
+    const merged: RadarEcho[] = [];
+    for (const e of sorted) {
+      const last = merged[merged.length - 1];
+      if (last && res > 0 && e.rangeM - last.rangeM < res && Math.abs(e.closureMps - last.closureMps) < 50) {
+        const p = last.meanSnr + e.meanSnr;
+        merged[merged.length - 1] = { ...(last.meanSnr >= e.meanSnr ? last : e), meanSnr: p, rangeM: (last.rangeM * last.meanSnr + e.rangeM * e.meanSnr) / p };
+      } else merged.push(e);
+    }
+    for (const e of merged) {
       const r = this.process(e, wf, to, own, tacts, T.searchCoherentS, clutter);
       if (!r.detected) continue;
       const m = this.measureSearch(e, wf, r.snr, own, to);
       if (m.rangeM < (wf.minSearchRangeM?.value ?? 0)) continue;
       found.push({ timeS: own.timeS, rangeM: m.rangeM, closureMps: m.closure, look: stabilizedAngles(own, m.los), losEnu: m.los, snrDb: 10 * Math.log10(r.snr), waveformId: wf.id });
     }
-    // Range resolution: returns in the same beam closer than the resolution merge into one mark (strongest wins,
-    // range weighted by power).
-    const res = wf.rangeResolutionM?.value ?? 0;
-    found.sort((a, b) => a.rangeM - b.rangeM);
-    for (let i = 0; i < found.length; i++) {
-      let grp = [found[i] as RadarPlot];
-      while (i + 1 < found.length && (found[i + 1] as RadarPlot).rangeM - (grp[0] as RadarPlot).rangeM < res) grp.push(found[++i] as RadarPlot);
-      const w = grp.map((p) => 10 ** (p.snrDb / 10)), sw = w.reduce((a, b) => a + b, 0);
-      const best = grp.reduce((a, b) => (b.snrDb > a.snrDb ? b : a));
-      this.addPlot({ ...best, rangeM: grp.reduce((acc, p, k) => acc + p.rangeM * (w[k] as number), 0) / sw }, own);
-      grp = [];
-    }
-    if (clutter.length) this.clutterFalseAlarms(own, wf, to, tacts, T.searchCoherentS, clutter, cmd.rangeScaleM);
+    for (const p of found) this.addPlot(p, own);
+    // Once per new beam position (one dwell), not every tick.
+    const dwellKey = `${Math.round(this.look.az / this.hw.antenna.halfPowerBeamwidthRad)}|${Math.round(this.look.el / this.hw.antenna.halfPowerBeamwidthRad)}|${this.bars}`;
+    if (clutter.length && dwellKey !== this.lastDwellKey) { this.lastDwellKey = dwellKey; this.clutterFalseAlarms(own, wf, to, tacts, T.searchCoherentS, clutter, cmd.rangeScaleM); }
     // Noise false alarms: range–Doppler cells per look × Pfa, confirmed by the measurement tacts.
     const cells = (Math.min(cmd.rangeScaleM, this.profile.instrumentedRangeM.value) / ((C * wf.pulseWidthS.value) / 2)) * Math.max(1, Math.round((wf.prfsHz.value[0] as number) * T.searchCoherentS / 8));
     const looksThisTick = (dt * rate) / this.hw.antenna.halfPowerBeamwidthRad * tacts;
@@ -633,7 +649,7 @@ export class PulseDopplerRadar {
       const r = this.process(cand, wf, los, own, Math.max(1, Math.round(dt / T.trackTactS)), T.trackCoherentS, clutter, false);
       if (r.detected) {
         const m = this.measureTrack(cand, wf, r.snr, own);
-        a.f.update(own.timeS, [own.positionEnuM[0] + m.los[0] * m.rangeM, own.positionEnuM[1] + m.los[1] * m.rangeM, own.positionEnuM[2] + m.los[2] * m.rangeM], 0.5, 0.02);
+        a.f.update(own.timeS, [own.positionEnuM[0] + m.los[0] * m.rangeM, own.positionEnuM[1] + m.los[1] * m.rangeM, own.positionEnuM[2] + m.los[2] * m.rangeM], 0.5, 0.02, false);
         // Speed channel: target velocity along the line of sight from the measured closure.
         a.f.setLineOfSightVelocity(m.los, dot(own.velocityEnuMps, m.los) - m.closure);
         a.hits++;
@@ -688,7 +704,7 @@ export class PulseDopplerRadar {
       if (p.detected) {
         const m = this.measureTrack(cand, wf, p.snr, own);
         const F = this.profile.rangeFilter.value;
-        s.f.update(own.timeS, [own.positionEnuM[0] + m.los[0] * m.rangeM, own.positionEnuM[1] + m.los[1] * m.rangeM, own.positionEnuM[2] + m.los[2] * m.rangeM], F.alpha, F.beta);
+        s.f.update(own.timeS, [own.positionEnuM[0] + m.los[0] * m.rangeM, own.positionEnuM[1] + m.los[1] * m.rangeM, own.positionEnuM[2] + m.los[2] * m.rangeM], F.alpha, F.beta, false);
         // Speed channel (Doppler): α–β on closure; it sets the target's velocity along the line of sight.
         const dtc = Math.max(dt, own.timeS - s.lastDetectS);
         const pc = s.closure + s.closureRate * dtc;

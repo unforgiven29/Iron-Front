@@ -29,16 +29,33 @@ export class AlphaBetaTrack {
    * Fold in a measured position at time t. Gains start high (fast initiation) and settle to the
    * steady values; `alpha`/`beta` are the steady gains.
    */
-  public update(t: number, measured: Vector3, alpha: number, beta: number): void {
+  public update(t: number, measured: Vector3, alpha: number, beta: number, startup = true): void {
     const dt = Math.max(1e-3, t - this.lastUpdateS);
     const pred = this.predict(t);
     const n = this.updates;
-    const a = n === 0 ? 1 : Math.max(alpha, 2 * (2 * n - 1) / (n * (n + 1)));
-    const b = n === 0 ? 0 : Math.max(beta, 6 / (n * (n + 1)));
+    // Least-squares start-up gains for the k-th measurement (k = n + 1): α_k = 2(2k−1)/(k(k+1)), β_k = 6/(k(k+1)),
+    // i.e. the 1st sets the position, the 2nd the velocity from two points (α = β = 1).
+    const k = n + 1;
+    if (!startup && n > 0) { this.blend(t, measured, alpha, beta); return; }
+    const a = n === 0 ? 1 : Math.max(alpha, (2 * (2 * k - 1)) / (k * (k + 1)));
+    const b = n === 0 ? 0 : Math.max(beta, 6 / (k * (k + 1)));
     for (let i = 0; i < 3; i++) {
       const r = (measured[i] as number) - (pred[i] as number);
       this.p[i] = (pred[i] as number) + a * r;
       this.v[i] = (this.v[i] as number) + (b * r) / dt;
+    }
+    this.lastUpdateS = t;
+    this.updates += 1;
+  }
+
+  /** Fixed-gain update (no start-up gains): for fast-rate trackers whose velocity comes from elsewhere. */
+  private blend(t: number, measured: Vector3, alpha: number, beta: number): void {
+    const dt = Math.max(1e-3, t - this.lastUpdateS);
+    const pred = this.predict(t);
+    for (let i = 0; i < 3; i++) {
+      const r = (measured[i] as number) - (pred[i] as number);
+      this.p[i] = (pred[i] as number) + alpha * r;
+      this.v[i] = (this.v[i] as number) + (beta * r) / dt;
     }
     this.lastUpdateS = t;
     this.updates += 1;
