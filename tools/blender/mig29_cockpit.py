@@ -12,7 +12,8 @@ to Blender axes (X = right, Y = forward, Z = up), so the glTF export (+Y up) lan
 camera frame with no extra rotation.
 
 References (arrangement only; nothing is copied into the repository): IrasD, "MiG-29 cockpit 1..4",
-c. 1995, Wikimedia Commons, CC BY-SA 4.0 — a Soviet-standard 9.12-type cockpit. Panel geometry and
+c. 1995, Wikimedia Commons, CC BY-SA 4.0 — a Soviet-standard 9.12 cockpit (the 9.13 cockpit is the
+same, per the project owner). The tub sides are curved lofted surfaces tiled with sub-panels. Panel geometry and
 instrument positions come from panel.json (shared with the TypeScript layout so bezels and live
 gauges coincide). Dimensions not measurable from the photographs are ESTIMATED.
 
@@ -355,85 +356,170 @@ def canopy_frame_and_tub():
         o = cyl(f"arch_{i}", pts[i], pts[i + 1], 0.022, COAMING, segs=8)
     for s, name in ((-1, "l"), (1, "r")):
         box(f"sill_{name}", (0.25, s * 0.49, 0.30), (1.5, 0.06, 0.05), PAINT_DK, bevel=0.006)
-        # Side wall below the sill down to the console.
-        box(f"wall_{name}", (0.25, s * 0.48, 0.45), (1.5, 0.02, 0.3), PAINT)
     del o
 
 
-CONSOLE_TOP = 0.57  # side consoles at elbow height (ESTIMATED from the photographs)
-FWD_TOP = 0.49      # raised forward console step
+CONSOLE_TOP = 0.57  # reference height for parts that still sit on a flat datum (ESTIMATED)
+
+
+def side_profile(side, a, b):
+    """Curved side panel ("downlook panel") of the cockpit tub, FRD. a: aft (0) → front (1);
+    b: canopy sill (0) → inboard edge at the foot well (1). Quadratic profile from the sill,
+    straight down, then curving inboard; toward the front it sweeps up and outboard into the
+    angled main-panel sections (shape from the reference photographs; dimensions ESTIMATED)."""
+    x = -0.45 + 1.31 * a
+    k = max(0.0, min(1.0, (a - 0.55) / 0.45)) ** 2
+    p0 = (0.485, 0.30)
+    p1 = (0.485, 0.62 - 0.17 * k)
+    p2 = (0.23 + 0.13 * k, 0.77 - 0.16 * k)
+    y = (1 - b) ** 2 * p0[0] + 2 * (1 - b) * b * p1[0] + b * b * p2[0]
+    z = (1 - b) ** 2 * p0[1] + 2 * (1 - b) * b * p1[1] + b * b * p2[1]
+    return (x, side * y, z)
+
+
+def loft(name, f, nu, nv, material, thickness=0.012, parent=None):
+    bm = bmesh.new()
+    g = [[bm.verts.new(B(f(i / (nu - 1), j / (nv - 1)))) for j in range(nv)] for i in range(nu)]
+    for i in range(nu - 1):
+        for j in range(nv - 1):
+            bm.faces.new([g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = obj_from_bm(name, bm, material, parent)
+    if thickness:
+        m = o.modifiers.new("solid", "SOLIDIFY")
+        m.thickness = thickness
+    sm = o.modifiers.new("smooth", "WEIGHTED_NORMAL") if False else None
+    return o
+
+
+def surface_frame(f, a, b, side):
+    e = 1e-3
+    p = Vector(f(a, b))
+    da = Vector(f(min(1, a + e), b)) - Vector(f(max(0, a - e), b))
+    db = Vector(f(a, min(1, b + e))) - Vector(f(a, max(0, b - e)))
+    n = da.cross(db).normalized()
+    if n.dot(Vector((0.0, -side, -1.0))) < 0:  # face the cockpit centre line and up
+        n = -n
+    return p, da.normalized(), db.normalized(), n
+
+
+def on_surface_plate(name, f, side, a0, a1, b0, b1, material, lift=0.004):
+    g = lambda u, v: tuple(Vector(f(a0 + (a1 - a0) * u, b0 + (b1 - b0) * v)) + surface_frame(f, a0 + (a1 - a0) * u, b0 + (b1 - b0) * v, side)[3] * lift)
+    return loft(name, g, 4, 4, material, thickness=0.004)
+
+
+def on_surface_item(name, f, side, a, b, kind, parent=None, base_lift=0.008):
+    p, ta, tb, n = surface_frame(f, a, b, side)
+    p = p + n * base_lift
+    if kind == "knob":
+        cyl(name, tuple(p), tuple(p + n * 0.018), 0.009, BLACK, parent, segs=14)
+        cyl(name + "_c", tuple(p + n * 0.018), tuple(p + n * 0.021), 0.004, WHITE, parent, segs=8)
+    elif kind == "toggle":
+        cyl(name, tuple(p), tuple(p + n * 0.005), 0.006, METAL, parent, segs=10)
+        cyl(name + "_b", tuple(p + n * 0.005), tuple(p + n * 0.022 + ta * 0.006), 0.0025, METAL, parent, segs=8)
+    elif kind == "guard":
+        c = p + n * 0.007
+        cs = [c - ta * 0.011 - tb * 0.008, c + ta * 0.011 - tb * 0.008, c + ta * 0.011 + tb * 0.008, c - ta * 0.011 + tb * 0.008]
+        hexa(name, [tuple(x + n * 0.007) for x in cs] + [tuple(x - n * 0.007) for x in cs], RED, parent, bevel=0.002)
+    elif kind == "lamp":
+        c = p + n * 0.002
+        cs = [c - ta * 0.008 - tb * 0.008, c + ta * 0.008 - tb * 0.008, c + ta * 0.008 + tb * 0.008, c - ta * 0.008 + tb * 0.008]
+        hexa(name, [tuple(x + n * 0.004) for x in cs] + [tuple(x - n * 0.002) for x in cs], AMBER_LAMP, parent)
+    return p, n
+
+
+def side_f(side):
+    return lambda a, b: side_profile(side, a, b)
+
+
+# Sub-panel plan per side: (a0, a1, b0, b1) on the side surface; regions kept clear for the throttle etc.
+SIDE_PANELS = {
+    -1: [(0.04, 0.30, 0.42, 0.98), (0.30, 0.38, 0.30, 0.55), (0.62, 0.80, 0.40, 0.98), (0.80, 0.97, 0.30, 0.95), (0.38, 0.60, 0.80, 0.98)],
+    1: [(0.04, 0.24, 0.40, 0.98), (0.24, 0.46, 0.40, 0.98), (0.46, 0.62, 0.55, 0.98), (0.62, 0.80, 0.35, 0.98), (0.80, 0.97, 0.30, 0.95)],
+}
+
+
+RESERVED = {-1: [(0.34, 0.58, 0.50, 0.75), (0.80, 0.94, 0.30, 0.54), (0.30, 0.37, 0.38, 0.52), (0.58, 0.66, 0.48, 0.62)], 1: [(0.48, 0.64, 0.30, 0.54)]}
+
+
+def side_tiles(side, rnd):
+    """Tile the side surface with sub-panels of varying size (as on the photographs), leaving the
+    reserved areas (throttle, gear, flap, airbrake, electrical plate) clear."""
+    tiles = []
+    a = 0.02
+    while a < 0.97:
+        w = min(0.97 - a, rnd.uniform(0.06, 0.13))
+        b = 0.16
+        while b < 0.99:
+            h = min(0.99 - b, rnd.uniform(0.18, 0.4))
+            t = (a, a + w, b, b + h)
+            clash = any(not (t[1] <= r[0] or t[0] >= r[1] or t[3] <= r[2] or t[2] >= r[3]) for r in RESERVED[side])
+            if not clash:
+                tiles.append(t)
+            b += h
+        a += w
+    return tiles
 
 
 def consoles():
-    for s, name in ((-1, "l"), (1, "r")):
-        box(f"console_{name}", (0.05, s * 0.39, CONSOLE_TOP + 0.2), (1.0, 0.16, 0.4), PAINT, bevel=0.006)
-        # Raised forward section: sloped face up from the console to a step that meets the panel wing
-        # (photographs 3 and 4 show the forward consoles stepping up toward the instrument panel).
-        y0, y1 = s * 0.385, s * 0.47
-        hexa(f"console_fwd_{name}", [
-            (0.55, y0, CONSOLE_TOP), (0.55, y1, CONSOLE_TOP), (0.66, y1, FWD_TOP), (0.66, y0, FWD_TOP),
-            (0.55, y0, CONSOLE_TOP + 0.3), (0.55, y1, CONSOLE_TOP + 0.3), (0.66, y1, CONSOLE_TOP + 0.3), (0.66, y0, CONSOLE_TOP + 0.3)], PAINT_DK, bevel=0.004)
-        box(f"console_step_{name}", (0.77, s * 0.4275, FWD_TOP + 0.2), (0.22, 0.085, 0.4), PAINT, bevel=0.006)
-        # Side-wall frames above the console (stringers) and a breaker panel.
-        for k, x in enumerate((-0.25, 0.15, 0.55)):
-            box(f"frame_{name}_{k}", (x, s * 0.47, 0.42), (0.025, 0.02, 0.26), PAINT_DK, bevel=0.003)
-        box(f"cb_panel_{name}", (0.0, s * 0.466, 0.44), (0.3, 0.01, 0.1), BLACK, bevel=0.002)
-        for i in range(10):
-            for j in range(2):
-                cyl(f"cb_{name}_{i}_{j}", (-0.13 + i * 0.028, s * 0.462, 0.42 + j * 0.04), (-0.13 + i * 0.028, s * 0.452, 0.42 + j * 0.04), 0.006, BLACK if (i + j) % 4 else WHITE, segs=10)
     rnd = random.Random(1995)
-    # Console sub-panels with knobs, toggles, guarded switches and lamps (photographs 1-4).
-    def subpanel(name, x0, x1, side, items, top=CONSOLE_TOP, inboard=0.315, rows=3):
-        CT = top
-        y0, y1 = (side * inboard, side * 0.465) if side > 0 else (side * 0.465, side * inboard)
-        box(name, ((x0 + x1) / 2, (y0 + y1) / 2, CT - 0.004), (x1 - x0 - 0.006, abs(y1 - y0) - 0.006, 0.008), BLACK if items == "radio" else PAINT_DK, bevel=0.002)
-        for i in range(int((x1 - x0) / 0.045)):
-            for j in range(rows):
-                x = x0 + 0.025 + i * 0.045
-                y = (min(y0, y1) + 0.03 + j * 0.05)
-                kind = rnd.random()
-                if kind < 0.35:
-                    cyl(f"{name}_k{i}{j}", (x, y, CT - 0.008), (x, y, CT - 0.028), 0.009, BLACK, segs=14)
-                    cyl(f"{name}_kp{i}{j}", (x, y, CT - 0.028), (x, y, CT - 0.031), 0.004, WHITE, segs=8)
-                elif kind < 0.7:
-                    cyl(f"{name}_tb{i}{j}", (x, y, CT - 0.008), (x, y, CT - 0.013), 0.007, METAL, segs=10)
-                    cyl(f"{name}_tt{i}{j}", (x, y, CT - 0.013), (x - 0.008, y, CT - 0.03), 0.0025, METAL, segs=8)
-                elif kind < 0.82:
-                    box(f"{name}_g{i}{j}", (x, y, CT - 0.016), (0.022, 0.016, 0.014), RED, bevel=0.002)
-                else:
-                    box(f"{name}_l{i}{j}", (x, y, CT - 0.01), (0.016, 0.016, 0.006), AMBER_LAMP)
-    subpanel("lp_a", -0.35, -0.12, -1, "sys")
-    subpanel("lp_b", 0.35, 0.53, -1, "radio")
-    subpanel("lp_c", 0.67, 0.87, -1, "sys", FWD_TOP, 0.39, 1)
-    subpanel("rp_a", -0.35, -0.08, 1, "sys")
-    subpanel("rp_c", 0.67, 0.87, 1, "radio", FWD_TOP, 0.39, 1)
+    for side, name in ((-1, "l"), (1, "r")):
+        f = side_f(side)
+        loft(f"side_{name}", f, 28, 14, PAINT, thickness=0)
+        for k, (a0, a1, b0, b1) in enumerate(side_tiles(side, rnd)):
+            on_surface_plate(f"sp_{name}_{k}", f, side, a0 + 0.004, a1 - 0.004, b0 + 0.008, b1 - 0.008, BLACK if rnd.random() < 0.35 else PAINT_DK)
+            na = max(1, int((a1 - a0) / 0.04)); nb = max(1, int((b1 - b0) / 0.12))
+            for i in range(na):
+                for j in range(nb):
+                    a = a0 + (i + 0.5) * (a1 - a0) / na
+                    b = b0 + (j + 0.5) * (b1 - b0) / nb
+                    r_ = rnd.random()
+                    kind = "knob" if r_ < 0.35 else "toggle" if r_ < 0.7 else "guard" if r_ < 0.8 else "lamp"
+                    on_surface_item(f"it_{name}_{k}_{i}_{j}", f, side, a, b, kind, base_lift=0.01)
+    # Orange lamp row along the right canopy sill (photograph 3).
+    f = side_f(1)
+    for i in range(10):
+        on_surface_item(f"sill_lamp_{i}", f, 1, 0.42 + i * 0.05, 0.12, "lamp", base_lift=0.004)
 
 
 def lower_pedestal_and_floor():
     bot = P(0, V_BOT, FACE_W)
     hexa("pedestal", [
-        (bot[0], -0.13, bot[2]), (bot[0], 0.13, bot[2]), (bot[0] - 0.06, 0.13, 0.95), (bot[0] - 0.06, -0.13, 0.95),
-        (bot[0] + 0.1, -0.13, bot[2]), (bot[0] + 0.1, 0.13, bot[2]), (bot[0] + 0.04, 0.13, 0.95), (bot[0] + 0.04, -0.13, 0.95)], PAINT_DK, bevel=0.004)
+        (bot[0], -0.11, bot[2]), (bot[0], 0.11, bot[2]), (bot[0] - 0.06, 0.11, 0.95), (bot[0] - 0.06, -0.11, 0.95),
+        (bot[0] + 0.1, -0.11, bot[2]), (bot[0] + 0.1, 0.11, bot[2]), (bot[0] + 0.04, 0.11, 0.95), (bot[0] + 0.04, -0.11, 0.95)], PAINT_DK, bevel=0.004)
     for i in range(3):
         z = bot[2] + 0.05 + i * 0.11
-        box(f"ped_plate_{i}", (bot[0] - 0.012 - i * 0.02, 0, z + 0.04), (0.01, 0.22, 0.09), BLACK, bevel=0.002)
+        box(f"ped_plate_{i}", (bot[0] - 0.012 - i * 0.02, 0, z + 0.04), (0.01, 0.19, 0.09), BLACK, bevel=0.002)
         for k in range(4):
-            cyl(f"ped_knob_{i}_{k}", (bot[0] - 0.017 - i * 0.02, -0.075 + k * 0.05, z + 0.04), (bot[0] - 0.035 - i * 0.02, -0.075 + k * 0.05, z + 0.04), 0.008, METAL if k % 2 else BLACK, segs=12)
-    box("floor", (0.45, 0, 1.0), (1.4, 0.8, 0.02), FLOOR)
-    for s in (-1, 1):
-        box(f"pedal_{s}", (0.98, s * 0.2, 0.86), (0.04, 0.12, 0.2), BLACK, rot_frd=(0, math.radians(-25), 0), bevel=0.006)
+            cyl(f"ped_knob_{i}_{k}", (bot[0] - 0.017 - i * 0.02, -0.065 + k * 0.043, z + 0.04), (bot[0] - 0.035 - i * 0.02, -0.065 + k * 0.043, z + 0.04), 0.007, METAL if k % 2 else BLACK, segs=12)
+    box("floor", (0.35, 0, 1.0), (1.6, 0.6, 0.02), FLOOR)
+    # Foot wells: ribbed/perforated floor plates sloping up to the rudder pedals (photograph 3).
+    for sd in (-1, 1):
+        y = sd * 0.175
+        hexa(f"footwell_{sd}", [
+            (0.35, y - 0.06, 0.985), (0.35, y + 0.06, 0.985), (0.85, y + 0.06, 0.86), (0.85, y - 0.06, 0.86),
+            (0.35, y - 0.06, 1.0), (0.35, y + 0.06, 1.0), (0.85, y + 0.06, 0.875), (0.85, y - 0.06, 0.875)], FLOOR)
+        for k in range(10):
+            t = (k + 0.5) / 10
+            x = 0.35 + 0.5 * t
+            z = 0.985 - 0.125 * t - 0.006
+            for c in (-1, 1):
+                box(f"rib_{sd}_{k}_{c}", (x, y + c * 0.025, z), (0.012, 0.035, 0.008), BLACK, rot_frd=(0, math.atan2(0.125, 0.5), 0))
+        box(f"pedal_{sd}", (0.88, y, 0.83), (0.035, 0.1, 0.17), BLACK, rot_frd=(0, math.radians(-25), 0), bevel=0.006)
 
 
 def seat():
-    box("seat_pan", (0.02, 0, 0.78), (0.42, 0.46, 0.1), LEATHER, bevel=0.03)
-    box("seat_front", (0.22, 0, 0.83), (0.06, 0.44, 0.16), LEATHER, bevel=0.015)
-    # Ejection handle loop (orange-red, between the knees: photographs 1 and 3).
-    pts = []
-    for i in range(13):
-        a = math.pi * i / 12
-        pts.append((0.24 + 0.02 * math.sin(a), -0.055 * math.cos(a), 0.80 - 0.05 * math.sin(a)))
-    for i in range(12):
-        cyl(f"eject_{i}", pts[i], pts[i + 1], 0.008, ORANGE, segs=10)
+    box("seat_pan", (-0.02, 0, 0.80), (0.42, 0.44, 0.1), LEATHER, bevel=0.03)
+    box("seat_front", (0.18, 0, 0.84), (0.05, 0.42, 0.14), LEATHER, bevel=0.015)
+    box("seat_placard", (0.207, 0, 0.82), (0.004, 0.09, 0.06), YELLOW)
+    # Two ejection handles side by side (red loops, photograph 3).
+    for sd in (-1, 1):
+        pts = []
+        for i in range(13):
+            a = math.pi * i / 12
+            pts.append((0.21 + 0.015 * math.sin(a), sd * 0.055 - 0.045 * math.cos(a), 0.775 - 0.06 * math.sin(a)))
+        for i in range(12):
+            cyl(f"eject_{sd}_{i}", pts[i], pts[i + 1], 0.008, RED, segs=10)
 
 
 # ---------------------------------------------------------------- animated nodes
@@ -455,44 +541,52 @@ def stick():
 
 
 def throttle():
-    base = (0.2, -0.375, CONSOLE_TOP)
-    box("throttle_quadrant", (0.2, -0.375, CONSOLE_TOP - 0.02), (0.3, 0.11, 0.04), BLACK, bevel=0.004)
-    box("throttle_slot", (0.2, -0.375, CONSOLE_TOP - 0.041), (0.26, 0.05, 0.003), RUBBER)
-    n = node("throttle", base)
-    for s in (-1, 1):
-        cyl(f"thr_arm_{s}", (0.18, -0.375 + s * 0.012, CONSOLE_TOP - 0.04), (0.16, -0.375 + s * 0.012, CONSOLE_TOP - 0.13), 0.008, METAL, n, segs=10)
-    box("thr_grip", (0.15, -0.375, CONSOLE_TOP - 0.16), (0.1, 0.06, 0.07), BLACK, parent=n, bevel=0.015)
-    cyl("thr_btn", (0.12, -0.35, CONSOLE_TOP - 0.19), (0.115, -0.35, CONSOLE_TOP - 0.197), 0.007, RED, n, segs=10)
+    """Throttle quadrant on the left side panel (photograph 3: lower left)."""
+    fl = side_f(-1)
+    p, ta, tb, n = surface_frame(fl, 0.45, 0.62, -1)
+    on_surface_plate("throttle_quadrant", fl, -1, 0.36, 0.56, 0.52, 0.72, BLACK, lift=0.006)
+    nd = node("throttle", tuple(p))
+    for k in (-1, 1):
+        a = p + n * 0.01 + tb * 0.012 * k
+        cyl(f"thr_arm_{k}", tuple(a), tuple(a + n * 0.10 - ta * 0.02), 0.008, METAL, nd, segs=10)
+    g = p + n * 0.13 - ta * 0.025
+    cyl("thr_grip", tuple(g - tb * 0.04), tuple(g + tb * 0.05), 0.033, BLACK, nd, segs=20)
+    cyl("thr_grip_cap", tuple(g + tb * 0.05), tuple(g + tb * 0.065), 0.028, RUBBER, nd, segs=20)
+    cyl("thr_btn", tuple(g + n * 0.03), tuple(g + n * 0.038), 0.008, RED, nd, segs=10)
 
 
 def levers():
-    # Gear lever on the left panel wing (red knob), pivot at its slot.
-    gx, gy, gz = 0.78, -0.455, 0.45
-    box("gear_panel", (gx, gy + 0.01, gz + 0.0), (0.12, 0.012, 0.09), BLACK, bevel=0.002)
-    n = node("gear_lever", (gx, gy, gz))
-    cyl("gear_arm", (gx, gy, gz), (gx - 0.045, gy + 0.004, gz - 0.035), 0.0055, METAL, n, segs=10)
-    cyl("gear_knob", (gx - 0.045, gy + 0.004, gz - 0.035), (gx - 0.06, gy + 0.004, gz - 0.045), 0.015, RED, n, segs=16)
-    # Emergency gear T-handle under the panel (yellow/black).
-    n = node("emerg_gear", (0.76, -0.30, 0.60))
-    cyl("emerg_stem", (0.80, -0.30, 0.60), (0.76, -0.30, 0.60), 0.006, METAL, n, segs=10)
-    box("emerg_handle", (0.755, -0.30, 0.60), (0.018, 0.08, 0.02), YELLOW, parent=n, bevel=0.004)
-    # Flap lever (left console, ahead of the throttle).
-    n = node("flap_lever", (0.42, -0.42, CONSOLE_TOP))
-    box("flap_gate", (0.42, -0.42, CONSOLE_TOP - 0.004), (0.08, 0.04, 0.008), BLACK)
-    cyl("flap_arm", (0.42, -0.42, CONSOLE_TOP), (0.42, -0.42, CONSOLE_TOP - 0.05), 0.005, METAL, n, segs=10)
-    box("flap_knob", (0.42, -0.42, CONSOLE_TOP - 0.055), (0.03, 0.02, 0.014), WHITE, parent=n, bevel=0.004)
-    # Airbrake switch (left console, behind the throttle).
-    n = node("airbrake_sw", (0.0, -0.40, CONSOLE_TOP - 0.008))
-    cyl("ab_base", (0.0, -0.40, CONSOLE_TOP - 0.008), (0.0, -0.40, CONSOLE_TOP - 0.013), 0.008, METAL)
-    cyl("ab_bat", (0.0, -0.40, CONSOLE_TOP - 0.013), (-0.01, -0.40, CONSOLE_TOP - 0.035), 0.003, GREEN_LAMP, n, segs=8)
-    # Electrical power switches (right console, forward plate).
-    box("elec_plate", (0.27, 0.385, CONSOLE_TOP - 0.004), (0.2, 0.15, 0.008), PAINT_DK, bevel=0.002)
+    fl, fr = side_f(-1), side_f(1)
+    # Gear lever: left side panel, forward (red knob); rotates fore/aft about its slot.
+    p, ta, tb, n = surface_frame(fl, 0.86, 0.42, -1)
+    on_surface_plate("gear_panel", fl, -1, 0.82, 0.92, 0.32, 0.52, BLACK, lift=0.006)
+    nd = node("gear_lever", tuple(p + n * 0.01))
+    cyl("gear_arm", tuple(p + n * 0.01), tuple(p + n * 0.06 - ta * 0.02), 0.0055, METAL, nd, segs=10)
+    cyl("gear_knob", tuple(p + n * 0.06 - ta * 0.02), tuple(p + n * 0.075 - ta * 0.025), 0.015, RED, nd, segs=16)
+    # Flap control: left side panel, ahead of the throttle.
+    p, ta, tb, n = surface_frame(fl, 0.62, 0.55, -1)
+    nd = node("flap_lever", tuple(p + n * 0.01))
+    cyl("flap_arm", tuple(p + n * 0.01), tuple(p + n * 0.045), 0.005, METAL, nd, segs=10)
+    cyl("flap_knob", tuple(p + n * 0.045), tuple(p + n * 0.058), 0.011, WHITE, nd, segs=12)
+    # Airbrake switch: left side panel behind the throttle.
+    p, ta, tb, n = surface_frame(fl, 0.33, 0.45, -1)
+    nd = node("airbrake_sw", tuple(p + n * 0.012))
+    cyl("ab_base", tuple(p + n * 0.006), tuple(p + n * 0.012), 0.007, METAL)
+    cyl("ab_bat", tuple(p + n * 0.012), tuple(p + n * 0.032 + ta * 0.008), 0.003, GREEN_LAMP, nd, segs=8)
+    # Emergency gear T-handle under the panel (yellow).
+    nd = node("emerg_gear", (0.76, -0.30, 0.60))
+    cyl("emerg_stem", (0.80, -0.30, 0.60), (0.76, -0.30, 0.60), 0.006, METAL, nd, segs=10)
+    box("emerg_handle", (0.755, -0.30, 0.60), (0.018, 0.08, 0.02), YELLOW, parent=nd, bevel=0.004)
+    # Electrical power switches: right side panel, a labelled plate.
+    on_surface_plate("elec_plate", fr, 1, 0.50, 0.62, 0.32, 0.52, PAINT_DK, lift=0.006)
     for i, nm in enumerate(("sw_bat", "sw_dcgen", "sw_acgen", "sw_pto")):
-        x = 0.20 + i * 0.045
-        n = node(nm, (x, 0.385, CONSOLE_TOP - 0.013))
-        cyl(f"{nm}_base", (x, 0.385, CONSOLE_TOP - 0.008), (x, 0.385, CONSOLE_TOP - 0.013), 0.006, METAL)
-        cyl(f"{nm}_bat", (x, 0.385, CONSOLE_TOP - 0.013), (x + 0.008, 0.385, CONSOLE_TOP - 0.03), 0.0025, METAL, n, segs=8)
-        box(f"{nm}_label", (x, 0.415, CONSOLE_TOP - 0.009), (0.018, 0.012, 0.002), WHITE)
+        p, ta, tb, n = surface_frame(fr, 0.515 + i * 0.03, 0.40, 1)
+        nd = node(nm, tuple(p + n * 0.013))
+        cyl(f"{nm}_base", tuple(p + n * 0.008), tuple(p + n * 0.013), 0.006, METAL)
+        cyl(f"{nm}_bat", tuple(p + n * 0.013), tuple(p + n * 0.032 + ta * 0.008), 0.0025, METAL, nd, segs=8)
+        q = p + tb * 0.035 + n * 0.0105
+        hexa(f"{nm}_label", [tuple(q + d) for d in (-ta * 0.008 - tb * 0.005, ta * 0.008 - tb * 0.005, ta * 0.008 + tb * 0.005, -ta * 0.008 + tb * 0.005)] +
+             [tuple(q + d - n * 0.002) for d in (-ta * 0.008 - tb * 0.005, ta * 0.008 - tb * 0.005, ta * 0.008 + tb * 0.005, -ta * 0.008 + tb * 0.005)], WHITE)
 
 
 # ---------------------------------------------------------------- build and export
