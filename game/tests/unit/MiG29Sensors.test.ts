@@ -266,7 +266,7 @@ describe("MiG-29 ИЛС formats per mode (BP-29 figs 13, 15, 16, 19–23)", () =
   });
   it("radar search: range scale follows the mode (В 150, АВТ 100, Д 50 km) with the РЛ index", () => {
     const w = new MiG29WeaponControl(); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["RL", "150"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["РЛ", "150"]));
     w.key("-", true); w.key("-", false); stepOnce(w);
     expect(texts(w.hud())).toContain("50");
     w.key("-", true); w.key("-", false); stepOnce(w);
@@ -275,17 +275,17 @@ describe("MiG-29 ИЛС formats per mode (BP-29 figs 13, 15, 16, 19–23)", () =
   it("IRST, CC, HMS, OPT and BRST show their own formats", () => {
     const w = new MiG29WeaponControl();
     w.set("master", "ТП"); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["IR", "GAIN 5"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["ТП", "УСИЛ 5"]));
     w.set("master", "ББ"); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["IR", "CC"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["ТП", "Б.Б"]));
     expect(w.hud().filter((p) => p.kind === "line" && p.frame === "angle").length).toBeGreaterThan(6);
     w.set("master", "ШЛЕМ"); stepOnce(w);
     expect(w.hud().some((p) => p.kind === "circle" && p.frame === "angle")).toBe(false); // HMS is on the helmet, not the ИЛС
     expect(w.helmet().filter((p) => p.kind === "circle").length).toBe(2); // mode-on double circle
     w.set("master", "ОПТ"); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["OPT", "10"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["ОПТ", "10"]));
     w.set("master", "БРСТ"); stepOnce(w);
-    expect(texts(w.hud())).toContain("BRST");
+    expect(texts(w.hud())).toContain("ВИЗ");
   });
   it("ИЗЛ–ЭКВ–ОТКЛ: dummy load keeps the radar silent, ОТКЛ powers it off", () => {
     const w = new MiG29WeaponControl();
