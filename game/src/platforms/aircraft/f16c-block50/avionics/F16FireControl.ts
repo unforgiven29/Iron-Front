@@ -37,7 +37,7 @@ export const APG68_PROFILE: RadarProfile = {
   scanRateRadS: { value: 60 * DEG, ...E("") }, barTurnaroundS: { value: 0.1, ...E("") }, slewRateRadS: { value: 120 * DEG, ...E("") },
   searchGimbal: { value: { azMaxRad: 60 * DEG, elMinRad: -60 * DEG, elMaxRad: 60 * DEG }, ...E("±60° gimbal") },
   trackGimbal: { value: { azMaxRad: 60 * DEG, elMinRad: -60 * DEG, elMaxRad: 60 * DEG }, ...E("") },
-  stabilization: { value: { rollMaxRad: 180 * DEG, pitchMaxRad: 60 * DEG }, ...E("") },
+  stabilization: { value: { rollMaxRad: 180 * DEG, pitchUpRad: 60 * DEG, pitchDownRad: 60 * DEG }, ...E("") },
   minTrackRangeM: { value: 300, ...E("") }, instrumentedRangeM: { value: 160 * 1852, ...E("160 nm scale") },
   acquisition: { value: { offsetAzRad: -3 * DEG, offsetElRad: 1.5 * DEG, boxWidthRad: 6 * DEG, boxSpacingRad: 3 * DEG, boxRateRadS: 30 * DEG, periods: 2, pullInS: 0.8, attempts: 4 }, ...E("") },
   trackMemoryS: { value: 2.0, ...E("") }, maxTrackLosRateRadS: { value: 70 * DEG, ...E("") },

@@ -303,3 +303,56 @@ describe("dummy target set", () => {
     for (const s of specs) expect(s.positionEnuM[2]).toBeGreaterThan(100);
   });
 });
+
+describe("N019 behaviours from the N-019EB description (N019-WEB)", { timeout: 120_000 }, () => {
+  const fly = (targets: AirTargetSpec[], setup: (r: PulseDopplerRadar) => void, alt: number, seconds: number, v = 230) => {
+    const r = new PulseDopplerRadar(N019_PROFILE, 4);
+    r.setPower(true);
+    setup(r);
+    const w = new AirTargetWorld(targets, flat);
+    let y = 0;
+    for (let t = 0.02; t < seconds; t += 0.02) { y += v * 0.02; w.step(0.02); r.step(own(t, y, alt, v), w, 0.02); }
+    return r;
+  };
+  it("mode В: two targets 2 km apart in range in the same beam show as one mark (resolution 5–6 km)", () => {
+    const pair: AirTargetSpec[] = [0, 2000].map((d, i) => ({ id: `p${i}`, label: "p", signature: REF3, positionEnuM: [300, 40000 + d, 5000], headingRad: Math.PI, speedMps: 240, throttle: 0.8 }));
+    const r = fly(pair, (x) => x.setSearch({ pattern: { ...searchV, bars: 1, widthRad: 20 * DEG, center: { az: 0, el: 0 } }, waveformIds: ["HPRF"], tws: false, plotPersistenceS: 3, rangeScaleM: 150000 }), 5000, 12);
+    const recent = r.recentPlots.filter((p) => !p.falseAlarm);
+    expect(recent.length).toBeGreaterThan(0);
+    const times = new Set(recent.map((p) => p.timeS));
+    for (const t of times) expect(recent.filter((p) => p.timeS === t).length).toBe(1);
+  });
+  it("guard channel: with КОМПЕНС on, a close strong target outside the beam is blanked; off, it appears as a ghost in the beam", () => {
+    const side: AirTargetSpec[] = [{ id: "s", label: "s", signature: SIGNATURES.bomber, positionEnuM: [-80, 3000, 4000], headingRad: Math.PI, speedMps: 240, throttle: 0.8 }];
+    // Beam scans 4° centred 10° left; the bomber sits at −1.5°, ≈ 8.5° (2.4 beamwidths) from the beam centre.
+    const stare = { ...searchV, bars: 1, widthRad: 4 * DEG, center: { az: -10 * DEG, el: 0 } };
+    const on = fly(side, (x) => { x.setCompensation(true); x.setSearch({ pattern: stare, waveformIds: ["HPRF"], tws: false, plotPersistenceS: 30, rangeScaleM: 150000 }); }, 4000, 6, 1);
+    const off = fly(side, (x) => { x.setCompensation(false); x.setSearch({ pattern: stare, waveformIds: ["HPRF"], tws: false, plotPersistenceS: 30, rangeScaleM: 150000 }); }, 4000, 6, 1);
+    expect(on.recentPlots.filter((p) => !p.falseAlarm).length).toBe(0);
+    const ghosts = off.recentPlots.filter((p) => !p.falseAlarm);
+    expect(ghosts.length).toBeGreaterThan(0);
+    for (const g of ghosts) expect(Math.abs(g.look.az / DEG + 10)).toBeLessThan(4); // plotted in the beam, not at the target's 31°
+  });
+  it("mode Д at low altitude over ground produces clutter false targets; at altitude looking level it does not", () => {
+    const pat = (el: number) => ({ ...searchV, bars: 3, barSpacingRad: 4 * DEG, widthRad: 40 * DEG, center: { az: 0, el } });
+    const low = fly([], (x) => x.setSearch({ pattern: pat(-3 * DEG), waveformIds: ["MPRF"], tws: false, plotPersistenceS: 60, rangeScaleM: 50000 }), 700, 30);
+    const high = fly([], (x) => x.setSearch({ pattern: pat(3 * DEG), waveformIds: ["MPRF"], tws: false, plotPersistenceS: 60, rangeScaleM: 50000 }), 9000, 30);
+    expect(low.recentPlots.filter((p) => p.falseAlarm).length).toBeGreaterThan(high.recentPlots.filter((p) => p.falseAlarm).length);
+  });
+  it("mode В lock stays ВЧП: a locked target that turns away and stops closing is lost", () => {
+    const wcs = new MiG29WeaponControl(8);
+    const t: AirTargetSpec = { id: "t", label: "t", signature: REF3, positionEnuM: [200, 20000, 5000], headingRad: Math.PI, speedMps: 230, throttle: 0.8, script: [{ kind: "straight", durationS: 8 }, { kind: "turn", rateDegS: 15, durationS: 12 }, { kind: "straight", durationS: 60 }] };
+    const world = new AirTargetWorld([t], flat);
+    let lockedOnce = false, lost = "";
+    for (let tm = 0.02; tm < 40; tm += 0.02) {
+      world.step(0.02);
+      const o = own(tm, tm * 150, 5000, 150);
+      if (tm > 0.5 && !lockedOnce && !wcs.radar.lock(o) && wcs.radar.state === "search") wcs.radar.designate({ look: { az: 0.01, el: 0 }, frame: "stabilized", rangeM: world.states()[0]!.positionEnuM[1] - o.positionEnuM[1], rangeWindowM: 10000 });
+      wcs.step({ own: o, snapshot: {} as AircraftSnapshot, scene: world, head: { az: 0, el: 0 } }, 0.02);
+      if (wcs.radar.lock(o)) lockedOnce = true;
+      if (lockedOnce && !lost && wcs.radar.lossEvent && wcs.radar.lossEvent.timeS > 1) lost = wcs.radar.lossEvent.reason;
+    }
+    expect(lockedOnce).toBe(true);
+    expect(lost).toMatch(/lost|notch|gate|clutter/);
+  });
+});

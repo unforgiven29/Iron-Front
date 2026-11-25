@@ -67,6 +67,10 @@ export interface WaveformSpec {
    * processing losses of the waveform — wider effective bandwidth, gate straddle, A/D — are included.
    */
   readonly sensitivityDbw?: Sourced<number>;
+  /** Two targets in one beam closer than this in range show as one mark, m. */
+  readonly rangeResolutionM?: Sourced<number>;
+  /** Shortest range this waveform reports in search, m. */
+  readonly minSearchRangeM?: Sourced<number>;
   /** Track-while-scan range gate, ± m. */
   readonly twsRangeGateM: Sourced<number>;
   /** Documented closure gates of this waveform's processing (e.g. a minimum closure in tail chase). */
@@ -95,7 +99,7 @@ export interface RadarProfile {
   readonly slewRateRadS: Sourced<number>;
   readonly searchGimbal: Sourced<GimbalLimits>;
   readonly trackGimbal: Sourced<GimbalLimits>;
-  readonly stabilization: Sourced<{ readonly rollMaxRad: number; readonly pitchMaxRad: number }>;
+  readonly stabilization: Sourced<{ readonly rollMaxRad: number; readonly pitchUpRad: number; readonly pitchDownRad: number }>;
   readonly minTrackRangeM: Sourced<number>;
   readonly instrumentedRangeM: Sourced<number>;
   readonly acquisition: Sourced<{
@@ -113,6 +117,17 @@ export interface RadarProfile {
   /** Range-tracking α–β gains per track tact. */
   readonly rangeFilter: Sourced<{ readonly alpha: number; readonly beta: number }>;
   readonly waveforms: Readonly<Record<string, WaveformSpec>>;
+  /**
+   * Guard (compensation) channel: a wide-beam auxiliary antenna. With it on, returns arriving through
+   * the main antenna's sidelobes (guard signal stronger) are blanked; with it off they are processed
+   * and plotted in the main beam's direction (sidelobe ghosts). Omitted = no guard channel.
+   */
+  readonly guardChannel?: Sourced<{ readonly blankBeyondBeamwidths: number }>;
+  /**
+   * How far the detection threshold rises with clutter (CFAR clutter suppression), dB. A radar whose
+   * threshold only partly follows clutter produces false targets over strong ground clutter.
+   */
+  readonly clutterThresholdSuppressionDb?: Sourced<number>;
   readonly tws: Sourced<{ readonly capacity: number; readonly dropAfterS: number; readonly gateAzRad: number; readonly gateElRad: number }>;
   readonly warmUpS: Sourced<number>;
 }
@@ -183,6 +198,10 @@ export interface AcquisitionRequest {
   readonly maxRangeM?: number;
   /** Skip the box search and stare (target already in the beam, e.g. close-combat auto-lock). */
   readonly stare?: boolean;
+  /** Override the acquisition box (e.g. the N019 СНП 40° × 8° box), and how many box periods to try. */
+  readonly box?: { readonly widthRad: number; readonly bars: number; readonly spacingRad: number; readonly periods: number };
+  /** Minimum tracking range for this lock, m (defaults to the profile's). */
+  readonly trackMinRangeM?: number;
 }
 
 export interface RadarSearchCommand {
@@ -198,7 +217,7 @@ export interface RadarSearchCommand {
   readonly autoAcquire?: { readonly minRangeM: number; readonly maxRangeM: number };
 }
 
-export interface ProcessResult { readonly detected: boolean; readonly snr: number; readonly reason: "ok" | "notch" | "clutter" | "eclipse" | "fade" | "gate" }
+export interface ProcessResult { readonly detected: boolean; readonly snr: number; readonly reason: "ok" | "notch" | "clutter" | "eclipse" | "fade" | "gate" | "sidelobe" }
 
 type Acq = { req: AcquisitionRequest; t: number; phase: "slew" | "box" | "pull-in"; scan: RasterScan; boxes: number; attempts: number; f?: AlphaBetaTrack; hits: number; pullT: number };
 
@@ -217,7 +236,9 @@ export class PulseDopplerRadar {
   private tws: { id: number; pos: Vector3; vel: Vector3; t: number; hits: number }[] = [];
   private nextTrackId = 1;
   private acq: Acq | null = null;
-  private stt: { f: AlphaBetaTrack; closure: number; closureRate: number; lastDetectS: number; since: number; lastReason: string; snrDb: number; lastLos: Vector3 | null } | null = null;
+  private guardOn = true;
+  private trackWaveformIds: readonly string[] | null = null;
+  private stt: { minRangeM: number; f: AlphaBetaTrack; closure: number; closureRate: number; lastDetectS: number; since: number; lastReason: string; snrDb: number; lastLos: Vector3 | null } | null = null;
   private lastLoss: { reason: string; timeS: number } | null = null;
   private clutterCache: { key: string; patches: readonly ClutterPatch[]; t: number } | null = null;
   private bars = 0;
@@ -244,6 +265,11 @@ export class PulseDopplerRadar {
     this.search = cmd;
     if (changed) this.scan.reset();
   }
+  /** Guard (compensation) channel on/off — the КОМПЕНС switch on the N019. */
+  public setCompensation(on: boolean): void { this.guardOn = on; }
+  public get compensation(): boolean { return this.guardOn && !!this.profile.guardChannel; }
+  /** Waveforms the radar may track with (e.g. HPRF only in a head-on mode); null = choose automatically. */
+  public setTrackWaveforms(ids: readonly string[] | null): void { this.trackWaveformIds = ids; }
   public designate(req: AcquisitionRequest): void {
     if (this.status === "track" || this.status === "memory" || this.acq) return;
     const a = this.profile.acquisition.value;
@@ -301,7 +327,7 @@ export class PulseDopplerRadar {
 
   private stabilized(own: SensorOwnship): boolean {
     const s = this.profile.stabilization.value;
-    return Math.abs(own.rollRad) <= s.rollMaxRad && Math.abs(own.pitchRad) <= s.pitchMaxRad;
+    return Math.abs(own.rollRad) <= s.rollMaxRad && own.pitchRad <= s.pitchUpRad && own.pitchRad >= -s.pitchDownRad;
   }
 
   /** Point the antenna: convert to body, clip to the gimbal, return the world direction actually achieved. */
@@ -316,10 +342,10 @@ export class PulseDopplerRadar {
   }
 
   private clutter(own: SensorOwnship, scene: SensorScene, beam: Vector3, look: RadarLook, tcoh: number, key: string): readonly ClutterPatch[] {
-    // Recompute when the beam moved more than half a beamwidth or 0.25 s passed.
-    const hb = this.hw.antenna.halfPowerBeamwidthRad / 2;
+    // Recompute when the beam moved about a beamwidth or 0.5 s passed.
+    const hb = this.hw.antenna.halfPowerBeamwidthRad;
     const k = `${key}|${Math.round(Math.atan2(beam[0], beam[1]) / hb)}|${Math.round(Math.asin(Math.max(-1, Math.min(1, beam[2]))) / hb)}`;
-    if (this.clutterCache && this.clutterCache.key === k && own.timeS - this.clutterCache.t < 0.25) return this.clutterCache.patches;
+    if (this.clutterCache && this.clutterCache.key === k && own.timeS - this.clutterCache.t < 0.5) return this.clutterCache.patches;
     const patches = scene.radarClutter({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamDirection: beam, look, integrationTimeS: tcoh, maxRangeM: this.profile.instrumentedRangeM.value });
     this.clutterCache = { key: k, patches, t: own.timeS };
     return patches;
@@ -338,6 +364,8 @@ export class PulseDopplerRadar {
     const lambda = this.hw.wavelengthM;
     const relDopplerHz = (2 * (echo.closureMps - dot(own.velocityEnuMps, beam))) / lambda;
     if (Math.abs(relDopplerHz) < (2 * wf.mainlobeNotchMps.value) / lambda) return { detected: false, snr: echo.meanSnr, reason: "notch" };
+    const guard = this.profile.guardChannel?.value;
+    if (guard && this.guardOn && echo.offBeamRad > guard.blankBeyondBeamwidths * this.hw.antenna.halfPowerBeamwidthRad) return { detected: false, snr: echo.meanSnr, reason: "sidelobe" };
     for (const g of wf.closureGates?.value ?? []) {
       if (echo.rangeM <= g.maxRangeM && echo.closureMps < g.minClosureMps) return { detected: false, snr: echo.meanSnr, reason: "gate" };
     }
@@ -389,10 +417,11 @@ export class PulseDopplerRadar {
     return { detected, snr: echo.meanSnr * fluct, reason };
   }
 
-  private measureSearch(echo: RadarEcho, wf: WaveformSpec, snr: number, own: SensorOwnship): { rangeM: number; los: Vector3; closure: number } {
+  private measureSearch(echo: RadarEcho, wf: WaveformSpec, snr: number, own: SensorOwnship, beamDir: Vector3): { rangeM: number; los: Vector3; closure: number } {
     const bw = this.hw.antenna.halfPowerBeamwidthRad;
     const sigA = bw / (1.6 * Math.sqrt(2 * Math.max(1, snr)));
-    const st = stabilizedAngles(own, echo.losEnu);
+    // A return through a sidelobe is plotted where the main beam points (angle comes from the antenna position).
+    const st = stabilizedAngles(own, echo.offBeamRad > this.hw.antenna.halfPowerBeamwidthRad ? beamDir : echo.losEnu);
     const look = { az: st.az + this.gauss() * sigA, el: st.el + this.gauss() * sigA };
     const dopplerRes = this.hw.wavelengthM / (2 * this.profile.timing.value.searchCoherentS);
     return { rangeM: Math.max(10, echo.rangeM + this.gauss() * wf.searchRangeSigmaM.value), los: worldDirection("stabilized", own, look), closure: echo.closureMps + this.gauss() * dopplerRes / 2 };
@@ -428,13 +457,28 @@ export class PulseDopplerRadar {
     const tacts = Math.max(1, Math.round(this.hw.antenna.halfPowerBeamwidthRad / rate / T.searchTactS));
     const look = this.lookFor(wf);
     const echoes = scene.radar({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamFrom: from, beamTo: to, look, integrationTimeS: T.searchCoherentS, reportFloorSnr: 0.05, maxRangeM: Math.min(cmd.rangeScaleM, this.profile.instrumentedRangeM.value) });
-    const clutter = echoes.length ? this.clutter(own, scene, to, look, T.searchCoherentS, wf.id) : [];
+    const clutter = echoes.length || this.profile.clutterThresholdSuppressionDb ? this.clutter(own, scene, to, look, T.searchCoherentS, wf.id) : [];
+    const found: RadarPlot[] = [];
     for (const e of echoes) {
       const r = this.process(e, wf, to, own, tacts, T.searchCoherentS, clutter);
       if (!r.detected) continue;
-      const m = this.measureSearch(e, wf, r.snr, own);
-      this.addPlot({ timeS: own.timeS, rangeM: m.rangeM, closureMps: m.closure, look: stabilizedAngles(own, m.los), losEnu: m.los, snrDb: 10 * Math.log10(r.snr), waveformId: wf.id }, own);
+      const m = this.measureSearch(e, wf, r.snr, own, to);
+      if (m.rangeM < (wf.minSearchRangeM?.value ?? 0)) continue;
+      found.push({ timeS: own.timeS, rangeM: m.rangeM, closureMps: m.closure, look: stabilizedAngles(own, m.los), losEnu: m.los, snrDb: 10 * Math.log10(r.snr), waveformId: wf.id });
     }
+    // Range resolution: returns in the same beam closer than the resolution merge into one mark (strongest wins,
+    // range weighted by power).
+    const res = wf.rangeResolutionM?.value ?? 0;
+    found.sort((a, b) => a.rangeM - b.rangeM);
+    for (let i = 0; i < found.length; i++) {
+      let grp = [found[i] as RadarPlot];
+      while (i + 1 < found.length && (found[i + 1] as RadarPlot).rangeM - (grp[0] as RadarPlot).rangeM < res) grp.push(found[++i] as RadarPlot);
+      const w = grp.map((p) => 10 ** (p.snrDb / 10)), sw = w.reduce((a, b) => a + b, 0);
+      const best = grp.reduce((a, b) => (b.snrDb > a.snrDb ? b : a));
+      this.addPlot({ ...best, rangeM: grp.reduce((acc, p, k) => acc + p.rangeM * (w[k] as number), 0) / sw }, own);
+      grp = [];
+    }
+    if (clutter.length) this.clutterFalseAlarms(own, wf, to, tacts, T.searchCoherentS, clutter, cmd.rangeScaleM);
     // Noise false alarms: range–Doppler cells per look × Pfa, confirmed by the measurement tacts.
     const cells = (Math.min(cmd.rangeScaleM, this.profile.instrumentedRangeM.value) / ((C * wf.pulseWidthS.value) / 2)) * Math.max(1, Math.round((wf.prfsHz.value[0] as number) * T.searchCoherentS / 8));
     const looksThisTick = (dt * rate) / this.hw.antenna.halfPowerBeamwidthRad * tacts;
@@ -443,6 +487,39 @@ export class PulseDopplerRadar {
       this.addPlot({ timeS: own.timeS, rangeM: this.rng.nextFloat() * cmd.rangeScaleM, closureMps: Number.NaN, look: stabilizedAngles(own, to), losEnu: to, snrDb: 12, waveformId: wf.id, falseAlarm: true }, own);
     }
     if (cmd.tws) this.updateTws(own, wf);
+  }
+
+  /**
+   * False targets from ground clutter: a few random range–Doppler cells per look are tested against the
+   * threshold; the threshold rises with clutter only by `clutterThresholdSuppressionDb`, so strong clutter
+   * cells (low altitude, look-down, medium PRF) cross it. Clutter is spatially fixed, so confirmation tacts
+   * do not reject it.
+   */
+  private clutterFalseAlarms(own: SensorOwnship, wf: WaveformSpec, beam: Vector3, tacts: number, coherentS: number, clutter: readonly ClutterPatch[], rangeScaleM: number): void {
+    const supp = this.profile.clutterThresholdSuppressionDb?.value;
+    if (supp === undefined) return;
+    const prf = wf.prfsHz.value[this.tactPhase % wf.prfsHz.value.length] as number;
+    const filterHz = 1 / coherentS;
+    const sensScale = wf.sensitivityDbw ? 10 ** ((receiverSensitivityDbw(this.profile, coherentS) - wf.sensitivityDbw.value) / 10) : 1;
+    const T = -Math.log(this.profile.falseAlarmProbability.value);
+    const notchHz = (2 * wf.mainlobeNotchMps.value) / this.hw.wavelengthM;
+    const band = wf.coverage?.value.dopplerBandHz ?? prf - 2 * notchHz;
+    const gate = (C * wf.pulseWidthS.value) / 2;
+    const cellsPerLook = (Math.min(rangeScaleM, C / (2 * prf)) / gate) * Math.max(1, band / filterHz);
+    const samples = 6;
+    for (let i = 0; i < samples; i++) {
+      const fd = notchHz + this.rng.nextFloat() * band;
+      const r = gate + this.rng.nextFloat() * Math.min(rangeScaleM, C / (2 * prf));
+      const cnr = sensScale * clutterInCell(clutter, fd, prf, filterHz, r, wf.rangeGated ? gate : 0) * 10 ** (-supp / 10);
+      if (cnr < 1e-3) continue;
+      const pCell = Math.exp(-T / (1 + cnr)) - Math.exp(-T);
+      const expected = (pCell * cellsPerLook * tacts) / samples;
+      if (this.rng.nextFloat() < Math.min(1, expected)) {
+        const range = wf.rangeGated ? r + Math.floor(this.rng.nextFloat() * (rangeScaleM / (C / (2 * prf)))) * (C / (2 * prf)) : this.rng.nextFloat() * rangeScaleM;
+        if (range > rangeScaleM) continue;
+        this.addPlot({ timeS: own.timeS, rangeM: range, closureMps: Number.NaN, look: stabilizedAngles(own, beam), losEnu: beam, snrDb: 10 * Math.log10(1 + cnr), waveformId: wf.id, falseAlarm: true }, own);
+      }
+    }
   }
 
   private addPlot(p: RadarPlot, own: SensorOwnship): void {
@@ -493,7 +570,7 @@ export class PulseDopplerRadar {
     const boxCentre = designated;
     if (a.phase === "slew") {
       // Fastest path to the point 4° left / 2° above the designation (start of the box), N019 practice.
-      const start = { az: boxCentre.az + A.offsetAzRad, el: boxCentre.el + A.offsetElRad };
+      const start = a.req.box ? { az: boxCentre.az - a.req.box.widthRad / 2, el: boxCentre.el + (a.req.box.spacingRad * (a.req.box.bars - 1)) / 2 } : { az: boxCentre.az + A.offsetAzRad, el: boxCentre.el + A.offsetElRad };
       const cur = anglesIn(a.req.frame, own, this.pointing(own, this.lookFrame, this.look, this.profile.trackGimbal.value));
       const next = slew(cur, start, this.profile.slewRateRadS.value, dt);
       this.lookFrame = a.req.frame;
@@ -504,14 +581,15 @@ export class PulseDopplerRadar {
     const wf = this.trackWaveform(own, worldDirection(a.req.frame, own, designated));
     const look = this.lookFor(wf);
     if (a.phase === "box") {
-      const pat: RasterPattern = { frame: a.req.frame, center: boxCentre, widthRad: A.boxWidthRad, bars: 2, barSpacingRad: A.boxSpacingRad, orientation: "horizontal", rateRadS: A.boxRateRadS, turnaroundS: 0.05 };
+      const bx = a.req.box;
+      const pat: RasterPattern = { frame: a.req.frame, center: boxCentre, widthRad: bx?.widthRad ?? A.boxWidthRad, bars: bx?.bars ?? 2, barSpacingRad: bx?.spacingRad ?? A.boxSpacingRad, orientation: "horizontal", rateRadS: bx ? this.profile.scanRateRadS.value : A.boxRateRadS, turnaroundS: 0.05 };
       const frames = a.scan.frameCount;
       const from = this.pointing(own, pat.frame, a.scan.look(pat), this.profile.trackGimbal.value);
       a.scan.advance(pat, dt);
       this.look = a.scan.look(pat);
       this.lookFrame = pat.frame;
       if (a.scan.frameCount > frames) a.boxes++;
-      if (a.boxes >= A.periods) { this.lastLoss = { reason: "no target in box", timeS: own.timeS }; this.acq = null; return; }
+      if (a.boxes >= (bx?.periods ?? A.periods)) { this.lastLoss = { reason: "no target in box", timeS: own.timeS }; this.acq = null; return; }
       const to = this.pointing(own, pat.frame, this.look, this.profile.trackGimbal.value);
       const tacts = Math.max(1, Math.round(this.hw.antenna.halfPowerBeamwidthRad / A.boxRateRadS / T.searchTactS));
       const echoes = scene.radar({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamFrom: from, beamTo: to, look, integrationTimeS: T.searchCoherentS, reportFloorSnr: 0.05, maxRangeM: this.profile.instrumentedRangeM.value });
@@ -521,7 +599,7 @@ export class PulseDopplerRadar {
         if (e.rangeM < (a.req.minRangeM ?? this.profile.minTrackRangeM.value) || e.rangeM > (a.req.maxRangeM ?? Infinity)) continue;
         const r = this.process(e, wf, to, own, tacts, T.searchCoherentS, clutter);
         if (!r.detected) continue;
-        const m = this.measureSearch(e, wf, r.snr, own);
+        const m = this.measureSearch(e, wf, r.snr, own, to);
         a.f = new AlphaBetaTrack([own.positionEnuM[0] + m.los[0] * m.rangeM, own.positionEnuM[1] + m.los[1] * m.rangeM, own.positionEnuM[2] + m.los[2] * m.rangeM], own.timeS);
         a.phase = "pull-in"; a.pullT = 0; a.hits = 0;
         break;
@@ -553,7 +631,7 @@ export class PulseDopplerRadar {
     } else a.f.coast(own.timeS);
     if (a.pullT >= A.pullInS) {
       if (a.hits >= Math.max(3, Math.round(A.pullInS / T.trackTactS / 3))) {
-        this.stt = { f: a.f, closure: dot(own.velocityEnuMps, los) - dot(a.f.velocity, los), closureRate: 0, lastDetectS: own.timeS, since: own.timeS, lastReason: "ok", snrDb: 0, lastLos: null };
+        this.stt = { minRangeM: a.req.trackMinRangeM ?? this.profile.minTrackRangeM.value, f: a.f, closure: dot(own.velocityEnuMps, los) - dot(a.f.velocity, los), closureRate: 0, lastDetectS: own.timeS, since: own.timeS, lastReason: "ok", snrDb: 0, lastLos: null };
         this.acq = null;
         this.status = "track";
       } else if (++a.attempts >= A.attempts) { this.lastLoss = { reason: "lock attempts failed", timeS: own.timeS }; this.acq = null; }
@@ -566,8 +644,10 @@ export class PulseDopplerRadar {
     const wfs = Object.values(this.profile.waveforms);
     const ownSpeed = norm(own.velocityEnuMps);
     const closure = this.stt ? this.stt.closure : ownSpeed * 2;
-    const high = wfs.find((w) => !w.rangeGated);
-    const med = wfs.find((w) => w.rangeGated);
+    const allowed = this.trackWaveformIds ? wfs.filter((w) => this.trackWaveformIds!.includes(w.id)) : wfs;
+    if (allowed.length === 1) return allowed[0] as WaveformSpec;
+    const high = allowed.find((w) => !w.rangeGated);
+    const med = allowed.find((w) => w.rangeGated);
     void los;
     return (closure > ownSpeed ? high : med) ?? high ?? (wfs[0] as WaveformSpec);
   }
@@ -581,7 +661,7 @@ export class PulseDopplerRadar {
     const los = scale(r, 1 / Math.max(1, range));
     const body = bodyAngles(own, los);
     if (!withinGimbal(this.profile.trackGimbal.value, body)) { this.breakLock("gimbal limit"); return; }
-    if (range < this.profile.minTrackRangeM.value) { this.breakLock("minimum range"); return; }
+    if (range < s.minRangeM) { this.breakLock("minimum range"); return; }
     if (s.lastLos && angleBetween(s.lastLos, los) / dt > this.profile.maxTrackLosRateRadS.value) { this.breakLock("angle rate"); return; }
     s.lastLos = los;
     this.look = anglesIn(this.lookFrame, own, los);

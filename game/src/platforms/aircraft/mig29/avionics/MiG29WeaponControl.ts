@@ -51,12 +51,13 @@ export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "home", label: "Radar transmit / standby / off", control: "ИЗЛ–ЭКВ–ОТКЛ switch, panel ПУР-31" },
   { key: "end", label: "Track-while-scan: off / head-on / tail", control: "СНП ППС–ЗПС switch, panel ПУР-31" },
   { key: "insert", label: "Radar + IRST work together on/off", control: "ТОРМОЗ–БЕЗ ТОРМОЗА switch, panel С-31" },
-  { key: "delete", label: "Laser rangefinder on/off", control: "OEPS laser enable" }
+  { key: "delete", label: "Laser rangefinder on/off", control: "OEPS laser enable" },
+  { key: "c", label: "Radar sidelobe guard on/off", control: "КОМПЕНС switch, panel ПУР-31 (guard channel)" }
 ];
 
 export interface Mig29WcsStatus {
   master: Master; radarMode: RadarMode; zone: number; dhKm: number; strobeKm: number; strobeAzDeg: number; strobeElDeg: number;
-  emission: Emission; snp: Snp; interaction: boolean; laser: boolean;
+  emission: Emission; snp: Snp; interaction: boolean; laser: boolean; compensation: boolean;
 }
 
 /** Approximate R-27R max launch range, km, from BP-29 p.21 (ППС 50–60 km, ЗПС 16–18 km at altitude) and fig.17's trend; display only. */
@@ -77,6 +78,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
   private held = new Set<string>();
   private ctx: AvionicsContext | null = null;
   private lockPressed = false;
+  /** СНП priority target chosen by the pilot (overrides the automatic most-dangerous choice). */
+  private priorityId: number | null = null;
 
   public constructor(seed = 29) {
     this.radar = new PulseDopplerRadar(N019_PROFILE, seed);
@@ -84,7 +87,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
   }
 
   private static initial(): Mig29WcsStatus {
-    return { master: "РЛС", radarMode: "В", zone: 0, dhKm: 0, strobeKm: 40, strobeAzDeg: 0, strobeElDeg: 0, emission: "ИЗЛ", snp: "ОТКЛ", interaction: false, laser: true };
+    return { master: "РЛС", radarMode: "В", zone: 0, dhKm: 0, strobeKm: 40, strobeAzDeg: 0, strobeElDeg: 0, emission: "ИЗЛ", snp: "ОТКЛ", interaction: false, laser: true, compensation: true };
   }
 
   public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); }
@@ -113,6 +116,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       case "end": s.snp = cycle<Snp>(["ОТКЛ", "ППС", "ЗПС"], s.snp); break;
       case "insert": s.interaction = !s.interaction; break;
       case "delete": s.laser = !s.laser; break;
+      case "c": s.compensation = !s.compensation; break;
     }
     return true;
   }
@@ -123,19 +127,51 @@ export class MiG29WeaponControl implements AvionicsSuite {
     // BP-29 figs 12–13: two vertical lines, 6° wide, −13° … +37°, fixed to the aircraft axis; RLPK slide 8:
     // review period 1.2 s → ≈ 90°/s over 2 × 50° (DERIVED).
     if (s.radarMode === "БЛ.БОЙ") return CLOSE_COMBAT_PATTERN;
-    // №4: 50° × 10.5° for strobe range < 30 km; №5: 50° × 7.8° at ≥ 30 km; 57°/s; 3 bars.
-    const elSpan = (s.strobeKm < 30 ? 10.5 : 7.8) * DEG;
-    const el = Math.max(-45 * DEG + elSpan / 2, Math.min(60 * DEG - elSpan / 2, Math.atan2(s.dhKm, Math.max(1, s.strobeKm))));
-    return { frame: "stabilized", center: { az: s.zone * 40 * DEG, el }, widthRad: 50 * DEG, bars: 3, barSpacingRad: (elSpan - 3.5 * DEG) / 2, orientation: "horizontal" };
+    // Mode Д (N019-WEB): 40° × 16.5° below 20 km strobe range, 30° × 13.5° beyond.
+    // Modes В/АВТ: zone №4 50° × 10.5° below 30 km, №5 50° × 7.8° beyond (RLPK slide 39); 57°/s.
+    const pursuit = s.radarMode === "Д";
+    const width = pursuit ? (s.strobeKm < 20 ? 40 : 30) * DEG : 50 * DEG;
+    const elSpan = (pursuit ? (s.strobeKm < 20 ? 16.5 : 13.5) : s.strobeKm < 30 ? 10.5 : 7.8) * DEG;
+    const bars = Math.max(2, Math.round((elSpan - 3.5 * DEG) / (3.4 * DEG)) + 1);
+    // Elevation centre: α ≈ ΔH/Д (BP-29 p.9); in СНП the zone follows the priority target in elevation (N019-WEB).
+    let el = Math.atan2(s.dhKm, Math.max(1, s.strobeKm));
+    const own = this.ctx?.own;
+    const pt = own && this.snpActive() ? this.priorityTrack(own) : undefined;
+    if (pt) el = pt.look.el;
+    el = Math.max(-36 * DEG + elSpan / 2, Math.min(56 * DEG - elSpan / 2, el));
+    return { frame: "stabilized", center: { az: s.zone * 40 * DEG, el }, widthRad: width, bars, barSpacingRad: (elSpan - 3.5 * DEG) / (bars - 1), orientation: "horizontal" };
   }
 
-  /** Waveforms for the radar mode (АВТ alternates ВЧП/СЧП; СНП ППС/ЗПС forces ВЧП/СЧП). */
+  /**
+   * Waveforms for the radar mode: В = ВЧП, Д = СЧП, АВТ alternates ВЧП/СЧП line by line except below
+   * 10 km strobe range where only СЧП is used (N019-WEB); СНП ППС/ЗПС forces ВЧП/СЧП.
+   */
   private waveforms(): string[] {
     const s = this.s;
     if (s.radarMode === "БЛ.БОЙ") return ["BMB"];
+    if (s.radarMode === "АВТ") return s.strobeKm < 10 ? ["MPRF"] : ["HPRF", "MPRF"];
     if (s.snp === "ППС") return ["HPRF"];
     if (s.snp === "ЗПС") return ["MPRF"];
-    return s.radarMode === "В" ? ["HPRF"] : s.radarMode === "Д" ? ["MPRF"] : ["HPRF", "MPRF"];
+    return s.radarMode === "В" ? ["HPRF"] : ["MPRF"];
+  }
+
+  /** Waveforms the lock may use: В locks stay ВЧП (a target that stops closing is lost), Д stays СЧП, АВТ chooses. */
+  private trackWaveforms(): string[] | null {
+    const s = this.s;
+    if (s.master === "ББ" || s.radarMode === "БЛ.БОЙ") return ["BMB"];
+    if (s.radarMode === "АВТ") return null;
+    return s.radarMode === "В" ? ["HPRF"] : ["MPRF"];
+  }
+
+  /** Track-while-scan: СНП switch in В/Д; built into АВТ (N019-WEB). */
+  private snpActive(): boolean {
+    const s = this.s;
+    return s.master === "РЛС" && (s.radarMode === "АВТ" || (s.snp !== "ОТКЛ" && (s.radarMode === "В" || s.radarMode === "Д")));
+  }
+
+  private priorityTrack(own: SensorOwnship): RadarTrackReport | undefined {
+    const tracks = this.radar.tracks(own);
+    return tracks.find((t) => t.id === this.priorityId) ?? this.mostDangerous(own);
   }
 
   /** RLPK slide 65: the OEPS leads in ТП, ШЛЕМ, ОПТ and in close combat when the laser is on. */
@@ -164,15 +200,15 @@ export class MiG29WeaponControl implements AvionicsSuite {
     // The radar emits in РЛС, in ББ without the laser, and as the slaved channel with ТОРМОЗ (interaction).
     const radarWanted = s.master === "РЛС" || (s.master === "ББ" && !s.laser) || (s.interaction && s.master !== "НВГ");
     this.radar.setRadiate(s.emission === "ИЗЛ" && radarWanted);
-    const closeCombat = s.radarMode === "БЛ.БОЙ" || s.master === "ББ";
     this.radar.setSearch({
       pattern: s.master === "ББ" ? CLOSE_COMBAT_PATTERN : this.searchPattern(),
       waveformIds: s.master === "ББ" ? ["BMB"] : this.waveforms(),
-      tws: s.snp !== "ОТКЛ" && !closeCombat,
+      tws: this.snpActive(),
       plotPersistenceS: 4,
-      rangeScaleM: (s.master === "ББ" ? 10 : scale) * 1000,
-      ...(closeCombat && radarWanted && !this.oepsLeads() ? { autoAcquire: { minRangeM: 450, maxRangeM: 10000 } } : {})
+      rangeScaleM: (s.master === "ББ" ? 10 : scale) * 1000
     });
+    this.radar.setCompensation(s.compensation);
+    this.radar.setTrackWaveforms(this.trackWaveforms());
 
     // OEPS by mode (BP-29 figs 14–16, 23).
     if (s.master === "ТП") this.kols.setScan({ frame: "body", center: { az: 0, el: 0 }, widthRad: 60 * DEG, bars: 8, barSpacingRad: 3.75 * DEG, orientation: "horizontal" });
@@ -186,10 +222,11 @@ export class MiG29WeaponControl implements AvionicsSuite {
     if (this.lockPressed) { this.lockPressed = false; this.designate(ctx); }
 
     // СНП: the most dangerous track (min Д/Ḋ) is framed; auto-lock at the max launch range (BP-29 p.14).
-    if (s.master === "РЛС" && s.snp !== "ОТКЛ" && this.radar.state === "search") {
-      const md = this.mostDangerous(ctx.own);
+    // At the max launch range the radar stops scanning and searches a 40° × 8° box on the target for up to 3 cycles (N019-WEB).
+    if (this.snpActive() && this.radar.state === "search") {
+      const md = this.priorityTrack(ctx.own);
       if (md && md.rangeM / 1000 < r27MaxLaunchKm(this.aspectDeg(md, ctx.own.positionEnuM), ctx.own.positionEnuM[2])) {
-        this.radar.designate({ look: md.look, frame: "stabilized", rangeM: md.rangeM, rangeWindowM: 3000 });
+        this.radar.designate({ look: md.look, frame: "stabilized", rangeM: md.rangeM, rangeWindowM: 10000, box: { widthRad: 40 * DEG, bars: 3, spacingRad: 2.25 * DEG, periods: 3 } });
       }
     }
     // OEPS leading + interaction: the radar gets the direction only ("quasi-search") and captures inside
@@ -208,15 +245,25 @@ export class MiG29WeaponControl implements AvionicsSuite {
 
   private designate(ctx: AvionicsContext): void {
     const s = this.s;
-    if (s.master === "РЛС" && s.radarMode !== "БЛ.БОЙ") {
+    if (this.snpActive()) {
+      // СНП: the button over a track makes it the priority target; over the current priority it locks now.
+      const t = this.radar.tracks(ctx.own).filter((x) => Math.abs(x.look.az / DEG - s.strobeAzDeg) < 5 && Math.abs(x.rangeM / 1000 - s.strobeKm) < SCALE_KM[s.radarMode] * 0.08)[0];
+      if (t && t.id !== this.priorityId) { this.priorityId = t.id; return; }
+      if (t) { this.radar.designate({ look: t.look, frame: "stabilized", rangeM: t.rangeM, rangeWindowM: 10000 }); return; }
+    }
+    if ((s.master === "РЛС" && s.radarMode === "БЛ.БОЙ") || (s.master === "ББ" && !this.oepsLeads())) {
+      // Semi-automatic close combat: the closest return in the zone, 450 m – 10 km, is locked (N019-WEB, BP-29 p.16).
+      const p = this.radar.recentPlots.filter((x) => !x.falseAlarm && x.rangeM >= 450 && x.rangeM <= 10000 && ctx.own.timeS - x.timeS < 1.5).sort((a, b) => a.rangeM - b.rangeM)[0];
+      if (p) this.radar.designate({ look: bodyAngles(ctx.own, p.losEnu), frame: "body", rangeM: p.rangeM, rangeWindowM: 800, stare: true, trackMinRangeM: 250 });
+      return;
+    }
+    if (s.master === "РЛС") {
       // Strobe over a mark (KU-31) + МРК.ЗАХВ: the radar re-finds the target in the strobed direction.
       const pat = this.searchPattern();
       const plot = this.radar.recentPlots.filter((p) => !p.falseAlarm && Math.abs(p.look.az / DEG - s.strobeAzDeg) < 4 && Math.abs(p.rangeM / 1000 - s.strobeKm) < SCALE_KM[s.radarMode] * 0.06)
         .sort((a, b) => b.timeS - a.timeS)[0];
       const look: LookAngles = plot ? plot.look : { az: s.strobeAzDeg * DEG, el: pat.center.el };
       this.radar.designate({ look, frame: "stabilized", rangeM: plot ? plot.rangeM : s.strobeKm * 1000, rangeWindowM: this.waveforms().includes("HPRF") ? 10000 : 2000 });
-    } else if (s.master === "РЛС" || (s.master === "ББ" && !this.oepsLeads())) {
-      this.radar.breakLock("rescan");
     } else if (s.master === "ТП") {
       this.kols.designate({ az: s.strobeAzDeg * DEG, el: s.strobeElDeg * DEG }, "body", 4 * DEG, 6 * DEG);
     } else if (s.master === "ШЛЕМ") {
@@ -327,7 +374,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
         const x = ax(p.look.az / DEG), y = ry(p.rangeM / 1000);
         if (Math.abs(x) <= 0.66) L([[x - 0.04, y], [x + 0.04, y]], { width: 3 });
       }
-      const md = this.mostDangerous(own);
+      const md = this.snpActive() ? this.priorityTrack(own) : undefined;
       for (const t of this.radar.tracks(own)) {
         const x = ax(t.look.az / DEG), y = ry(t.rangeM / 1000);
         if (Math.abs(x) > 0.66) continue;
@@ -383,7 +430,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     }
 
     // Switch-state line (simulation aid; the real ИЛС has no such line).
-    if (!hud || s.emission !== "ИЗЛ" || s.interaction || s.snp !== "ОТКЛ") T(0.95, -0.95, `${s.emission}${s.interaction ? " ТОРМ" : ""}${s.snp !== "ОТКЛ" ? ` СНП ${s.snp}` : ""}`, "right", 0.05);
+    if (!hud || s.emission !== "ИЗЛ" || s.interaction || s.snp !== "ОТКЛ" || !s.compensation) T(0.95, -0.95, `${s.emission}${s.interaction ? " ТОРМ" : ""}${s.snp !== "ОТКЛ" ? ` СНП ${s.snp}` : ""}${s.compensation ? "" : " БЕЗ КОМП"}`, "right", 0.05);
     if (!hud) T(-0.95, -0.95, `РЛС ${this.radar.state.toUpperCase()}  КОЛС ${this.kols.state.toUpperCase()}`, "left", 0.05);
     const loss = this.radar.lossEvent ?? this.kols.lossEvent;
     if (loss && own.timeS - loss.timeS < 2.5 && !["mode change", "pilot", "rescan", "reset"].includes(loss.reason)) T(0, 0.72, "СРЫВ", "center", 0.08);
