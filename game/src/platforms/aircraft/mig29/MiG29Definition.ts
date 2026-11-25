@@ -11,7 +11,7 @@ import type { AircraftDefinition, ScheduledDevices, SwitchBinding } from "../com
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { mig29Aerodynamics } from "./MiG29Aerodynamics.js";
 import { mig29FuelSystem, mig29TankSpecs } from "./MiG29FuelSystem.js";
-import { MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
+import { MIG29_COCKPIT_INSTRUMENTS, MIG29_COCKPIT_LAYOUT } from "./MiG29Cockpit.js";
 import { mig29ControlSystem, type SauMode } from "./MiG29ControlSystem.js";
 import { MIG29_CONTROLS as K, MIG29_ENGINE, MIG29_GEOMETRY as G, MIG29_HYDRAULICS as HYD, MIG29_MASS as M } from "./MiG29Data.js";
 import { mig29IntakeSystem } from "./MiG29Intake.js";
@@ -131,6 +131,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
     createFuelSystem: () => mig29FuelSystem(),
     electrical: MIG29_ELECTRICAL_INSTALLATION,
     cockpit: MIG29_COCKPIT_LAYOUT,
+    cockpitInstruments: MIG29_COCKPIT_INSTRUMENTS,
     efb: MIG29_EFB,
     mfdPages: { "panel-left": enginePanel, "panel-right": systemsPanel },
     annunciate: (s) => {

@@ -342,6 +342,8 @@ export interface AircraftDefinition {
   readonly systemsCoupling?: (s: { readonly electrical?: import("../../../systems/electrical/ElectricalNetwork.js").ElectricalSnapshot; readonly hydraulics?: import("../../../systems/hydraulics/HydraulicNetwork.js").HydraulicSnapshot }) => { readonly startEmergencyUnit?: boolean };
   readonly createFuelSystem?: () => import("../../../systems/fuel/FuelTanks.js").FuelSystemModel;
   readonly cockpit: CockpitLayout;
+  /** Values for each cockpit instrument part (by part id), read from the snapshot; non-finite = no valid signal (e.g. unpowered). */
+  readonly cockpitInstruments?: Readonly<Record<string, (s: import("./FixedWingAircraft.js").AircraftSnapshot) => readonly number[]>>;
   /** Aircraft-specific cautions and warnings built from the snapshot (e.g. hydraulic pressure lights). */
   readonly annunciate?: (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[];
   /**

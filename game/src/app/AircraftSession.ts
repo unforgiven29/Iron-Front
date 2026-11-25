@@ -52,6 +52,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     snapshot: () => jet.renderSnapshot(),
     hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
+    instrument: (id) => definition.cockpitInstruments?.[id]?.(jet.snapshot()) ?? [Number.NaN],
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
   };
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
