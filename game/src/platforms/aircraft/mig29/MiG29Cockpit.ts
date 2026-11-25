@@ -37,22 +37,39 @@ const SW = {
   batGnd: "mig29.elec.bat-gnd", dcGen: "mig29.elec.dc-gen", acGen: "mig29.elec.ac-gen", pto: "mig29.elec.pto"
 } as const;
 
-/** Panel plane, tilted 0.3 rad (top away from the pilot). Face coordinates u (right), v (down), metres → body FRD from the eye. */
-const TILT = -0.3, FACE_X = 0.845, FACE_Z = 0.42;
-const onPanel = (u: number, v: number): [number, number, number] => [FACE_X + Math.sin(TILT) * v, u, FACE_Z + Math.cos(TILT) * v];
+/**
+ * Panel geometry. The main panel is a centre section tilted 0.3 rad (top away from the pilot) with
+ * left and right wings yawed toward the pilot beyond |u| > WING_U (the photographs show the outer
+ * instruments turned inward; the 0.38 rad yaw is ESTIMATED from "cockpit 3", not measured).
+ * Face coordinates u (right), v (down), metres → body FRD from the eye.
+ */
+const TILT = -0.3, FACE_X = 0.845, FACE_Z = 0.42, WING_U = 0.2, WING_YAW = 0.38;
+const onPanel = (u: number, v: number): [number, number, number] => {
+  const over = Math.max(0, Math.abs(u) - WING_U), side = Math.sign(u);
+  const lateral = side * (Math.min(Math.abs(u), WING_U) + over * Math.cos(WING_YAW));
+  return [FACE_X + Math.sin(TILT) * v - over * Math.sin(WING_YAW), lateral, FACE_Z + Math.cos(TILT) * v];
+};
+const panelRot = (u: number): [number, number, number] => [0, TILT, Math.abs(u) > WING_U ? Math.sign(u) * WING_YAW : 0];
 /** Photo pixels ("cockpit 3", 870 px crop) → panel metres: ADI 75 px ≙ 0.10 m; origin at the panel centre line. */
 const PX = 0.1 / 75, OX = 390, OY = 190;
 const at = (x: number, y: number): [number, number] => [(x - OX) * PX, (y - OY) * PX];
 const round = (id: string, x: number, y: number, dPx: number, face: InstrumentFace): CockpitPart => {
   const [u, v] = at(x, y), d = dPx * PX;
-  return { id, kind: "instrument", positionM: onPanel(u, v), sizeM: [d, d, 0], rotationRad: [0, TILT, 0], color: "#000", instrument: face };
+  return { id, kind: "instrument", positionM: onPanel(u, v), sizeM: [d, d, 0], rotationRad: panelRot(u), color: "#000", instrument: face };
 };
 const rect = (id: string, x: number, y: number, wPx: number, hPx: number, face: InstrumentFace): CockpitPart => {
   const [u, v] = at(x, y);
-  return { id, kind: "instrument", positionM: onPanel(u, v), sizeM: [wPx * PX, hPx * PX, 0], rotationRad: [0, TILT, 0], color: "#000", instrument: face };
+  return { id, kind: "instrument", positionM: onPanel(u, v), sizeM: [wPx * PX, hPx * PX, 0], rotationRad: panelRot(u), color: "#000", instrument: face };
+};
+const screenAt = (id: string, screen: string, x: number, y: number, w: number, h: number): CockpitPart => {
+  const [u, v] = at(x, y);
+  return { id, kind: "screen", positionM: onPanel(u, v), sizeM: [w, h, 0], rotationRad: panelRot(u), color: "#101214", screen };
 };
 const lever = (id: string, switchId: string, positions: readonly string[], positionM: [number, number, number], sizeM: [number, number, number], color: string): CockpitPart =>
   ({ id, kind: "box", positionM, sizeM, color, binding: { kind: "switch", switchId, positions } });
+/** Static furniture box. */
+const box = (id: string, positionM: [number, number, number], sizeM: [number, number, number], color: string, rotationRad?: [number, number, number]): CockpitPart =>
+  (rotationRad ? { id, kind: "box", positionM, sizeM, color, rotationRad } : { id, kind: "box", positionM, sizeM, color });
 
 const KGF = 98066.5; // Pa per kgf/cm²
 const PANEL_TOP_V = at(0, 30)[1], PANEL_BOTTOM_V = at(0, 300)[1];
@@ -61,12 +78,23 @@ const [panelX, , panelZ] = onPanel(0, PANEL_MID_V);
 
 export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   aircraftId: "mig29",
-  provenance: "Main panel arranged from CC BY-SA photographs (IrasD, Wikimedia Commons, c. 1995); positions approximate, scale estimated; consoles and levers approximate",
+  provenance: "Main panel arranged from CC BY-SA photographs (IrasD, Wikimedia Commons, c. 1995); positions approximate, scale and wing/HUD/stick angles ESTIMATED; not a measured 1:1 cockpit",
   eyeFromCgM: [4.9, 0, -1.15],
   fieldOfViewDeg: 62,
   parts: [
-    { id: "panel", kind: "box", positionM: [panelX + 0.035, 0, panelZ], sizeM: [0.06, 0.82, PANEL_BOTTOM_V - PANEL_TOP_V], rotationRad: [0, TILT, 0], color: PANEL },
-    { id: "glareshield", kind: "box", positionM: [0.85, 0, 0.17], sizeM: [0.24, 0.66, 0.05], color: DARK },
+    // Main panel: centre section and two yawed wings (backing boxes sit just behind the faces).
+    { id: "panel", kind: "box", positionM: [panelX + 0.035, 0, panelZ], sizeM: [0.06, 2 * WING_U, PANEL_BOTTOM_V - PANEL_TOP_V], rotationRad: [0, TILT, 0], color: PANEL },
+    ...([-1, 1] as const).map((side): CockpitPart => {
+      const u = side * (WING_U + 0.11), [x, y, z] = onPanel(u, PANEL_MID_V);
+      return box(side < 0 ? "panel-wing-l" : "panel-wing-r", [x + 0.035 * Math.cos(WING_YAW), y + side * 0.035 * Math.sin(WING_YAW), z], [0.06, 0.22, PANEL_BOTTOM_V - PANEL_TOP_V], PANEL, [0, TILT, side * WING_YAW]);
+    }),
+    // Glareshield coaming and the ILS-31 HUD: projector body under the coaming, frame posts and a
+    // combiner raked back toward the pilot (rake and size ESTIMATED from photographs).
+    box("glareshield", [0.86, 0, 0.17], [0.26, 0.7, 0.05], DARK),
+    box("hud-body", [0.74, 0, 0.13], [0.16, 0.16, 0.06], DARK),
+    box("hud-post-l", [0.7, -0.075, 0.05], [0.015, 0.012, 0.13], DARK, [0, -0.45, 0]),
+    box("hud-post-r", [0.7, 0.075, 0.05], [0.015, 0.012, 0.13], DARK, [0, -0.45, 0]),
+    { id: "hud-glass", kind: "glass", positionM: [0.69, 0, 0.03], sizeM: [0.14, 0.13, 0], rotationRad: [0, -0.45, 0], color: "#7fe0a0" },
     // Flight instruments (left of the stick, Soviet "T").
     round("ias", 130, 165, 65, { kind: "dial", label: "КУС", unit: "км/ч", min: 0, max: 1600, majorStep: 200, minorStep: 50, labelDivisor: 100, needles: ["", ""] }),
     round("alt", 140, 235, 65, { kind: "dial", label: "ВД", unit: "м", min: 0, max: 1000, majorStep: 100, minorStep: 20, labelDivisor: 100, startDeg: 0, sweepDeg: 360, wrap: true, readout: { divisor: 1000, digits: 2, suffix: " км" } }),
@@ -89,9 +117,9 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
       { label: "ОСН", min: 0, max: 200 }, { label: "АВАР", min: 0, max: 200 }] }),
     rect("ramps", 555, 255, 55, 42, { kind: "tapes", title: "КЛИН", footer: "%", tapes: [{ label: "Л", min: 0, max: 100 }, { label: "П", min: 0, max: 100 }], marks: [0, 50, 100] }),
     // Radar head-down display: repeats the radar/KOLS picture (drawn from the weapon-control system).
-    { id: "hdd", kind: "screen", positionM: onPanel(...at(600, 95)), sizeM: [0.15, 0.13, 0], rotationRad: [0, TILT, 0], color: "#101214", screen: "radar" },
+    screenAt("hdd", "radar", 600, 95, 0.15, 0.13),
     // СПО-15 indicator (right side of the panel; position approximate).
-    { id: "spo15", kind: "screen", positionM: onPanel(...at(650, 215)), sizeM: [0.1, 0.1, 0], rotationRad: [0, TILT, 0], color: "#101214", screen: "rwr" },
+    screenAt("spo15", "rwr", 650, 215, 0.1, 0.1),
     // Levers and switches (clickable; positions approximate, not from the photographs).
     lever("gear-lever", SW.gear, ["UP", "DN"], [0.62, -0.46, 0.36], [0.04, 0.03, 0.08], "#c33"),
     lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.7, -0.33, 0.64], [0.03, 0.06, 0.03], YELLOW),
@@ -101,15 +129,25 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-dcgen", SW.dcGen, ["ON", "OFF"], [0.43, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-acgen", SW.acGen, ["ON", "OFF"], [0.38, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
-    { id: "hud-glass", kind: "glass", positionM: [0.68, 0, 0.02], sizeM: [0.14, 0.14, 0], rotationRad: [0, -0.2, 0], color: "#7fe0a0" },
-    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.36], sizeM: [0.02, 0.3, 0], color: "#151815", binding: { kind: "stick" } },
-    { id: "throttle", kind: "box", positionM: [0.2, -0.35, 0.38], sizeM: [0.07, 0.05, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    { id: "console-left", kind: "box", positionM: [0.2, -0.42, 0.48], sizeM: [0.7, 0.15, 0.08], color: CONSOLE },
-    { id: "console-right", kind: "box", positionM: [0.2, 0.42, 0.48], sizeM: [0.7, 0.15, 0.08], color: CONSOLE },
-    { id: "canopy-bow-l", kind: "box", positionM: [0.75, -0.3, -0.1], sizeM: [0.03, 0.03, 0.5], rotationRad: [0.35, 0, 0], color: FRAME },
-    { id: "canopy-bow-r", kind: "box", positionM: [0.75, 0.3, -0.1], sizeM: [0.03, 0.03, 0.5], rotationRad: [-0.35, 0, 0], color: FRAME },
-    { id: "sill-left", kind: "box", positionM: [0.25, -0.5, 0.3], sizeM: [1.4, 0.04, 0.04], color: FRAME },
-    { id: "sill-right", kind: "box", positionM: [0.25, 0.5, 0.3], sizeM: [1.4, 0.04, 0.04], color: FRAME }
+    // Centre stick (РУС): floor boot, shaft raked forward, grip. Only the shaft is bound to pilot input
+    // (the view rotates a part about its own centre, so a separate grip would detach). Dimensions ESTIMATED.
+    box("stick-boot", [0.44, 0, 0.62], [0.12, 0.12, 0.04], DARK),
+    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
+    // Twin throttles (РУД) on the left console; both follow the single throttle input.
+    { id: "throttle", kind: "box", positionM: [0.22, -0.37, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
+    { id: "throttle-2", kind: "box", positionM: [0.22, -0.335, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
+    box("throttle-quadrant", [0.22, -0.355, 0.44], [0.3, 0.09, 0.04], DARK),
+    // Side consoles slope down toward the pilot; forward sections step up to the panel wings.
+    box("console-left", [0.15, -0.43, 0.49], [0.75, 0.16, 0.08], CONSOLE, [0.1, 0, 0]),
+    box("console-right", [0.15, 0.43, 0.49], [0.75, 0.16, 0.08], CONSOLE, [-0.1, 0, 0]),
+    box("console-fwd-left", [0.62, -0.42, 0.5], [0.22, 0.14, 0.12], CONSOLE),
+    box("console-fwd-right", [0.62, 0.42, 0.5], [0.22, 0.14, 0.12], CONSOLE),
+    // Windscreen arch and canopy rails.
+    box("canopy-bow-l", [0.75, -0.3, -0.1], [0.03, 0.03, 0.5], FRAME, [0.35, 0, 0]),
+    box("canopy-bow-r", [0.75, 0.3, -0.1], [0.03, 0.03, 0.5], FRAME, [-0.35, 0, 0]),
+    box("canopy-arch", [0.72, 0, -0.33], [0.03, 0.46, 0.03], FRAME),
+    box("sill-left", [0.25, -0.5, 0.3], [1.4, 0.04, 0.04], FRAME),
+    box("sill-right", [0.25, 0.5, 0.3], [1.4, 0.04, 0.04], FRAME)
   ]
 };
 
