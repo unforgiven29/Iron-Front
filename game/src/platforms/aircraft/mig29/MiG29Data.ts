@@ -85,7 +85,11 @@ export const MIG29_AERO = Object.freeze({
   rudderPowerPerDeg: P(-0.0014, "Cn per deg (both rudders, + = nose left)", "estimated", EST),
   speedbrakeDrag: P(0.06, "ΔCD at full", "estimated", EST, "Upper and lower panels"),
   gearDrag: P(0.022, "ΔCD gear down", "estimated", EST),
-  lefLiftPerDeg: P(0.004, "ΔCLmax per deg of LEF", "estimated", EST)
+  lefLiftPerDeg: P(0.004, "ΔCLmax per deg of LEF", "estimated", EST),
+  flapLiftAtFull: P(0.32, "ΔCL at full flap", "estimated", EST, "Plain/single-slotted TEF over ≈40 % of the span (DATCOM-style flap-chord/span estimate); no MiG-29 flap data"),
+  flapDragAtFull: P(0.045, "ΔCD at full flap", "estimated", EST, "Profile drag increment, scales with deflection^1.5"),
+  flapPitchAtFull: P(-0.05, "ΔCm at full flap", "estimated", EST, "Aft loading: nose-down increment about the reference CG"),
+  flapStallAlphaReductionDeg: P(1.5, "deg at full flap", "estimated", EST, "Trailing-edge flaps raise CLmax but lower the stall AoA")
 });
 
 /** RD-33 (each of two). Family-level ratings only; the series and maps are not established for 9.13. */
@@ -141,6 +145,10 @@ export const MIG29_CONTROLS = Object.freeze({
   stabilatorRateDegS: P(45, "deg/s", "estimated", EST),
   aileronRateDegS: P(80, "deg/s", "estimated", EST),
   rudderRateDegS: P(80, "deg/s", "estimated", EST),
+  flapTakeoffDeg: P(15, "deg", "estimated", EST, "Takeoff setting; MiG-29 flap angles are not given in the GAF Section 1 material available here (see MiG-29-product-9-13.md)"),
+  flapLandingDeg: P(25, "deg", "estimated", EST, "Landing setting; not confirmed for product 9.13"),
+  flapRateDegS: P(5, "deg/s", "estimated", EST, "≈5 s full travel"),
+  flapAutoRetractKias: P(270, "KIAS", "estimated", EST, "Automatic retraction (blow-up protection) above this speed; re-extend below it; value not confirmed"),
   lefMaxDeg: P(20, "deg", "estimated", EST, "LEF deflection angle not given in Section 1; LEF are locked fully in or fully out"),
   lefExtendAlphaDeg: P(8.7, "deg", "primary-published", GAF_TO, "Extend at ≥8.7° AoA below the Mach-sensor switch point"),
   lefRetractAlphaDeg: P(7, "deg", "primary-published", GAF_TO),

@@ -95,3 +95,24 @@ describe("runtime: fuel moves the CG and changes mass and inertia", () => {
     }, 20_000); // simulates 2 minutes of full-throttle flight
   }
 });
+
+describe("MiG-29 fuel accumulator is a tank (mass, CG and inertia include it)", () => {
+  it("feeds the engines at near-zero g, refills from tank 2 afterwards, and fuel is conserved throughout", () => {
+    const f = mig29FuelSystem();
+    f.reset();
+    expect(f.tanks.states().some((t) => t.id === "accumulator")).toBe(true);
+    const full = f.tanks.kg("accumulator");
+    expect(full).toBeGreaterThan(0);
+    const burn = { left: 0.5, right: 0.5 }, speed = { left: 0.9, right: 0.9 };
+    let burned = 0;
+    const total0 = f.tanks.totalKg();
+    // 10 s at zero g: the accumulator carries the engines.
+    for (let i = 0; i < 100; i++) { f.step({ engineFlowKgS: burn, engineSpeed: speed, nzG: 0, altitudeM: 3000 }, 0.1); burned += 0.1 * 1; }
+    expect(f.tanks.kg("accumulator")).toBeLessThan(full);
+    // Back to 1 g: boost pumps refill it from tank 2 — a transfer, not a loss.
+    for (let i = 0; i < 300; i++) { f.step({ engineFlowKgS: burn, engineSpeed: speed, nzG: 1, altitudeM: 3000 }, 0.1); burned += 0.1 * 1; }
+    expect(f.tanks.kg("accumulator")).toBeCloseTo(full, 6);
+    const delivered = Math.min(burned, total0);
+    expect(total0 - f.tanks.totalKg()).toBeCloseTo(delivered, 6);
+  });
+});

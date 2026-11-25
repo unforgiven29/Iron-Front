@@ -28,7 +28,7 @@ const PNEU_FAULTS = {
   "RES REG FAIL": [{ kind: "regulator-failed", regulatorId: "reg.reservoir", mode: "closed" }]
 } as const satisfies Record<string, readonly import("../../../systems/pneumatics/PneumaticNetwork.js").PneumaticFault[]>;
 
-export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", emergencyGear: "mig29.gear.emergency", pneumaticFault: "mig29.test.pneumatic-fault", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault",
+export const MIG29_SWITCHES = Object.freeze({ sau: "mig29.test.sau", speedbrake: "mig29.speedbrake", gear: "mig29.gear.handle", emergencyGear: "mig29.gear.emergency", flaps: "mig29.flaps", pneumaticFault: "mig29.test.pneumatic-fault", hydraulicFault: "mig29.test.hydraulic-fault", leftEngine: "mig29.test.left-engine", electricalFault: "mig29.test.electrical-fault",
   batGnd: "mig29.elec.bat-gnd", dcGen: "mig29.elec.dc-gen", acGen: "mig29.elec.ac-gen", pto: "mig29.elec.pto" });
 
 /** Electrical test faults (simulation only). CSD OVERSPEED = automatic CSD disconnect at 14,300–14,500 rpm (GAF T.O.). */
@@ -67,15 +67,28 @@ function inertia(massKg: number): [[number, number, number], [number, number, nu
  * below M0.8, retract at AoA ≤ 7° or above M0.8. Gear/flap-linked extension is not modelled (the
  * device schedule has no gear-position input yet).
  */
-export function lefSchedule(): ScheduledDevices {
-  let out = false;
+export const MIG29_FLAP_POSITIONS = ["UP", "TAKEOFF", "LANDING"] as const;
+export type Mig29FlapSelection = (typeof MIG29_FLAP_POSITIONS)[number];
+
+/**
+ * LEF schedule (GAF T.O. AoA/Mach logic) and trailing-edge flaps: the flap lever selects UP /
+ * TAKEOFF / LANDING (ESTIMATED angles); above the (ESTIMATED) blow-up speed the flaps retract
+ * and re-extend below it with a 10 kt hysteresis. Flap actuators are hydraulic (main system).
+ */
+export function lefSchedule(flapSelection: () => Mig29FlapSelection = () => "UP"): ScheduledDevices {
+  let out = false, blownUp = false;
   return {
-    reset: () => { out = false; },
+    reset: () => { out = false; blownUp = false; },
     step: (s) => {
       const alpha = s.alphaRad * 180 / Math.PI;
       if (s.mach >= K.lefMachLimit.value || alpha <= K.lefRetractAlphaDeg.value) out = false;
       else if (alpha >= K.lefExtendAlphaDeg.value) out = true;
-      return { lef: out ? K.lefMaxDeg.value : 0 };
+      const kias = Math.sqrt((2 * s.dynamicPressurePa) / 1.225) / 0.514444;
+      if (kias > K.flapAutoRetractKias.value) blownUp = true;
+      else if (kias < K.flapAutoRetractKias.value - 10) blownUp = false;
+      const sel = flapSelection();
+      const flap = blownUp || sel === "UP" ? 0 : sel === "TAKEOFF" ? K.flapTakeoffDeg.value : K.flapLandingDeg.value;
+      return { lef: out ? K.lefMaxDeg.value : 0, flap };
     }
   };
 }
@@ -108,6 +121,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
       { id: "differentialStabilator", limitDeg: K.differentialStabilatorDeg.value, rateDegS: K.stabilatorRateDegS.value, bandwidthRadS: 20 },
       { id: "rudder", limitDeg: K.rudderLimitDeg.value, rateDegS: K.rudderRateDegS.value, bandwidthRadS: 20 },
       { id: "lef", limitDeg: K.lefMaxDeg.value, minDeg: 0, rateDegS: 15, bandwidthRadS: 5 },
+      { id: "flap", limitDeg: K.flapLandingDeg.value, minDeg: 0, rateDegS: K.flapRateDegS.value, bandwidthRadS: 5 },
       { id: "speedbrake", limitDeg: 60, minDeg: 0, rateDegS: 30, bandwidthRadS: 10 }
     ],
     engines: mig29Engines(options.engineMode ?? "NPM"),
@@ -154,11 +168,16 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
         ...(ELEC_FAULTS[elec.fault as keyof typeof ELEC_FAULTS] ?? []),
         ...(elec.batGnd ? [] : ["battery"]), ...(elec.dcGen ? [] : ["gen.dc"]), ...(elec.acGen ? [] : ["gen.ac"]), ...(elec.pto ? [] : ["pto", "pto36"])
       ]);
-      let speedbrakeSwitch = false, emergencyHandle = "STOWED";
+      let speedbrakeSwitch = false, emergencyHandle = "STOWED", flapSelection: Mig29FlapSelection = "UP";
       const switches: SwitchBinding[] = [
         { key: "f", definition: { id: MIG29_SWITCHES.sau, ownerId: "mig29.sau", label: "SAU (TEST)", positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "Simulation test switch for the stability-augmentation dampers" }, onChange: (to) => { fcs.setSau(to as SauMode); return { accepted: true }; } },
         { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { speedbrakeSwitch = to === "EXTEND"; return { accepted: true }; } },
         { key: "g", gearHandle: { up: "UP", down: "DN" }, definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
+        {
+          key: "x",
+          definition: { id: MIG29_SWITCHES.flaps, ownerId: "mig29.flaps", label: "FLAPS", positions: [...MIG29_FLAP_POSITIONS], defaultPosition: "UP", provenance: "Flap lever; positions and angles ESTIMATED (not confirmed for product 9.13)" },
+          onChange: (to) => { flapSelection = to as Mig29FlapSelection; return { accepted: true }; }
+        },
         {
           key: "u",
           definition: { id: MIG29_SWITCHES.emergencyGear, ownerId: "mig29.gear.emergency", label: "EMERG GEAR", positions: [...MIG29_EMERGENCY_GEAR_POSITIONS], defaultPosition: "STOWED", provenance: "GAF T.O. 1F-MIG29-1: EMERG GEAR handle — pull aft (nose gear), then rotate 90° clockwise and pull full aft (main gear)" },
@@ -194,7 +213,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
           return sb === undefined ? out : { ...out, commands: { ...out.commands, speedbrake: sb * blow } };
         }
       };
-      return { aero: mig29Aerodynamics(), fcs: guardedFcs, switches, devices: lefSchedule(), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]), hydraulicLoads: mig29HydraulicLoads(), pneumaticLoads: mig29PneumaticLoads(MIG29_SWITCHES.emergencyGear) };
+      return { aero: mig29Aerodynamics(), fcs: guardedFcs, switches, devices: lefSchedule(() => flapSelection), accessoryDrives: mig29AccessoryDrives(), intakes: mig29IntakeSystem(["left", "right"]), hydraulicLoads: mig29HydraulicLoads(), pneumaticLoads: mig29PneumaticLoads(MIG29_SWITCHES.emergencyGear) };
     }
   };
 }

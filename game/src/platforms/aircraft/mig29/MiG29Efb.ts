@@ -1,12 +1,14 @@
 /**
  * MiG-29 EFB pages (UI only): this aircraft's own systems drawn from its snapshot — twin RD-33
  * engines fed from tank 2, the GAF tank arrangement with turbo/jet pumps, the gearbox-driven AC/DC
- * generators with PTO and batteries, and the main/boost hydraulic systems with the emergency pump.
+ * generators with PTO and batteries, the main/boost hydraulic systems with the emergency pump, and
+ * the main/emergency nitrogen systems with their regulators and consumers.
  * Layouts are schematic (after GAF T.O. 1F-MIG29-1 figs. 1-18/1-19 and the system descriptions).
  */
-import { box, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
+import { accumulator, box, checkValve, COLORS, engineCutaway, engineHealthPanel, hbar, num, pipe, pump, svg, tank, text, valve } from "../../../app/efb/EfbKit.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
-import { MIG29_HYDRAULICS } from "./MiG29Data.js";
+import { MIG29_HYDRAULICS, MIG29_PNEUMATICS } from "./MiG29Data.js";
+import { MIG29_SWITCHES } from "./MiG29Definition.js";
 import { F34_KG_PER_L } from "./MiG29FuelSystem.js";
 
 type Snap = AircraftSnapshot;
@@ -122,6 +124,59 @@ function electricsPage(s: Snap): string {
 }
 
 /** Live schematic: GBX pumps → main/boost; pressure limiter isolates the utilities below 13 MPa. */
+/**
+ * Nitrogen systems: every value comes from the pneumatic snapshot (bottle pressure, temperature and
+ * inventory; regulator outlets; consumer supply and gas use) or the gear/switch state.
+ */
+function pneumaticsPage(s: Snap): string {
+  const pn = s.pneumatics;
+  if (!pn) return svg(600, 200, text(20, 40, "No pneumatic model"));
+  const N2 = "#9ad0ff", N2F = "#e0f2ff", N2_KG_PER_MOL = 0.0280134;
+  const gas = (pts: [number, number][], on: boolean) => pipe(pts, { flow: on, color: N2, fluid: N2F });
+  const sys = (id: string) => pn.systems.find((x) => x.id === id);
+  const reg = (id: string) => pn.regulators.find((x) => x.id === id);
+  const con = (id: string) => pn.consumers.find((x) => x.id === id);
+  const using = (id: string) => (con(id)?.usedMolS ?? 0) > 1e-9;
+  const gS = (id: string) => `${num((con(id)?.usedMolS ?? 0) * N2_KG_PER_MOL * 1000, 2)} g/s`;
+  const MPa = (pa: number | undefined) => `${num((pa ?? Number.NaN) / 1e6, 1)} MPa`;
+  const bottle = (x: number, id: string, label: string, chargePa: number) => {
+    const b = sys(id);
+    const f = b ? b.pressurePa / chargePa : 0, low = f < 0.4;
+    return `${accumulator(x, 60, 70, 120, f, low ? COLORS.warn : N2)}
+      ${text(x + 35, 50, label, { anchor: "middle", size: 12, weight: 700, color: "#7fd4ff" })}
+      ${text(x + 85, 84, MPa(b?.pressurePa), { size: 14, weight: 700, color: low ? COLORS.warn : COLORS.text })}
+      ${text(x + 85, 102, `charge ${MPa(chargePa)}`, { size: 10, color: COLORS.dim })}
+      ${text(x + 85, 118, `${num((b?.inventoryFraction ?? 0) * 100)} % gas`, { size: 10, color: COLORS.dim })}
+      ${text(x + 85, 134, `${num((b?.temperatureK ?? Number.NaN) - 273.15)} °C`, { size: 10, color: COLORS.dim })}`;
+  };
+  const legs = s.gear?.legExtension ?? {};
+  const leg = (id: string) => `${num((legs[id] ?? Number.NaN) * 100)} %`;
+  const handle = s.switches[MIG29_SWITCHES.emergencyGear] ?? "—";
+  const brakes = con("brakes.normal"), res = con("hyd.reservoir");
+  const gearMoving = using("gear.emergency.nose") || using("gear.emergency.main");
+  const fault = (f: (typeof pn.faults)[number]) => f.kind === "system-leak" ? `LEAK ${f.systemId}` : f.kind === "regulator-failed" ? `${f.regulatorId} FAILED ${f.mode.toUpperCase()}` : `CHECK VALVE ${f.systemA}/${f.systemB}`;
+  return svg(600, 560, `
+    ${text(16, 24, "NITROGEN SYSTEMS (GAF T.O. 1F-MIG29-1) · no in-flight recharge", { size: 11, color: COLORS.dim })}
+    ${bottle(20, "main", "MAIN", MIG29_PNEUMATICS.mainChargePa.value)}
+    ${bottle(220, "emergency", "EMERGENCY", MIG29_PNEUMATICS.emergencyChargePa.value)}
+    ${bottle(420, "chute", "CHUTE", MIG29_PNEUMATICS.chuteChargePa.value)}
+    ${gas([[55, 180], [55, 230]], using("brakes.normal") || using("hyd.reservoir"))}${checkValve(55, 205, "down", true)}
+    ${gas([[55, 230], [55, 260], [196, 260], [196, 300]], using("hyd.reservoir"))}
+    ${gas([[55, 230], [55, 300]], using("brakes.normal"))}
+    ${box(10, 300, 130, 54, "BRAKE REG", [MPa(reg("reg.brakes")?.outletPa)], (reg("reg.brakes")?.outletPa ?? 0) > 0 ? "on" : "warn")}
+    ${box(150, 300, 92, 54, "RES REG", [MPa(reg("reg.reservoir")?.outletPa)], (reg("reg.reservoir")?.outletPa ?? 0) > 0 ? "on" : "warn")}
+    ${gas([[75, 354], [75, 390]], using("brakes.normal"))}${gas([[196, 354], [196, 390]], using("hyd.reservoir"))}
+    ${box(10, 390, 130, 70, "WHEEL BRAKES", [`supply ${num((brakes?.supplyFraction ?? 0) * 100)} %`, `gas ${gS("brakes.normal")}`], (brakes?.supplyFraction ?? 0) > 0.5 ? "on" : "warn")}
+    ${box(150, 390, 92, 70, "HYD RES", [`press ${num((res?.supplyFraction ?? 0) * 100)} %`, `gas ${gS("hyd.reservoir")}`], (res?.supplyFraction ?? 0) > 0.5 ? "on" : "warn")}
+    ${gas([[255, 180], [255, 300]], gearMoving)}${checkValve(255, 205, "down", gearMoving)}${valve(255, 260, handle !== "STOWED")}
+    ${box(290, 300, 150, 160, "EMERG GEAR", [`handle ${handle}`, `nose ${leg("nose")}`, `left ${leg("left")}`, `right ${leg("right")}`, `supply ${num((con("gear.emergency.nose")?.supplyFraction ?? 0) * 100)} %`, `gas ${num(((con("gear.emergency.nose")?.usedMolS ?? 0) + (con("gear.emergency.main")?.usedMolS ?? 0)) * N2_KG_PER_MOL * 1000, 1)} g/s`], (con("gear.emergency.nose")?.supplyFraction ?? 0) > 0.5 ? "on" : "warn")}
+    ${gas([[255, 300], [255, 380], [290, 380]], gearMoving)}
+    ${box(450, 300, 140, 70, "DRAG CHUTE", ["bottle only", "deploy not modelled"], "off")}
+    ${text(16, 490, "FAULTS", { size: 12, weight: 700, color: "#7fd4ff" })}
+    ${(pn.faults.length ? pn.faults.map(fault) : ["none"]).map((t, i) => text(16, 508 + 16 * i, t, { size: 11, color: pn.faults.length ? COLORS.warn : COLORS.dim })).join("")}
+    ${text(300, 552, "Volumes, regulated pressures and flows ESTIMATED", { size: 9, color: COLORS.dim, anchor: "middle" })}`);
+}
+
 function hydraulicsPage(s: Snap): string {
   const h = s.hydraulics;
   if (!h) return svg(600, 200, text(20, 40, "No hydraulic model"));
@@ -181,6 +236,7 @@ export const MIG29_EFB = {
     { id: "engines", title: "Engines", render: (s: Snap) => enginesPage(s) },
     { id: "fuel", title: "Fuel", render: (s: Snap) => fuelPage(s) },
     { id: "electrics", title: "Electrics", render: (s: Snap) => electricsPage(s) },
-    { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) }
+    { id: "hydraulics", title: "Hydraulics", render: (s: Snap) => hydraulicsPage(s) },
+    { id: "pneumatics", title: "Pneumatics", render: (s: Snap) => pneumaticsPage(s) }
   ]
 } as const;

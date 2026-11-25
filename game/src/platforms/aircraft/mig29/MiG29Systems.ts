@@ -56,6 +56,8 @@ export const MIG29_HYDRAULIC_INSTALLATION: HydraulicInstallation = {
   actuators: {
     elevator: dual, aileron: dual, differentialStabilator: dual, rudder: dual,
     lef: { chambers: [{ circuitId: "main", displacementM3PerDeg: H.displacementM3PerDeg.value }], hingeLoad },
+    // Trailing-edge flaps on the main system (GAF T.O.: main keeps the flaps/LEF below the limiter).
+    flap: { chambers: [{ circuitId: "main", displacementM3PerDeg: H.displacementM3PerDeg.value }], hingeLoad },
     speedbrake: { chambers: [{ circuitId: "main.util", displacementM3PerDeg: H.displacementM3PerDeg.value }], hingeLoad }
   }
 };
