@@ -37,21 +37,21 @@ const SCALE_KM: Record<RadarMode, number> = { "В": 150, "АВТ": 100, "Д": 50
 const CLOSE_COMBAT_PATTERN: RasterPattern = { frame: "body", center: { az: 0, el: 12 * DEG }, widthRad: 50 * DEG, bars: 2, barSpacingRad: 3 * DEG, orientation: "vertical", rateRadS: 90 * DEG, turnaroundS: 0.05 };
 
 export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
-  { key: "=", label: "РЕЖ.СУВ: НВГ / РЛС / ТП / ББ / ШЛЕМ / ОПТ", control: "Weapon-control mode selector, panel ПСР-31 (RLPK slide 61)" },
-  { key: "-", label: "РЕЖИМЫ РЛС: В / Д / АВТ / Б.БОЙ", control: "Radar mode selector, panel ПУР-31" },
-  { key: "t", label: "МРК.ЗАХВ.ПЗ: lock", control: "Lock button on the stick (BP-29 p.16)" },
-  { key: "z", label: "Lock reset", control: "Lock reset" },
-  { key: "[", label: "Strobe range − / ТП strobe down (hold)", control: "KU-31 strobe knob (BP-29 p.9)" },
-  { key: "]", label: "Strobe range + / ТП strobe up (hold)", control: "KU-31 strobe knob" },
-  { key: ",", label: "Strobe left (hold)", control: "KU-31 strobe knob" },
-  { key: ".", label: "Strobe right (hold)", control: "KU-31 strobe knob" },
-  { key: ";", label: "ΔH −", control: "ПЕРЕКЛ ΔН, panel ПУР-31" },
-  { key: "'", label: "ΔH +", control: "ПЕРЕКЛ ΔН, panel ПУР-31" },
-  { key: "\\", label: "ЗОНА: left / centre / right", control: "Search-sector buttons ← ↑ →, panel ПСР-31" },
-  { key: "home", label: "ИЗЛ – ЭКВ – ОТКЛ", control: "Transmitter switch, panel ПУР-31 (emit / dummy load / off)" },
-  { key: "end", label: "СНП: off / ППС (HPRF) / ЗПС (MPRF)", control: "СНП ППС–ЗПС switch, panel ПУР-31" },
-  { key: "insert", label: "ТОРМОЗ / БЕЗ ТОРМОЗА (radar–OEPS interaction)", control: "ТОРМОЗ–БЕЗ ТОРМОЗА switch, panel С-31" },
-  { key: "delete", label: "Laser rangefinder on/off", control: "Laser rangefinder enable (OEPS)" }
+  { key: "arrowup", label: "Radar cursor: farther (ТП: up)", control: "KU-31 strobe knob (BP-29 p.9)" },
+  { key: "arrowdown", label: "Radar cursor: nearer (ТП: down)", control: "KU-31 strobe knob" },
+  { key: "arrowleft", label: "Radar cursor: left", control: "KU-31 strobe knob" },
+  { key: "arrowright", label: "Radar cursor: right", control: "KU-31 strobe knob" },
+  { key: "enter", label: "Lock target under the cursor", control: "МРК.ЗАХВ.ПЗ lock button (BP-29 p.16)" },
+  { key: "backspace", label: "Break lock", control: "Lock reset" },
+  { key: "=", label: "Sight mode: NAV / RADAR / IRST / CLOSE COMBAT / HELMET / OPTICAL", control: "РЕЖ.СУВ selector НВГ/РЛС/ТП/ББ/ШЛЕМ/ОПТ, panel ПСР-31" },
+  { key: "-", label: "Radar mode: head-on / tail-chase / auto / dogfight", control: "РЕЖИМЫ РЛС В/Д/АВТ/Б.БОЙ, panel ПУР-31" },
+  { key: "pageup", label: "Scan elevation up (target above you)", control: "ΔН switch, panel ПУР-31" },
+  { key: "pagedown", label: "Scan elevation down (target below you)", control: "ΔН switch" },
+  { key: "\\", label: "Scan zone: centre / left / right", control: "ЗОНА buttons, panel ПСР-31" },
+  { key: "home", label: "Radar transmit / standby / off", control: "ИЗЛ–ЭКВ–ОТКЛ switch, panel ПУР-31" },
+  { key: "end", label: "Track-while-scan: off / head-on / tail", control: "СНП ППС–ЗПС switch, panel ПУР-31" },
+  { key: "insert", label: "Radar + IRST work together on/off", control: "ТОРМОЗ–БЕЗ ТОРМОЗА switch, panel С-31" },
+  { key: "delete", label: "Laser rangefinder on/off", control: "OEPS laser enable" }
 ];
 
 export interface Mig29WcsStatus {
@@ -104,10 +104,10 @@ export class MiG29WeaponControl implements AvionicsSuite {
     switch (k) {
       case "=": s.master = cycle(MASTERS, s.master); this.radar.breakLock("mode change"); this.kols.breakLock("mode change"); break;
       case "-": s.radarMode = cycle(RADAR_MODES, s.radarMode); this.radar.breakLock("mode change"); s.strobeKm = Math.min(s.strobeKm, SCALE_KM[s.radarMode]); break;
-      case "t": this.lockPressed = true; break;
-      case "z": this.radar.breakLock("pilot"); this.kols.breakLock("pilot"); break;
-      case ";": s.dhKm = DH_KM[Math.max(0, DH_KM.indexOf(s.dhKm as (typeof DH_KM)[number]) - 1)] as number; break;
-      case "'": s.dhKm = DH_KM[Math.min(DH_KM.length - 1, DH_KM.indexOf(s.dhKm as (typeof DH_KM)[number]) + 1)] as number; break;
+      case "enter": this.lockPressed = true; break;
+      case "backspace": this.radar.breakLock("pilot"); this.kols.breakLock("pilot"); break;
+      case "pagedown": s.dhKm = DH_KM[Math.max(0, DH_KM.indexOf(s.dhKm as (typeof DH_KM)[number]) - 1)] as number; break;
+      case "pageup": s.dhKm = DH_KM[Math.min(DH_KM.length - 1, DH_KM.indexOf(s.dhKm as (typeof DH_KM)[number]) + 1)] as number; break;
       case "\\": s.zone = s.zone === 0 ? -1 : s.zone === -1 ? 1 : 0; break;
       case "home": s.emission = cycle<Emission>(["ИЗЛ", "ЭКВ", "ОТКЛ"], s.emission); break;
       case "end": s.snp = cycle<Snp>(["ОТКЛ", "ППС", "ЗПС"], s.snp); break;
@@ -149,11 +149,11 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const s = this.s;
     const scale = SCALE_KM[s.radarMode];
     const tp = s.master === "ТП";
-    if (this.held.has("]")) { if (tp) s.strobeElDeg = Math.min(15, s.strobeElDeg + 15 * dt); else s.strobeKm = Math.min(scale, s.strobeKm + scale * 0.3 * dt); }
-    if (this.held.has("[")) { if (tp) s.strobeElDeg = Math.max(-15, s.strobeElDeg - 15 * dt); else s.strobeKm = Math.max(0.5, s.strobeKm - scale * 0.3 * dt); }
+    if (this.held.has("arrowup")) { if (tp) s.strobeElDeg = Math.min(15, s.strobeElDeg + 15 * dt); else s.strobeKm = Math.min(scale, s.strobeKm + scale * 0.3 * dt); }
+    if (this.held.has("arrowdown")) { if (tp) s.strobeElDeg = Math.max(-15, s.strobeElDeg - 15 * dt); else s.strobeKm = Math.max(0.5, s.strobeKm - scale * 0.3 * dt); }
     const azLim = tp ? 30 : 25;
-    if (this.held.has(".")) s.strobeAzDeg = Math.min(azLim, s.strobeAzDeg + 20 * dt);
-    if (this.held.has(",")) s.strobeAzDeg = Math.max(-azLim, s.strobeAzDeg - 20 * dt);
+    if (this.held.has("arrowright")) s.strobeAzDeg = Math.min(azLim, s.strobeAzDeg + 20 * dt);
+    if (this.held.has("arrowleft")) s.strobeAzDeg = Math.max(-azLim, s.strobeAzDeg - 20 * dt);
 
     // Power: radar and OEPS on the 115 V AC bus, shed under PTO supply (assignment ESTIMATED).
     const ac = ctx.snapshot.electrical?.buses.find((b) => b.id === "ac");
@@ -334,8 +334,9 @@ export class MiG29WeaponControl implements AvionicsSuite {
         O(x, y, 0.025);
         if (md && t.id === md.id) L([[x - 0.07, y - 0.055], [x + 0.07, y - 0.055], [x + 0.07, y + 0.055], [x - 0.07, y + 0.055]], { closed: true });
       }
+      // Capture strobe (cursor): a box over the mark to lock.
       const sx = ax(s.strobeAzDeg), sy = ry(s.strobeKm);
-      L([[sx - 0.045, sy + 0.03], [sx + 0.045, sy + 0.03]]); L([[sx - 0.045, sy - 0.03], [sx + 0.045, sy - 0.03]]);
+      L([[sx - 0.06, sy - 0.045], [sx + 0.06, sy - 0.045], [sx + 0.06, sy + 0.045], [sx - 0.06, sy + 0.045]], { closed: true, width: 1.5 });
       L([[ax(-25), -0.78], [ax(25), -0.78]]);
       L([[ax(this.radar.beam.look.az / DEG), -0.82], [ax(this.radar.beam.look.az / DEG), -0.74]]);
       T(0.95, 0.75, `${s.dhKm > 0 ? "+" : ""}${s.dhKm}`, "right", 0.07);

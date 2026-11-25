@@ -54,7 +54,8 @@ export function mountGameScreen(root: HTMLElement): void {
   const renderControls = () => {
     controls.replaceChildren();
     const switchRows = definition.createSystems().switches.filter((s) => s.key).map((s) => [s.key!.toUpperCase(), s.definition.label] as const);
-    const avionicsRows = (definition.createAvionics?.().controls ?? []).map((c) => [c.key.length === 1 ? c.key.toUpperCase() : c.key.replace(/^./, (x) => x.toUpperCase()), c.label] as const);
+    const KEY_NAMES: Record<string, string> = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", enter: "Enter", backspace: "Backspace", pageup: "PgUp", pagedown: "PgDn", home: "Home", end: "End", insert: "Ins", delete: "Del" };
+    const avionicsRows = (definition.createAvionics?.().controls ?? []).map((c) => [KEY_NAMES[c.key] ?? c.key.toUpperCase(), c.label] as const);
     for (const [k, v] of [
       ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw / nose-wheel steering"], ["Shift / Ctrl", "Throttle"], ["Space", "Wheel brakes"],
       ...switchRows,

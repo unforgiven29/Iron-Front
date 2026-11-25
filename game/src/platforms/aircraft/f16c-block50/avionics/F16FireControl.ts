@@ -52,19 +52,19 @@ const AZ = [60, 30, 10];
 const BARS = [1, 2, 4];
 
 export const F16_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
-  { key: "-", label: "FCR mode CRM / ACM", control: "FCR mode (OSB / DOGFIGHT switch)" },
-  { key: "t", label: "TMS up: designate / lock", control: "Target management switch forward" },
-  { key: "z", label: "TMS down: break lock", control: "Target management switch aft" },
-  { key: "[", label: "Cursor down (hold)", control: "Cursor/enable switch" },
-  { key: "]", label: "Cursor up (hold)", control: "Cursor/enable switch" },
-  { key: ",", label: "Cursor left (hold)", control: "Cursor/enable switch" },
-  { key: ".", label: "Cursor right (hold)", control: "Cursor/enable switch" },
-  { key: ";", label: "Antenna elevation down", control: "ANT ELEV knob" },
-  { key: "'", label: "Antenna elevation up", control: "ANT ELEV knob" },
-  { key: "\\", label: "Azimuth scan ±60 / ±30 / ±10", control: "FCR azimuth OSB" },
-  { key: "end", label: "Bars 1 / 2 / 4", control: "FCR bar OSB" },
-  { key: "home", label: "Radar transmit / standby", control: "FCR OVRD (standby)" },
-  { key: "pageup", label: "Range scale", control: "FCR range OSB" }
+  { key: "arrowup", label: "Radar cursor: farther", control: "Cursor/enable switch" },
+  { key: "arrowdown", label: "Radar cursor: nearer", control: "Cursor/enable switch" },
+  { key: "arrowleft", label: "Radar cursor: left", control: "Cursor/enable switch" },
+  { key: "arrowright", label: "Radar cursor: right", control: "Cursor/enable switch" },
+  { key: "enter", label: "Lock target under the cursor", control: "TMS forward" },
+  { key: "backspace", label: "Break lock", control: "TMS aft" },
+  { key: "-", label: "Radar mode: search / dogfight", control: "FCR mode (CRM / ACM)" },
+  { key: "=", label: "Radar range scale", control: "FCR range OSB" },
+  { key: "pageup", label: "Antenna elevation up", control: "ANT ELEV knob" },
+  { key: "pagedown", label: "Antenna elevation down", control: "ANT ELEV knob" },
+  { key: "\\", label: "Scan width ±60 / ±30 / ±10°", control: "FCR azimuth OSB" },
+  { key: "end", label: "Scan bars 1 / 2 / 4", control: "FCR bar OSB" },
+  { key: "home", label: "Radar transmit / standby", control: "FCR standby" }
 ];
 
 export class F16FireControl implements AvionicsSuite {
@@ -92,14 +92,14 @@ export class F16FireControl implements AvionicsSuite {
     this.held.add(k);
     switch (k) {
       case "-": this.mode = this.mode === "CRM" ? "ACM" : "CRM"; this.radar.breakLock("mode"); break;
-      case "t": this.tms = true; break;
-      case "z": this.radar.breakLock("pilot"); break;
-      case ";": this.elevDeg = Math.max(-60, this.elevDeg - 2); break;
-      case "'": this.elevDeg = Math.min(60, this.elevDeg + 2); break;
+      case "enter": this.tms = true; break;
+      case "backspace": this.radar.breakLock("pilot"); break;
+      case "pagedown": this.elevDeg = Math.max(-60, this.elevDeg - 2); break;
+      case "pageup": this.elevDeg = Math.min(60, this.elevDeg + 2); break;
       case "\\": this.az = (this.az + 1) % AZ.length; break;
       case "end": this.bars = (this.bars + 1) % BARS.length; break;
       case "home": this.transmit = !this.transmit; break;
-      case "pageup": this.scale = (this.scale + 1) % SCALES.length; break;
+      case "=": this.scale = (this.scale + 1) % SCALES.length; break;
     }
     return true;
   }
@@ -113,10 +113,10 @@ export class F16FireControl implements AvionicsSuite {
   public step(ctx: AvionicsContext, dt: number): void {
     this.ctx = ctx;
     const sc = SCALES[this.scale] as number;
-    if (this.held.has("]")) this.cursor.rNm = Math.min(sc, this.cursor.rNm + sc * 0.3 * dt);
-    if (this.held.has("[")) this.cursor.rNm = Math.max(0, this.cursor.rNm - sc * 0.3 * dt);
-    if (this.held.has(".")) this.cursor.x = Math.min(1, this.cursor.x + 0.5 * dt);
-    if (this.held.has(",")) this.cursor.x = Math.max(-1, this.cursor.x - 0.5 * dt);
+    if (this.held.has("arrowup")) this.cursor.rNm = Math.min(sc, this.cursor.rNm + sc * 0.3 * dt);
+    if (this.held.has("arrowdown")) this.cursor.rNm = Math.max(0, this.cursor.rNm - sc * 0.3 * dt);
+    if (this.held.has("arrowright")) this.cursor.x = Math.min(1, this.cursor.x + 0.5 * dt);
+    if (this.held.has("arrowleft")) this.cursor.x = Math.max(-1, this.cursor.x - 0.5 * dt);
     const bus = ctx.snapshot.electrical?.buses.find((b) => b.id === "ac.nonessential");
     this.radar.setPower(!ctx.snapshot.electrical || !!bus?.powered);
     this.radar.setRadiate(this.transmit);
@@ -144,7 +144,7 @@ export class F16FireControl implements AvionicsSuite {
       out.push({ kind: "text", frame: "screen", at: [0.8, 0.92], text: `${(lock.rangeM / NM).toFixed(1)}NM ${Math.round(lock.closureMps * 1.944)}VC`, align: "right", size: 0.07 });
     } else {
       const cx = this.cursor.x * 0.85, cy = Y(this.cursor.rNm * NM);
-      for (const dx of [-0.03, 0.03]) out.push({ kind: "line", frame: "screen", points: [[cx + dx, cy - 0.04], [cx + dx, cy + 0.04]] });
+      out.push({ kind: "line", frame: "screen", points: [[cx - 0.05, cy - 0.05], [cx + 0.05, cy - 0.05], [cx + 0.05, cy + 0.05], [cx - 0.05, cy + 0.05]], closed: true });
     }
     out.push({ kind: "line", frame: "screen", points: [[X(this.radar.beam.look.az), -0.92], [X(this.radar.beam.look.az), -0.87]] });
     out.push({ kind: "text", frame: "screen", at: [-0.85, 0.92], text: `${this.mode} ${this.mode === "CRM" ? `A${AZ[this.az]} ${BARS[this.bars]}B` : ""} ${sc}`, size: 0.07 });

@@ -90,7 +90,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   void throttle;
   frame.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
-    if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
+    if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home", "end", "backspace", "enter"].includes(k)) e.preventDefault();
     if (e.repeat) return;
     if (paused) return;
     if (k === "r") { restart(); return; }
@@ -113,8 +113,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     const axis = (p: boolean, n: boolean) => (p ? 1 : 0) - (n ? 1 : 0);
     const toward = (v: number, t: number, rate: number) => (v < t ? Math.min(t, v + rate * dt) : Math.max(t, v - rate * dt));
     stick = {
-      pitch: toward(stick.pitch, axis(has("s", "arrowdown"), has("w", "arrowup")), 2.5),
-      roll: toward(stick.roll, axis(has("d", "arrowright"), has("a", "arrowleft")), 3),
+      pitch: toward(stick.pitch, axis(has("s"), has("w")), 2.5),
+      roll: toward(stick.roll, axis(has("d"), has("a")), 3),
       yaw: toward(stick.yaw, axis(has("e"), has("q")), 3),
       brakes: has(" ") ? 1 : 0
     };
