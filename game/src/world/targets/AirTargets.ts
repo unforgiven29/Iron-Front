@@ -64,7 +64,14 @@ export interface AirTargetState {
   readonly afterburner: number;
 }
 
-class AirTarget {
+/** Anything the world flies as an air target: scripted targets or AI-driven aircraft. */
+export interface AirTargetBody {
+  readonly spec: { readonly id: string; readonly label: string; readonly signature: TargetSignature };
+  update(dt: number): void;
+  state(): AirTargetState;
+}
+
+class AirTarget implements AirTargetBody {
   private pos: [number, number, number];
   private heading: number;
   private vs = 0;
@@ -133,15 +140,16 @@ const toBodyOf = (s: AirTargetState) => (v: Vector3): Vector3 => [dot(v, s.forwa
 
 /** The world's air targets plus the SensorScene built on them. */
 export class AirTargetWorld implements SensorScene {
-  private targets: AirTarget[];
+  private targets: AirTargetBody[];
   private destroyed = new Set<string>();
   public readonly sunDirectionEnu: Vector3 = unit([0.4, -0.3, 1]);
 
-  public constructor(private readonly specs: readonly AirTargetSpec[], private readonly terrain?: RadarTerrain) {
-    this.targets = specs.map((s) => new AirTarget(s));
+  /** @param extraBodies factory for AI-driven bodies (re-created on reset) */
+  public constructor(private readonly specs: readonly AirTargetSpec[], private readonly terrain?: RadarTerrain, private readonly extraBodies: () => readonly AirTargetBody[] = () => []) {
+    this.targets = [...specs.map((s) => new AirTarget(s)), ...extraBodies()];
   }
 
-  public reset(): void { this.targets = this.specs.map((s) => new AirTarget(s)); this.destroyed.clear(); }
+  public reset(): void { this.targets = [...this.specs.map((s) => new AirTarget(s)), ...this.extraBodies()]; this.destroyed.clear(); }
 
   /** Destroy a target (warhead effect). It stops existing for sensors and rendering. */
   public destroy(id: string): void { this.destroyed.add(id); this.targets = this.targets.filter((t) => t.spec.id !== id); }
@@ -174,7 +182,7 @@ export class AirTargetWorld implements SensorScene {
     const sources: IrSource[] = this.targets.map((t) => {
       const s = t.state();
       const a = standardAtmosphere(Math.min(80000, Math.max(0, s.positionEnuM[2])));
-      const state: IrEmitterState = { throttle: s.throttle, afterburner: s.afterburner, mach: t.spec.speedMps / a.speedOfSoundMps };
+      const state: IrEmitterState = { throttle: s.throttle, afterburner: s.afterburner, mach: Math.hypot(...s.velocityEnuMps) / a.speedOfSoundMps };
       return { positionEnuM: s.positionEnuM, toBody: toBodyOf(s), signature: t.spec.signature.ir, state };
     });
     return infraredPoints(query, sources, this.sunDirectionEnu, this.terrain);

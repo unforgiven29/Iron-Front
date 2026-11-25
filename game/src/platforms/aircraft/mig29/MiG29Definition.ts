@@ -18,7 +18,7 @@ import { mig29IntakeSystem } from "./MiG29Intake.js";
 import { mig29Engines, type Rd33PowerMode } from "./MiG29Engines.js";
 import { leakForTimeConstant, mig29PneumaticLoads, MIG29_EMERGENCY_GEAR_POSITIONS, MIG29_PNEUMATIC_INSTALLATION } from "./MiG29Pneumatics.js";
 import { MIG29_PNEUMATICS as PN } from "./MiG29Data.js";
-import { MiG29WeaponControl } from "./avionics/MiG29WeaponControl.js";
+import { MIG29_LOADOUTS, MiG29WeaponControl } from "./avionics/MiG29WeaponControl.js";
 import { mig29AccessoryDrives, mig29HydraulicLoads, MIG29_ELECTRICAL_INSTALLATION, MIG29_HYDRAULIC_INSTALLATION, MIG29_LANDING_GEAR } from "./MiG29Systems.js";
 
 /** Pneumatic test faults: leaks bleed a system with a 2-minute time constant (simulation choice). */
@@ -164,6 +164,8 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
       return out;
     },
     createAvionics: () => new MiG29WeaponControl(),
+    loadouts: MIG29_LOADOUTS,
+    exteriorModelId: "mig29",
     createSystems: () => {
       const fcs = mig29ControlSystem();
       const elec = { fault: "NORMAL", batGnd: true, dcGen: true, acGen: true, pto: true };

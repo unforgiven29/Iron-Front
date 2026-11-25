@@ -18,6 +18,7 @@ import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import { drawInstrument } from "../instruments/Gauges.js";
 import { drawDisplayList, type DisplayList } from "../instruments/DisplayList.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
+import { buildAircraftModel } from "./models/AircraftModels.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
 export interface CockpitViewSnapshot {
@@ -61,7 +62,7 @@ export interface CockpitViewSource {
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
-  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
+  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly modelId?: string; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
@@ -85,6 +86,9 @@ export class ThreeCockpitView {
   private readonly raycaster = new THREE.Raycaster();
   private readonly others = new Map<string, THREE.Group>();
   private frame = 0;
+  /** External (chase) camera instead of the cockpit eye. */
+  private external = false;
+  private ownModel: THREE.Group | null = null;
 
   public constructor(
     private readonly container: HTMLElement,
@@ -92,7 +96,8 @@ export class ThreeCockpitView {
     terrain: TerrainSurface,
     terrainBounds: { readonly minM: readonly [number, number]; readonly maxM: readonly [number, number]; readonly stepM: number },
     private readonly source: CockpitViewSource,
-    airfields: readonly AirfieldSpec[] = []
+    airfields: readonly AirfieldSpec[] = [],
+    ownModelId?: string
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -119,6 +124,11 @@ export class ThreeCockpitView {
     this.world.add(buildTerrainMesh(terrain, terrainBounds));
     for (const a of airfields) this.world.add(buildAirfield(a));
     this.buildCockpit();
+    if (ownModelId) {
+      this.ownModel = buildAircraftModel(ownModelId);
+      this.ownModel.visible = false;
+      this.rig.add(this.ownModel);
+    }
     this.renderer.domElement.addEventListener("click", (e) => this.onClick(e));
     // Head look: hold the right mouse button and drag; wheel zooms.
     const el = this.renderer.domElement;
@@ -153,9 +163,23 @@ export class ThreeCockpitView {
     const b = "buffet" in s ? Math.max(0, Math.min(1, (s as { buffet: number }).buffet)) : 0;
     const t = performance.now() / 1000, amp = 0.006 * b;
     const shake = amp === 0 ? [0, 0] : [amp * (Math.sin(t * 71) + 0.6 * Math.sin(t * 113)), amp * 0.6 * Math.sin(t * 97)];
-    this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch + shake[0]!, this.lookYaw + shake[1]!, 0, "YXZ"));
+    const ext = this.external && this.ownModel !== null;
+    this.cockpit.visible = !ext;
+    if (this.ownModel) {
+      this.ownModel.visible = ext;
+      this.ownModel.traverse((o) => { if (o.name === "afterburner") o.visible = s.throttle > 0.9; });
+    }
+    if (ext) {
+      // Chase camera orbiting the aircraft (right-drag orbits, wheel zooms via the field of view).
+      const look = new THREE.Euler(this.lookPitch - 0.18, this.lookYaw, 0, "YXZ");
+      this.camera.position.copy(new THREE.Vector3(0, 0, 26).applyEuler(look));
+      this.camera.quaternion.setFromEuler(look);
+    } else {
+      this.camera.position.set(0, 0, 0);
+      this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch + shake[0]!, this.lookYaw + shake[1]!, 0, "YXZ"));
+    }
     this.rig.updateMatrixWorld(true);
-    const eyeWorld = rotateVector(q, this.layout.eyeFromCgM as Vector3);
+    const eyeWorld = ext ? [0, 0, 0] as const : rotateVector(q, this.layout.eyeFromCgM as Vector3);
     const eye = enuToThree([s.positionEnuM[0] + eyeWorld[0], s.positionEnuM[1] + eyeWorld[1], s.positionEnuM[2] + eyeWorld[2]]);
     this.world.position.copy(eye).multiplyScalar(-1);
 
@@ -165,7 +189,29 @@ export class ThreeCockpitView {
     this.drawOthers();
     this.drawSmoke();
     this.renderer.render(this.scene, this.camera);
-    this.drawHud(s);
+    if (ext) this.drawExternalHud();
+    else this.drawHud(s);
+  }
+
+  /** Toggle the external chase view (only when an exterior model is available). */
+  public toggleExternal(): void { this.external = !this.external && this.ownModel !== null; this.lookYaw = 0; this.lookPitch = 0; }
+  public get isExternal(): boolean { return this.external; }
+
+  /** Minimal overlay in the chase view: warnings and a view hint (the HUD is collimated in the cockpit). */
+  private drawExternalHud(): void {
+    const g = this.hudCanvas.getContext("2d");
+    if (!g) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), w = this.hudCanvas.width / dpr, h = this.hudCanvas.height / dpr;
+    g.save();
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const data = this.source.hud();
+    g.font = "600 14px ui-monospace, Menlo, monospace";
+    g.textAlign = "center";
+    data.warnings.slice(0, 4).forEach((x, i) => { g.fillStyle = x.level === "warning" ? "#ff6b5e" : "#ffd36e"; g.fillText(x.text, w / 2, 40 + i * 20); });
+    g.fillStyle = "rgba(231,237,242,0.75)";
+    g.fillText(`EXTERNAL VIEW — C: cockpit   ${Math.round(data.airspeedKt)} KT  ${Math.round(data.altitudeFt)} FT`, w / 2, h - 24);
+    g.restore();
   }
 
   /** Head look angles (rad): yaw left positive, pitch up positive. */
@@ -421,6 +467,12 @@ export class ThreeCockpitView {
         const flame = m.getObjectByName("flame");
         if (flame) flame.visible = o.missile.burning;
         if (o.missile.burning) this.addSmoke(o.id, o.positionEnuM, o.forwardEnu, o.missile.geometry.lengthM);
+      }
+      if (!m && o.modelId) {
+        m = buildAircraftModel(o.modelId);
+        m.traverse((c) => { if (c.name === "afterburner") c.visible = false; });
+        this.world.add(m);
+        this.others.set(o.id, m);
       }
       if (!m) {
         m = new THREE.Group();
