@@ -29,6 +29,13 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: st
   return n;
 }
 
+/**
+ * Letter alternatives for the navigation-cluster keys, for compact/laptop keyboards without them.
+ * The alternative is translated before anything else sees the key, so every package binding works.
+ */
+export const KEY_ALTERNATIVES: Readonly<Record<string, string>> = { h: "home", m: "end", ".": "pageup", ",": "pagedown", t: "insert", z: "delete" };
+const keyOf = (e: KeyboardEvent): string => { const k = e.key.toLowerCase(); return KEY_ALTERNATIVES[k] ?? k; };
+
 export interface AircraftSessionHandle {
   readonly paused: boolean;
   setPaused(paused: boolean): void;
@@ -182,7 +189,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   let throttle = jet.snapshot().throttle;
   void throttle;
   frame.addEventListener("keydown", (e) => {
-    const k = e.key.toLowerCase();
+    const k = keyOf(e);
     if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "pageup", "pagedown", "home", "end", "backspace", "enter"].includes(k)) e.preventDefault();
     if (e.repeat) return;
     if (paused) return;
@@ -195,7 +202,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (k === "c") { view.toggleExternal(); return; }
     held.add(k);
   });
-  frame.addEventListener("keyup", (e) => { held.delete(e.key.toLowerCase()); avionics?.key(e.key.toLowerCase(), false); });
+  frame.addEventListener("keyup", (e) => { const k = keyOf(e); held.delete(k); avionics?.key(k, false); });
   frame.addEventListener("blur", () => { held.clear(); for (const c of avionics?.controls ?? []) avionics?.key(c.key, false); });
   frame.addEventListener("pointerdown", () => frame.focus());
 
