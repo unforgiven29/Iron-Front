@@ -4,7 +4,8 @@ import { uniformWind } from "../../src/physics/environment/Atmosphere.js";
 import { solveCycle } from "../../src/physics/propulsion/MixedFlowTurbofan.js";
 import { FixedWingAircraft } from "../../src/platforms/aircraft/common/FixedWingAircraft.js";
 import { createMiG29Definition } from "../../src/platforms/aircraft/mig29/MiG29Definition.js";
-import { RD33_DESIGN, RD33_LPM_DESIGN } from "../../src/platforms/aircraft/mig29/MiG29Engines.js";
+import { scheduleSteadyState } from "../../src/physics/propulsion/Fadec.js";
+import { RD33_CONTROL, RD33_DESIGN, RD33_LPM_DESIGN } from "../../src/platforms/aircraft/mig29/MiG29Engines.js";
 import { generateSyntheticTile, TerrainSurface } from "../../src/world/terrain/Terrain.js";
 
 const KP = 9.80665;
@@ -53,5 +54,21 @@ describe("RD-33 (GAF T.O. 1F-MIG29-1)", () => {
     expect(tLit - tGate).toBeLessThanOrEqual(3.1);
     expect(tFull).toBeGreaterThanOrEqual(3);
     expect(tFull).toBeLessThanOrEqual(7);
+  });
+});
+
+describe("RD-33 minimum afterburner (GAF T.O.: min AB 5,600 kp > MIL 5,040 kp)", () => {
+  it("just past the detent schedules minimum afterburner, which gives more thrust than MIL — never less", () => {
+    const detent = RD33_CONTROL.afterburnerDetentThrottle;
+    const mil = scheduleSteadyState(RD33_DESIGN, RD33_CONTROL, "primary", detent, SLS);
+    const minAb = scheduleSteadyState(RD33_DESIGN, RD33_CONTROL, "primary", detent + 1e-4, SLS);
+    expect(mil.afterburner).toBe(0);
+    expect(minAb.afterburner).toBeCloseTo(0.206, 2);
+    // Uninstalled bench cycle (published thrusts are bench figures).
+    const bench = { ...RD33_DESIGN, installationLossFraction: 0, inlet: { kind: "bellmouth" as const, recovery: () => 1 } };
+    const t = (ab: number) => solveCycle(bench as typeof RD33_DESIGN, SLS, 1, ab).netThrustN / KP;
+    expect(t(minAb.afterburner)).toBeGreaterThan(t(0));
+    expect(t(minAb.afterburner)).toBeCloseTo(5600, -2);
+    expect(scheduleSteadyState(RD33_DESIGN, RD33_CONTROL, "primary", 1, SLS).afterburner).toBe(1);
   });
 });

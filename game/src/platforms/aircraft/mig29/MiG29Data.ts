@@ -114,7 +114,8 @@ export const MIG29_ENGINE = Object.freeze({
   nozzleClosedThroatFractionOfMil: P(1.0, "-", "estimated", EST, "Minimum primary area ≈ what sea-level MIL flow needs"),
   nozzleOpenThroatFractionOfMaxAb: P(1.08, "-", "estimated", EST, "Maximum primary area: margin over sea-level max-AB need"),
   nozzleMaxExitAreaRatio: P(1.8, "A9/A8", "estimated", EST, "Mechanical limit of the secondary (divergent) nozzle"),
-  afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST)
+  afterburnerDetentThrottle: P(0.77, "throttle fraction", "estimated", EST),
+  minAfterburnerFraction: P(0.206, "afterburner fraction", "derived", GAF_TO, "Solved so the uninstalled SL static cycle at max speed gives the published min AB thrust, 5,600 kp (NPM). Without it, light AB gave less thrust than MIL at +6–13 % fuel")
 });
 
 /** Controls: mechanical linkage, feel-control unit and SAU, from the GAF flight manual where stated. */

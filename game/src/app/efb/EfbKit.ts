@@ -89,14 +89,14 @@ function heat(k: number): string {
 
 /**
  * Vertical engine cutaway (intake at top): sections coloured by their station temperatures, exhaust
- * plume by nozzle temperature and afterburner, nozzle opening by throat position. Station labels on
+ * flame in the afterburner duct and an exhaust plume behind the nozzle (never over the engine),
+ * nozzle opening by throat position. Station labels on
  * the given side.
  */
 export function engineCutaway(cx: number, top: number, e: EngineSnapshot, side: "left" | "right", rpmLabel: string): string {
   const s = e.stations, w = 52;
   const lx = side === "left" ? cx - w - 14 : cx + w + 14, anchor = side === "left" ? "end" : "start";
   const L = (y: number, a: string, b?: string) => text(lx, y, a, { anchor, size: 13, weight: 600 }) + (b ? text(lx, y + 15, b, { anchor, size: 11, color: COLORS.dim }) : "");
-  const plume = e.flameout ? 0 : clamp01(0.25 + 0.75 * e.afterburnerFraction);
   const throat = Number.isFinite(e.nozzle.position) ? e.nozzle.position : 0.4;
   const exitW = w * (0.55 + 0.4 * throat);
   const sec = (y: number, h: number, wTop: number, wBot: number, color: string, label: string) =>
@@ -110,8 +110,7 @@ export function engineCutaway(cx: number, top: number, e: EngineSnapshot, side: 
     ${sec(top + 174, 34, w * 0.8, w * 0.9, heat(s?.Tt5K ?? Number.NaN), "TURB")}
     ${sec(top + 208, 26, w * 0.9, w, heat(s?.Tt6K ?? Number.NaN), "MIX")}
     <path d="M${cx - w / 2},${top + 234} L${cx + w / 2},${top + 234} L${cx + exitW / 2},${top + 330} L${cx - exitW / 2},${top + 330} Z" fill="#2a2c30" stroke="#ccc"/>
-    <defs><radialGradient id="plume-${side}" cx="50%" cy="20%" r="80%"><stop offset="0" stop-color="#fff2b0" stop-opacity="${plume}"/><stop offset="0.45" stop-color="${e.afterburnerLit ? "#ff7a1a" : "#c0581a"}" stop-opacity="${plume * 0.9}"/><stop offset="1" stop-color="#b8860b" stop-opacity="0"/></radialGradient></defs>
-    <ellipse cx="${cx}" cy="${top + 300}" rx="${exitW / 2 + 6}" ry="${60 + 50 * e.afterburnerFraction}" fill="url(#plume-${side})"/>
+    ${afterburnerFlame(cx, top, w, exitW, e, side)}
     <path d="M${cx - exitW / 2},${top + 330} l-6,24 M${cx + exitW / 2},${top + 330} l6,24" stroke="#ccc" stroke-width="2"/>
     ${L(top + 14, rpmLabel, `NH ${num(e.spoolSpeed * 100, 1)} % · NL ${num(e.fanSpeed * 100, 1)} %`)}
     ${L(top + 52, `${num(e.airflowKgS, 1)} kg/s`, `core ${num(s?.coreFlowKgS, 1)} · bypass ${num(s?.bypassFlowKgS, 1)} (BPR ${num(s?.bypassRatio, 2)})`)}
@@ -123,6 +122,37 @@ export function engineCutaway(cx: number, top: number, e: EngineSnapshot, side: 
     ${Number.isFinite(e.nozzleActualPosition) ? L(top + 280, `A8 ${num(e.nozzle.throatAreaM2, 3)} m²`, `A9 ${num(e.nozzle.exitAreaM2, 3)} m² · cmd ${num(e.nozzleCommandPosition * 100)} % act ${num(e.nozzleActualPosition * 100)} %`) : L(top + 280, "nozzle fixed", "")}
     ${L(top + 340, `${num(e.netThrustN / 1000, 1)} kN`, `total ${num(e.fuelFlowKgS * 3600)} kg/h · f/a ${num((s?.totalFuelAirRatio ?? Number.NaN) * 1000, 1)} g/kg`)}
     ${e.flameout ? text(cx, top + 290, "FLAMEOUT", { anchor: "middle", size: 12, color: COLORS.warn, weight: 700 }) : ""}`;
+}
+
+/**
+ * Afterburner duct glow (inside the duct, behind the flameholders) and the exhaust plume, which
+ * starts at the nozzle flap tips and grows with the afterburner fraction. Shock diamonds show while
+ * the afterburner is lit. Plume length is capped at 80 px so it never overlaps page text below.
+ */
+function afterburnerFlame(cx: number, top: number, w: number, exitW: number, e: EngineSnapshot, side: string): string {
+  if (e.flameout) return "";
+  const lit = e.afterburnerLit, f = clamp01(e.afterburnerFraction);
+  const id = `ab-${side}`;
+  const ductTop = top + 246, ductBot = top + 330, flapTip = top + 354, mouth = exitW + 12;
+  // Duct: flameholder gutters always drawn; glow only when lit.
+  const gutters = [0.55, 0.8].map((k) => `<path d="M${cx - (w / 2) * k},${top + 240} l${(w / 2) * k * 0.25},6 M${cx + (w / 2) * k},${top + 240} l${-(w / 2) * k * 0.25},6" stroke="#888" stroke-width="1.5" fill="none"/>`).join("");
+  const duct = lit ? `<path d="M${cx - w / 2 + 3},${ductTop} L${cx + w / 2 - 3},${ductTop} L${cx + exitW / 2 - 3},${ductBot} L${cx - exitW / 2 + 3},${ductBot} Z" fill="url(#${id}-duct)" opacity="${0.35 + 0.5 * f}"/>` : "";
+  // Plume: dry = short faint heat haze; lit = orange outer flame and a white-yellow core.
+  const len = lit ? 34 + 46 * f : 16;
+  const outer = `<path d="M${cx - mouth / 2},${flapTip} C${cx - mouth / 2},${flapTip + len * 0.5} ${cx - mouth * 0.18},${flapTip + len * 0.85} ${cx},${flapTip + len} C${cx + mouth * 0.18},${flapTip + len * 0.85} ${cx + mouth / 2},${flapTip + len * 0.5} ${cx + mouth / 2},${flapTip} Z" fill="url(#${id}-outer)"/>`;
+  const coreW = mouth * 0.55, coreLen = len * 0.6;
+  const core = lit ? `<path d="M${cx - coreW / 2},${flapTip} Q${cx - coreW * 0.35},${flapTip + coreLen * 0.7} ${cx},${flapTip + coreLen} Q${cx + coreW * 0.35},${flapTip + coreLen * 0.7} ${cx + coreW / 2},${flapTip} Z" fill="url(#${id}-core)"/>` : "";
+  const diamonds = lit ? Array.from({ length: 3 }, (_, i) => {
+    const y = flapTip + len * (0.2 + 0.24 * i), dw = mouth * (0.22 - 0.05 * i), dh = 6 + 4 * f;
+    return `<path d="M${cx},${y - dh} L${cx + dw / 2},${y} L${cx},${y + dh} L${cx - dw / 2},${y} Z" fill="#fffbe6" opacity="${(0.75 - 0.2 * i) * (0.5 + 0.5 * f)}"/>`;
+  }).join("") : "";
+  return `<defs>
+      <linearGradient id="${id}-duct" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb347" stop-opacity="0.2"/><stop offset="1" stop-color="#ff7a1a"/></linearGradient>
+      <linearGradient id="${id}-outer" x1="0" y1="0" x2="0" y2="1">${lit
+        ? `<stop offset="0" stop-color="#ff8c2a" stop-opacity="0.95"/><stop offset="0.6" stop-color="#ff5a1f" stop-opacity="0.6"/><stop offset="1" stop-color="#c2361b" stop-opacity="0"/>`
+        : `<stop offset="0" stop-color="#9a7a5a" stop-opacity="0.45"/><stop offset="1" stop-color="#9a7a5a" stop-opacity="0"/>`}</linearGradient>
+      <linearGradient id="${id}-core" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#fff2b0" stop-opacity="0.85"/><stop offset="1" stop-color="#ffd36b" stop-opacity="0"/></linearGradient>
+    </defs>${duct}${gutters}${outer}${core}${diamonds}`;
 }
 
 /** Wrap a page body in an SVG canvas. */
