@@ -161,6 +161,10 @@ body.game-mode { overflow: hidden; background: #06090c; }
 .pylon { display: grid; justify-items: center; gap: 6px; min-width: 54px; padding: 8px 4px; border-top: 3px solid var(--accent-2); background: rgba(16, 24, 32, 0.8); }
 .pylon.empty { border-top-color: #33424f; opacity: 0.55; }
 .pylon-no { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.12em; }
+.pylon-select { width: 100%; max-width: 92px; background: #0d151c; color: #e7edf2; border: 1px solid var(--line); font: inherit; font-size: 0.72rem; padding: 3px; }
+.pylon.locked { opacity: 0.35; }
+.loadout-errors { margin: 8px 0 0; padding-left: 18px; color: #ff8f7f; font-size: 0.85rem; }
+.loadout-errors:empty { display: none; }
 .pylon-store { font-weight: 700; font-size: 0.82rem; writing-mode: vertical-rl; transform: rotate(180deg); min-height: 70px; letter-spacing: 0.06em; }
 .loadout-summary { margin: 10px 0 0; color: var(--accent); letter-spacing: 0.1em; font-weight: 700; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 22px; margin: 0 0 14px; }

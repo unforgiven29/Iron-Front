@@ -1,8 +1,9 @@
+import { F16_STORES } from "./F16Stores.js";
 /**
  * F-16C Block 50 package definition: everything aircraft-specific, expressed through the shared
  * AircraftDefinition contract. The shared FixedWingAircraft runtime flies it.
  */
-import { F16FireControl, F16_LOADOUTS } from "./avionics/F16FireControl.js";
+import { F16FireControl } from "./avionics/F16FireControl.js";
 import { F16_EFB } from "./F16Efb.js";
 import type { ModuleManifest } from "../../../core/modules/ModuleTypes.js";
 import { groundEffect, groundEffectPitchIncrement, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
@@ -209,7 +210,7 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
     efb: F16_EFB,
     mfdPages: { "mfd-left": engPage, "mfd-right": flcsPage },
     createAvionics: () => new F16FireControl(),
-    loadouts: F16_LOADOUTS,
+    stores: F16_STORES,
     exteriorModelId: "f16c",
     createSystems: () => {
       const fcs = f16Fcs();

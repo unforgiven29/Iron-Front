@@ -11,7 +11,8 @@
 import type { DisplayList, DisplayPrimitive } from "../../../../rendering/instruments/DisplayList.js";
 import { DEG, type RasterPattern } from "../../../../sensors/common/ScanGeometry.js";
 import { PulseDopplerRadar, type RadarProfile, type WaveformSpec } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AudioCues, AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import { decodeStores, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
+import { F16_STORES } from "../F16Stores.js";
 import { RadarWarningReceiver } from "../../../../sensors/rwr/RadarWarningReceiver.js";
 import { ALR56M_PROFILE, alr56mDisplay } from "./ALR56M.js";
 import { NOTIONAL_AAM, type NotionalMissileSpec } from "../../../../weapons/catalog/NotionalAirToAir.js";
@@ -72,23 +73,13 @@ export const F16_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "l", label: "Launch missile", control: "Weapon release (placeholder)" }
 ];
 
-/**
- * Air-to-air loadouts. The missiles are NOTIONAL low-fidelity placeholders (invented gameplay
- * values) until the F-16 weapons are reworked; station layout: 1 (left tip) … 9 (right tip).
- */
-export const F16_LOADOUTS: readonly LoadoutOption[] = [
-  { id: "a2a-standard", label: "Air superiority", description: "2 × AIM-9X on the wingtips, 4 × AIM-120 on the wing stations.", stations: ["AIM-9X", "AIM-120", "AIM-120", "", "", "", "AIM-120", "AIM-120", "AIM-9X"] },
-  { id: "a2a-bvr", label: "Beyond visual range", description: "6 × AIM-120: maximum long-range shots, no heat-seekers.", stations: ["AIM-120", "AIM-120", "AIM-120", "", "", "", "AIM-120", "AIM-120", "AIM-120"] },
-  { id: "a2a-wvr", label: "Close-in fight", description: "4 × AIM-9X and 2 × AIM-120 for a turning fight.", stations: ["AIM-9X", "AIM-9X", "AIM-120", "", "", "", "AIM-120", "AIM-9X", "AIM-9X"] },
-  { id: "clean", label: "Clean (training)", description: "No stores: flying and radar practice.", stations: ["", "", "", "", "", "", "", "", ""] }
-];
 const BY_NAME: Record<string, NotionalMissileSpec> = { "AIM-9X": NOTIONAL_AAM.AIM9X, "AIM-120": NOTIONAL_AAM.AIM120 };
-const storesFor = (id: string): (NotionalMissileSpec | null)[] => (F16_LOADOUTS.find((l) => l.id === id) ?? F16_LOADOUTS[0]!).stations.map((n) => BY_NAME[n] ?? null);
+const storesFor = (names: readonly string[]): (NotionalMissileSpec | null)[] => names.map((n) => BY_NAME[n] ?? null);
+const DEFAULT_STORES = F16_STORES.presets[0]!.stations;
 
 export class F16FireControl implements AvionicsSuite {
   /** Radar warning receiver (passive; independent of the radar). */
   public readonly rwr = new RadarWarningReceiver(ALR56M_PROFILE);
-  public readonly insetScreen = "rwr";
   private rwrSeen = new Set<number>();
   private rwrTime = 0;
   public readonly controls = F16_AVIONICS_CONTROLS;
@@ -103,19 +94,18 @@ export class F16FireControl implements AvionicsSuite {
   private held = new Set<string>();
   private ctx: AvionicsContext | null = null;
   private tms = false;
-  private loadoutId = F16_LOADOUTS[0]!.id;
-  private stores: (NotionalMissileSpec | null)[] = storesFor(this.loadoutId);
+  private loadout: readonly string[] = DEFAULT_STORES;
+  private stores: (NotionalMissileSpec | null)[] = storesFor(this.loadout);
   private selectedId: string = "aim120";
   private launch = false;
-  private message: { text: string; t: number } | null = null;
 
   public constructor(seed = 16) { this.radar = new PulseDopplerRadar(APG68_PROFILE, seed); }
 
   public reset(): void {
-    this.rwr.reset(); this.rwrSeen.clear(); this.radar.breakLock("reset"); this.mode = "CRM"; this.stores = storesFor(this.loadoutId); this.selectFirst(); }
+    this.rwr.reset(); this.rwrSeen.clear(); this.radar.breakLock("reset"); this.mode = "CRM"; this.stores = storesFor(this.loadout); this.selectFirst(); }
 
   public setOption(key: string, value: string): void {
-    if (key === "loadout" && F16_LOADOUTS.some((l) => l.id === value)) { this.loadoutId = value; this.stores = storesFor(value); this.selectFirst(); }
+    if (key === "stores") { const names = decodeStores(value); if (F16_STORES.validate(names).length === 0) { this.loadout = names; this.stores = storesFor(names); this.selectFirst(); } }
   }
 
   private selectFirst(): void { const first = this.stores.find((x) => x); if (first) this.selectedId = first.id; }
@@ -135,9 +125,9 @@ export class F16FireControl implements AvionicsSuite {
   private fire(ctx: AvionicsContext): void {
     const w = this.weapon;
     const port = ctx.weapons;
-    if (!w || !port?.launchNotional) { this.message = { text: "NO WPN", t: ctx.own.timeS }; return; }
+    if (!w || !port?.launchNotional) { return; }
     const lock = this.radar.lock(ctx.own);
-    if (w.guidance === "radar" && !lock) { this.message = { text: "NO LOCK", t: ctx.own.timeS }; return; }
+    if (w.guidance === "radar" && !lock) { return; }
     const radar = this.radar;
     // Midcourse cue: the FCR track while the lock holds (one-way datalink), else nothing.
     const cue = () => { const c = this.ctx; const l = c ? radar.lock(c.own) : null; return l ? { positionEnuM: l.positionEnuM, velocityEnuMps: l.velocityEnuMps } : null; };
@@ -145,7 +135,6 @@ export class F16FireControl implements AvionicsSuite {
     let first = true;
     port.launchNotional(w, [ctx.own.positionEnuM[0], ctx.own.positionEnuM[1], ctx.own.positionEnuM[2] - 1.5], ctx.own.velocityEnuMps, () => { if (first) { first = false; return at; } return cue(); });
     this.stores[this.stores.findIndex((x) => x?.id === w.id)] = null;
-    this.message = { text: `${w.display} AWAY`, t: ctx.own.timeS };
     if (!this.weapon) this.cycleWeapon();
   }
 
@@ -229,7 +218,6 @@ export class F16FireControl implements AvionicsSuite {
     const w = this.weapon;
     const n = w ? this.stores.filter((x) => x?.id === w.id).length : 0;
     const out: DisplayPrimitive[] = [{ kind: "text", frame: "screen", at: [0.9, -0.95], text: w ? `${n} ${w.display}` : "NO WPN", align: "right", size: 0.06 }];
-    if (this.message && ctx && ctx.own.timeS - this.message.t < 3) out.push({ kind: "text", frame: "screen", at: [0, -0.62], text: this.message.text, align: "center", size: 0.07 });
     if (lock && w) {
       const inRange = lock.rangeM < w.maxLaunchRangeM && lock.rangeM > w.minLaunchRangeM && Math.hypot(lock.lookBody.az, lock.lookBody.el) < w.maxOffBoresightRad;
       if (inRange) out.push({ kind: "text", frame: "screen", at: [0, -0.72], text: "SHOOT", align: "center", size: 0.09 });

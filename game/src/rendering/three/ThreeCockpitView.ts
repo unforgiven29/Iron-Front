@@ -59,8 +59,6 @@ export interface CockpitViewSource {
   hudOverlay?(): DisplayList;
   /** True when the package draws the complete HUD itself (the shared flight symbology is then omitted; warnings stay). */
   hudOwnedByPackage?(): boolean;
-  /** Small repeater of one package screen (e.g. the RWR indicator), drawn in the lower-left corner. */
-  inset?(): DisplayList | undefined;
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
@@ -193,23 +191,6 @@ export class ThreeCockpitView {
     this.renderer.render(this.scene, this.camera);
     if (ext) this.drawExternalHud();
     else this.drawHud(s);
-    this.drawInset();
-  }
-
-  private drawInset(): void {
-    const list = this.source.inset?.();
-    const g = this.hudCanvas.getContext("2d");
-    if (!list || !g) return;
-    const h = this.hudCanvas.height, size = Math.round(Math.min(h * 0.26, this.hudCanvas.width * 0.3)), pad = Math.round(h * 0.02);
-    const x0 = pad, y0 = h - pad - size, half = size / 2;
-    g.save();
-    g.fillStyle = "rgba(4, 10, 8, 0.82)";
-    g.strokeStyle = "rgba(125, 255, 154, 0.35)";
-    g.lineWidth = Math.max(1, size * 0.006);
-    g.fillRect(x0, y0, size, size);
-    g.strokeRect(x0, y0, size, size);
-    drawDisplayList(g, list, { screen: (x, y) => [x0 + half + x * half * 0.94, y0 + half - y * half * 0.94], unitPx: half }, "#8ff0a8");
-    g.restore();
   }
 
   /** Toggle the external chase view (only when an exterior model is available). */

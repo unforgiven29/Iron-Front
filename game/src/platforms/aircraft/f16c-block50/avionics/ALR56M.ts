@@ -44,12 +44,12 @@ export const ALR56M_PROFILE: RwrProfile = {
 /** Threat display (screen frame, nose up). `blink` toggles at ~2 Hz for missile flashing. */
 export function alr56mDisplay(contacts: readonly RwrContact[], powered: boolean, blink: boolean): DisplayList {
   const out: DisplayPrimitive[] = [];
-  out.push({ kind: "circle", frame: "screen", at: [0, 0], radius: 0.92, color: "#2f6b45" });
-  out.push({ kind: "circle", frame: "screen", at: [0, 0], radius: 0.5, dash: true, color: "#2f6b45" });
-  out.push({ kind: "line", frame: "screen", points: [[-0.08, 0], [0.08, 0]], color: "#2f6b45" }, { kind: "line", frame: "screen", points: [[0, -0.08], [0, 0.08]], color: "#2f6b45" });
+  out.push({ kind: "circle", frame: "screen", at: [0, 0], radius: 0.92, color: "#4fbf74" });
+  out.push({ kind: "circle", frame: "screen", at: [0, 0], radius: 0.5, dash: true, color: "#4fbf74" });
+  out.push({ kind: "line", frame: "screen", points: [[-0.08, 0], [0.08, 0]], color: "#4fbf74" }, { kind: "line", frame: "screen", points: [[0, -0.08], [0, 0.08]], color: "#4fbf74" });
   for (let a = 0; a < 360; a += 30) {
     const r = a * D;
-    out.push({ kind: "line", frame: "screen", points: [[0.92 * Math.sin(r), 0.92 * Math.cos(r)], [0.98 * Math.sin(r), 0.98 * Math.cos(r)]], color: "#2f6b45" });
+    out.push({ kind: "line", frame: "screen", points: [[0.92 * Math.sin(r), 0.92 * Math.cos(r)], [0.98 * Math.sin(r), 0.98 * Math.cos(r)]], color: "#4fbf74" });
   }
   if (!powered) { out.push({ kind: "text", frame: "screen", at: [0, -0.05], text: "OFF", align: "center", size: 0.12 }); return out; }
   const shown = contacts.slice(0, 8);
@@ -66,6 +66,6 @@ export function alr56mDisplay(contacts: readonly RwrContact[], powered: boolean,
     if (c.isNew) out.push({ kind: "line", frame: "screen", points: [[x - 0.09, y + 0.07], [x - 0.05, y + 0.12], [x + 0.05, y + 0.12], [x + 0.09, y + 0.07]] });
     if (i === 0) out.push({ kind: "line", frame: "screen", points: [[x, y + 0.15], [x + 0.15, y], [x, y - 0.15], [x - 0.15, y]], closed: true });
   });
-  out.push({ kind: "text", frame: "screen", at: [-0.95, -0.95], text: "ALR-56M", size: 0.07, color: "#2f6b45" });
+  out.push({ kind: "text", frame: "screen", at: [-0.95, -0.95], text: "ALR-56M", size: 0.07, color: "#4fbf74" });
   return out;
 }

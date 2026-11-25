@@ -33,6 +33,38 @@ export interface WeaponPort {
   notionalEvents?(sinceS?: number): readonly import("../../../world/weapons/NotionalMissiles.js").NotionalWeaponEvent[];
 }
 
+/** One weapon station: what it may carry ("" = empty is always allowed). */
+export interface StationDefinition {
+  readonly id: string;
+  readonly label: string;
+  readonly allowed: readonly string[];
+  /** Why the station carries nothing air-to-air here (e.g. tanks/air-to-ground only, not modelled). */
+  readonly note?: string;
+}
+
+/**
+ * An aircraft's stores plan: stations, carriage rules and presets. The chosen per-station list
+ * reaches the avionics as setOption("stores", names.join("|")); packages re-validate it.
+ */
+export interface StoresPlan {
+  readonly stations: readonly StationDefinition[];
+  readonly presets: readonly LoadoutOption[];
+  readonly provenance: string;
+  /** Carriage-rule violations for a per-station list (empty = valid). */
+  validate(stores: readonly string[]): readonly string[];
+}
+
+/** Per-station checks shared by every plan: list length and each store allowed on its station. */
+export function stationErrors(plan: Pick<StoresPlan, "stations">, stores: readonly string[]): string[] {
+  if (stores.length !== plan.stations.length) return [`Expected ${plan.stations.length} stations, got ${stores.length}`];
+  const out: string[] = [];
+  stores.forEach((s, i) => { const st = plan.stations[i]!; if (s && !st.allowed.includes(s)) out.push(`${s} cannot be carried on ${st.label}`); });
+  return out;
+}
+
+export const encodeStores = (stores: readonly string[]): string => stores.join("|");
+export const decodeStores = (v: string): string[] => v.split("|");
+
 /** A selectable stores configuration offered by an aircraft package (menu loadout screen). */
 export interface LoadoutOption {
   readonly id: string;
@@ -66,8 +98,6 @@ export interface AvionicsSuite {
   /** Short status lines for data panels and tests. */
   status(): Readonly<Record<string, string | number>>;
   reset(): void;
-  /** Screen id the session may also show as a small inset over the view (e.g. the RWR indicator). */
-  readonly insetScreen?: string;
   /** Warning tones the package's equipment is requesting now (the session plays them). */
   audioCues?(): AudioCues;
   /** Optional presentation settings from the game menu (e.g. hudLanguage = ru | en). */

@@ -5,8 +5,10 @@ import { NotionalMissileWorld, type CombatTarget } from "../../src/world/weapons
 import { canSee, HostileFighter, type HostileEnvironment } from "../../src/world/combat/HostileFighters.js";
 import { SIGNATURES } from "../../src/world/targets/AirTargets.js";
 import { hostileSpecs } from "../../src/app/TestRange.js";
-import { F16FireControl, F16_LOADOUTS } from "../../src/platforms/aircraft/f16c-block50/avionics/F16FireControl.js";
-import { MIG29_LOADOUTS } from "../../src/platforms/aircraft/mig29/avionics/MiG29WeaponControl.js";
+import { F16FireControl } from "../../src/platforms/aircraft/f16c-block50/avionics/F16FireControl.js";
+import { F16_STORES } from "../../src/platforms/aircraft/f16c-block50/F16Stores.js";
+import { MIG29_STORES } from "../../src/platforms/aircraft/mig29/MiG29Stores.js";
+import { encodeStores } from "../../src/platforms/aircraft/common/Avionics.js";
 
 /** A straight-flying target moved by the test. */
 function mover(id: string, side: "blue" | "red", p: Vector3, v: Vector3) {
@@ -87,19 +89,27 @@ describe("hostile F-16C (low fidelity)", () => {
   });
 });
 
-describe("loadouts", () => {
-  it("F-16 loadout option sets the stores; unknown ids are ignored", () => {
+describe("stores plans", () => {
+  it("F-16 stores option sets the stations; invalid lists are ignored", () => {
     const fc = new F16FireControl();
-    fc.setOption("loadout", "a2a-bvr");
+    fc.setOption("stores", encodeStores(F16_STORES.presets.find((p) => p.id === "a2a-bvr")!.stations));
     expect(fc.inventory).toEqual({ "AIM-120": 6 });
-    fc.setOption("loadout", "does-not-exist");
+    fc.setOption("stores", encodeStores(["AIM-120", "", "", "AIM-9X", "", "", "", "", ""])); // station 4 cannot carry AAMs
     expect(fc.inventory).toEqual({ "AIM-120": 6 });
-    fc.setOption("loadout", "clean");
+    fc.setOption("stores", encodeStores(["", "", "", "", "", "", "", "", ""]));
     expect(fc.weapon).toBeNull();
   });
 
-  it("every offered loadout names only stores the package can carry", () => {
-    for (const l of F16_LOADOUTS) for (const s of l.stations) expect(["", "AIM-9X", "AIM-120"]).toContain(s);
-    for (const l of MIG29_LOADOUTS) for (const s of l.stations) expect(["", "R-73", "R-60M", "R-27R", "R-27ER", "R-27T", "R-27ET"]).toContain(s);
+  it("every preset is valid", () => {
+    for (const plan of [F16_STORES, MIG29_STORES]) for (const l of plan.presets) expect(plan.validate(l.stations)).toEqual([]);
+  });
+
+  it("MiG-29: R-27 only on the inboard pylons, at most two, one guidance family", () => {
+    expect(MIG29_STORES.validate(["R-27R", "", "", "", "", ""]).length).toBeGreaterThan(0);
+    expect(MIG29_STORES.validate(["", "", "R-27R", "R-27ER", "", ""])).toEqual([]);
+    expect(MIG29_STORES.validate(["", "", "R-27T", "R-27ET", "", ""])).toEqual([]);
+    expect(MIG29_STORES.validate(["", "", "R-27R", "R-27T", "", ""]).join()).toContain("one family");
+    expect(MIG29_STORES.validate(["R-73", "R-60M", "", "", "R-73", "R-73"])).toEqual([]);
+    expect(MIG29_STORES.validate(["R-73", "R-73", "R-73", "", "", ""]).length).toBeGreaterThan(0);
   });
 });

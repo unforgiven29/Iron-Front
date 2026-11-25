@@ -18,9 +18,10 @@ import { norm, sub, unit } from "../../../../physics/sensing/SweepGeometry.js";
 import { bodyAngles, DEG, type LookAngles, type RasterPattern, type SensorOwnship } from "../../../../sensors/common/ScanGeometry.js";
 import { ScanningIrst } from "../../../../sensors/irst/ScanningIrst.js";
 import { PulseDopplerRadar, type RadarTrackReport } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AudioCues, AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
-import { RadarWarningReceiver } from "../../../../sensors/rwr/RadarWarningReceiver.js";
-import { SPO15_PROFILE, spo15Display } from "./Spo15.js";
+import { decodeStores, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
+import { MIG29_STORES } from "../MiG29Stores.js";
+import { spo15Display } from "./Spo15.js";
+import { Spo15Lm } from "./Spo15Lm.js";
 import { KOLS_PROFILE } from "./KolsProfile.js";
 import { SOVIET_AAM } from "../../../../weapons/catalog/SovietAirToAir.js";
 import { launchZone, type LauncherLink, type MissileSpec } from "../../../../weapons/missiles/Missile.js";
@@ -74,6 +75,7 @@ export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "]", label: "IRST gain up", control: "УСИЛ.ТП knob, panel ПСР-31" },
   { key: "f", label: "Select missile type", control: "Weapon selector" },
   { key: "l", label: "Launch missile", control: "ПУСК (launch) button on the stick" },
+  { key: "j", label: "SPO-15: search signals shown / track only", control: "СПО-15 control panel search switch (DCS MiG-29A manual p.107)" },
   { key: "k", label: "Cannon sight (hold = trigger first stage)", control: "Gun trigger, first stage (НО), BP-29 p.25" }
 ];
 
@@ -97,22 +99,12 @@ export function r27MaxLaunchKm(aspectFromNoseDeg: number, altitudeM: number): nu
 
 const fmtKm = (km: number) => (km >= 1 ? String(Math.round(km)) : km.toFixed(1));
 
-/** Stores options, stations 1 (left outboard) … 6 (right outboard). */
-export const MIG29_LOADOUTS: readonly LoadoutOption[] = [
-  { id: "test-mix", label: "Test mix (one of each)", description: "R-73, R-60M, R-27R, R-27ER, R-27T, R-27ET: try every missile.", stations: ["R-73", "R-60M", "R-27R", "R-27ER", "R-27T", "R-27ET"] },
-  { id: "standard", label: "2 × R-27R + 4 × R-73", description: "Symmetric air-to-air fit: semi-active medium range plus close-combat IR.", stations: ["R-73", "R-73", "R-27R", "R-27R", "R-73", "R-73"] },
-  { id: "extended", label: "R-27ER / R-27ET + R-73", description: "Extended-range pair (radar + IR) with four R-73.", stations: ["R-73", "R-73", "R-27ER", "R-27ET", "R-73", "R-73"] },
-  { id: "dogfight", label: "6 × R-73", description: "All close-combat missiles.", stations: ["R-73", "R-73", "R-73", "R-73", "R-73", "R-73"] },
-  { id: "clean", label: "Clean (training)", description: "No stores.", stations: ["", "", "", "", "", ""] }
-];
 const MIG_STORE: Record<string, MissileSpec> = { "R-73": SOVIET_AAM.R73A, "R-60M": SOVIET_AAM.R60M, "R-27R": SOVIET_AAM.R27R, "R-27ER": SOVIET_AAM.R27ER, "R-27T": SOVIET_AAM.R27T, "R-27ET": SOVIET_AAM.R27ET };
-const migStores = (id: string): (MissileSpec | null)[] => (MIG29_LOADOUTS.find((l) => l.id === id) ?? MIG29_LOADOUTS[0]!).stations.map((n) => MIG_STORE[n] ?? null);
+const migStores = (names: readonly string[]): (MissileSpec | null)[] => names.map((n) => MIG_STORE[n] ?? null);
 
 export class MiG29WeaponControl implements AvionicsSuite {
-  /** Radar warning receiver (passive; independent of the radar). */
-  public readonly rwr = new RadarWarningReceiver(SPO15_PROFILE);
-  public readonly insetScreen = "rwr";
-  private rwrSeen = new Set<number>();
+  /** СПО-15ЛМ radar warning station (passive; its forward channels blank while the radar radiates). */
+  public readonly rwr = new Spo15Lm();
   private rwrTime = 0;
   public readonly controls = MIG29_AVIONICS_CONTROLS;
   public readonly ownsHud = true;
@@ -128,15 +120,14 @@ export class MiG29WeaponControl implements AvionicsSuite {
    * Stores: test loadout carrying one of each type (wing stations 1–6). A real squadron fit is
    * symmetric (e.g. 2 × R-27R + 4 × R-60M, BP-29 fig.1); this mix is for trying every missile.
    */
-  private loadoutId = MIG29_LOADOUTS[0]!.id;
-  private stores: (MissileSpec | null)[] = migStores(this.loadoutId);
+  private loadout: readonly string[] = MIG29_STORES.presets[0]!.stations;
+  private stores: (MissileSpec | null)[] = migStores(this.loadout);
   private selected = 0;
   /** Time the current weapon was selected (IR seeker cool-down starts then). */
   private selectedAtS = 0;
   /** Smoothed launch zone of the selected missile on the current target, m. */
   private dlz: { maxM: number; minM: number; t: number; specId: string } | null = null;
   private launchPressed = false;
-  private killCue: { text: string; t: number } | null = null;
   private eventsSeen = 0;
 
   public constructor(seed = 29) {
@@ -271,7 +262,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
   }
 
   public reset(): void {
-    this.rwr.reset(); this.rwrSeen.clear(); this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); this.stores = migStores(this.loadoutId); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
+    this.rwr.reset(); this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); this.stores = migStores(this.loadout); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
 
   public get state(): Readonly<Mig29WcsStatus> { return this.s; }
 
@@ -301,6 +292,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       case "]": s.irstGain = Math.min(1, Math.round((s.irstGain + 0.1) * 10) / 10); break;
       case "k": s.gun = true; break;
       case "f": this.cycleWeapon(); break;
+      case "j": this.rwr.setSearchAllowed(!this.rwr.searchAllowed); break;
       case "l": this.launchPressed = true; break;
     }
     return true;
@@ -369,7 +361,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.rwrTime = ctx.own.timeS;
     // Power: any live bus (the exact RWR bus assignment is not sourced).
     this.rwr.setPower(!ctx.snapshot.electrical || ctx.snapshot.electrical.buses.some((b) => b.powered));
-    this.rwr.step({ timeS: ctx.own.timeS, positionEnuM: ctx.own.positionEnuM, bodyToWorld: ctx.own.bodyToWorld, headingRad: ctx.own.headingRad }, ctx.scene, dt);
+    const radiating = this.s.emission === "ИЗЛ" && !["off", "warmup", "standby"].includes(this.radar.state);
+    this.rwr.step({ timeS: ctx.own.timeS, positionEnuM: ctx.own.positionEnuM, bodyToWorld: ctx.own.bodyToWorld }, ctx.scene, dt, radiating);
     this.ctx = ctx;
     const s = this.s;
     const scale = SCALE_KM[s.radarMode];
@@ -420,7 +413,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.updateDlz(ctx);
     if (this.launchPressed) { this.launchPressed = false; this.launch(ctx); }
     const evs = ctx.weapons?.events() ?? [];
-    for (const e of evs.slice(this.eventsSeen)) if (e.kind === "kill" || e.kind === "miss") this.killCue = { text: e.kind === "kill" ? "ПОРАЖ" : "ПРОМАХ", t: ctx.own.timeS };
+
     this.eventsSeen = evs.length;
     // HMS: the lock is made where the pilot is looking now — an acquisition in progress follows the head.
     if (s.master === "ШЛЕМ") this.kols.steerAcquisition({ az: ctx.head.az, el: ctx.head.el });
@@ -693,7 +686,6 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const w = this.weapon;
     T(-0.95, -0.82, w ? (MISSILE_RU[w.id] ?? w.display) : "НЕТ", "left", 0.065);
     // IR seeker lock is not drawn on the ИЛС: BP-29 fig.16 gives it as the helmet symbol with the audio tone.
-    if (this.killCue && own.timeS - this.killCue.t < 2.5) T(0, 0.55, this.killCue.text, "center", 0.1);
     const em = s.emission;
     const tags = [s.emission !== "ИЗЛ" ? em : "", s.interaction ? "ТОРМ" : "", s.snp !== "ОТКЛ" ? `СНП ${s.snp}` : "", s.compensation ? "" : "БЕЗ КОМП"].filter(Boolean);
     if (!hud) T(0.95, -0.95, tags.join(" "), "right");
@@ -763,7 +755,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
   private lang: "ru" | "en" = "ru";
   public setOption(key: string, value: string): void {
     if (key === "hudLanguage" && (value === "ru" || value === "en")) this.lang = value;
-    if (key === "loadout" && MIG29_LOADOUTS.some((l) => l.id === value)) { this.loadoutId = value; this.stores = migStores(value); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
+    if (key === "stores") { const names = decodeStores(value); if (MIG29_STORES.validate(names).length === 0) { this.loadout = names; this.stores = migStores(names); this.selected = Math.max(0, this.stores.findIndex((x) => x)); } }
   }
 
   private localize(list: DisplayPrimitive[]): DisplayList {
@@ -774,14 +766,13 @@ export class MiG29WeaponControl implements AvionicsSuite {
   public hud(): DisplayList { return this.localize(this.picture(true)); }
 
   public audioCues(): AudioCues {
-    const cs = this.rwr.contacts();
-    let fresh = 0;
-    for (const c of cs) if (!this.rwrSeen.has(c.id)) { this.rwrSeen.add(c.id); fresh++; }
-    return { newContacts: fresh, steadyIllumination: cs.some((c) => c.steadyIllumination), missile: cs.some((c) => c.match?.entry.category === "missile-seeker") };
+    const st = this.rwr.state;
+    // Low tone per detection event; continuous high tone in track-warning mode (source p.105/108).
+    return { newContacts: st.detections > 0 && !st.trackWarning ? 1 : 0, steadyIllumination: st.trackWarning, missile: false };
   }
 
   public screen(id: string): DisplayList | undefined {
-    if (id === "rwr") return spo15Display(this.rwr.contacts(), this.rwr.isPowered, Math.floor(this.rwrTime * 4) % 2 === 0);
+    if (id === "rwr") return spo15Display(this.rwr.state, Math.floor(this.rwrTime * 4) % 2 === 0);
     return id === "radar" ? this.localize(this.picture(false)) : undefined; }
 
   public status(): Readonly<Record<string, string | number>> {

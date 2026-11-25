@@ -67,10 +67,24 @@ test("main menu walks the sortie steps and the loadout choice changes the statio
   await page.getByRole("radiogroup", { name: "Loadout" }).getByRole("radio", { name: /Beyond visual range/ }).click();
   await expect(page.locator(".loadout-summary")).toHaveText("6 × AIM-120");
   await page.getByRole("button", { name: /Briefing/ }).click();
-  await expect(page.locator(".facts")).toContainText("Beyond visual range");
+  await expect(page.locator(".facts")).toContainText("6 × AIM-120");
   await page.getByRole("button", { name: "← Main menu" }).click();
   await expect(page.getByRole("link", { name: "Developer tools →" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("per-station stores: the MiG-29 cannot mix radar and IR R-27s", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Sortie setup/ }).click();
+  await page.getByRole("radiogroup", { name: "Aircraft" }).getByRole("radio", { name: /MiG-29/ }).click();
+  await page.getByRole("button", { name: /Loadout/ }).click();
+  await page.getByLabel("Pylon 4 (R inboard)").selectOption("R-27T");
+  await expect(page.locator(".loadout-errors")).toContainText("one family");
+  await page.getByRole("button", { name: /Briefing/ }).click();
+  await expect(page.getByRole("button", { name: "Launch" })).toBeDisabled();
+  await page.getByRole("button", { name: /Loadout/ }).click();
+  await page.getByLabel("Pylon 3 (L inboard)").selectOption("R-27ET");
+  await expect(page.locator(".loadout-errors")).toBeEmpty();
 });
 
 test("main game starts the F-16, flies, pauses and resumes without page errors", async ({ page }) => {

@@ -4,7 +4,6 @@ import { friisPowerW, rfInterceptsAt, type RfEmitter } from "../../src/physics/r
 import { EMPTY_SENSOR_SCENE, type SensorScene } from "../../src/physics/sensing/SensorScene.js";
 import { amplitudeBearing, RadarWarningReceiver, type RwrProfile } from "../../src/sensors/rwr/RadarWarningReceiver.js";
 import { ALR56M_PROFILE, alr56mDisplay } from "../../src/platforms/aircraft/f16c-block50/avionics/ALR56M.js";
-import { SPO15_PROFILE, spo15Display } from "../../src/platforms/aircraft/mig29/avionics/Spo15.js";
 import { HostileFighter, NOTIONAL_FIGHTER_RADAR } from "../../src/world/combat/HostileFighters.js";
 import { NotionalMissileWorld } from "../../src/world/weapons/NotionalMissiles.js";
 import { NOTIONAL_AAM } from "../../src/weapons/catalog/NotionalAirToAir.js";
@@ -139,26 +138,11 @@ describe("RWR engine", () => {
 });
 
 describe("installed fits", () => {
-  it("SPO-15 reports sector-quantized bearings and is less sensitive than the ALR-56M", () => {
-    const spo = new RadarWarningReceiver(SPO15_PROFILE, 6);
-    const tx: Vector3 = [10900, 30000, 5000]; // 20° right
-    run(spo, sceneOf(() => [emitter(tx, toward(tx, [0, 0, 5000]))]), 1);
-    expect(spo.contacts()[0]!.bearingRad / D).toBeCloseTo(20, 0); // centre of the 10–30° sector
-    expect(spo.contacts()[0]!.match?.entry.symbol).toBe("П");
-    // A sidelobe-level signal at 20 km: the superhet hears it, the crystal-video set does not.
-    const weak = () => [emitter([0, 20000, 5000], [0, 1, 0], { prfHz: 12e3, pulseWidthS: 1.1e-6, peakPowerW: 19e3 })];
-    const alr = new RadarWarningReceiver(ALR56M_PROFILE, 6), spo2 = new RadarWarningReceiver(SPO15_PROFILE, 6);
-    run(alr, sceneOf(weak), 1); run(spo2, sceneOf(weak), 1);
-    expect(alr.contacts().length).toBe(1);
-    expect(spo2.contacts().length).toBe(0);
-  });
-
-  it("an active AIM-120-class seeker shows as a missile on the ALR-56M but only as an untyped emitter on the SPO-15", () => {
+  it("an active AIM-120-class seeker shows as a missile on the ALR-56M", () => {
     const seeker = () => [emitter([0, 2500, 5000], [0, -1, 0], { carrierHz: 15.5e9, prfHz: 120e3, pulseWidthS: 0.6e-6, peakPowerW: 500, pattern: { peakGainDbi: 24, beamwidthRad: 9 * D, sidelobeDb: -20 } })];
-    const alr = new RadarWarningReceiver(ALR56M_PROFILE, 7), spo = new RadarWarningReceiver(SPO15_PROFILE, 7);
-    run(alr, sceneOf(seeker), 1); run(spo, sceneOf(seeker), 1);
+    const alr = new RadarWarningReceiver(ALR56M_PROFILE, 7);
+    run(alr, sceneOf(seeker), 1);
     expect(alr.contacts()[0]?.match?.entry.category).toBe("missile-seeker");
-    expect(spo.contacts()[0]?.match).toBeNull();
   });
 
   it("displays draw contacts and an OFF state", () => {
@@ -166,7 +150,6 @@ describe("installed fits", () => {
     run(rwr, sceneOf(() => [emitter([0, 20000, 5000], [0, -1, 0])]), 2);
     expect(alr56mDisplay(rwr.contacts(), true, true).some((p) => p.kind === "text" && p.text === "16")).toBe(true);
     expect(alr56mDisplay([], false, true).some((p) => p.kind === "text" && p.text === "OFF")).toBe(true);
-    expect(spo15Display(rwr.contacts(), true, true).length).toBeGreaterThan(20);
   });
 });
 

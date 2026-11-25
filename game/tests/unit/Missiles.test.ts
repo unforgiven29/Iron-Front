@@ -40,6 +40,8 @@ describe("launch zones by flyout (BP-29 conditions: both at 10 km, 900 / 700 km/
 
 function engage(target: AirTargetSpec, setup: (w: MiG29WeaponControl) => void, onTick: (w: MiG29WeaponControl, t: number) => void, seconds: number) {
   const wcs = new MiG29WeaponControl(11);
+  // One R-27R (inboard) and one R-60M (outboard) for these engagements.
+  wcs.setOption("stores", "R-60M|R-73|R-27R||R-73|R-73");
   const targets = new AirTargetWorld([target], flat);
   const missiles = new MissileWorld(targets, () => 0);
   setup(wcs);

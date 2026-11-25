@@ -146,11 +146,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
 
   const source: CockpitViewSource = {
     snapshot: () => jet.renderSnapshot(),
-    hud: () => {
-      const s = jet.snapshot();
-      const base = hud(s, jet.definition.annunciate);
-      return { ...base, warnings: [...combatWarnings(), ...base.warnings] };
-    },
+    hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     instrument: (id) => definition.cockpitInstruments?.[id]?.(jet.snapshot()) ?? [Number.NaN],
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); },
@@ -158,7 +154,6 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     hudOverlay: () => avionics?.hud() ?? [],
     hudOwnedByPackage: () => avionics?.ownsHud === true,
     helmetOverlay: () => avionics?.helmet?.() ?? [],
-    inset: () => (avionics?.insetScreen ? avionics.screen(avionics.insetScreen) : undefined),
     worldObjects: () => [
       ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, ...(hostileModel.has(t.id) ? { modelId: hostileModel.get(t.id)! } : {}), positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
       ...notional.states().map((m) => ({ id: m.id, kind: "missile" as const, ...orient(m.velocityEnuMps), positionEnuM: m.positionEnuM, missile: { geometry: m.spec.geometry, burning: m.burning } })),
@@ -172,8 +167,6 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       })
     ]
   };
-  // Loss is shown on the HUD; threat warnings come from the aircraft's own RWR (inset + tones).
-  const combatWarnings = (): { text: string; level: "caution" | "warning" }[] => (shotDown ? [{ text: `SHOT DOWN — ${shotDown}`, level: "warning" }] : []);
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield], definition.exteriorModelId);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   const tones = new WarningTones();

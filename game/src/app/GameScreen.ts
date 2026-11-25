@@ -1,5 +1,5 @@
 /**
- * Main game screen (route "/"): hangar main menu, sortie setup (aircraft → mission → loadout →
+ * Main game screen (route "/"): hangar main menu, sortie setup (aircraft → mission → per-station loadout →
  * briefing), pause menu and mission debrief. Developer tools live on a separate route (#debug).
  *
  * Presentation and flow only: the menu chooses an aircraft package, a scenario and a loadout id and
@@ -57,9 +57,15 @@ export function mountGameScreen(root: HTMLElement): void {
   let scenario: TargetScenario = "hostile-1";
   let startMode: StartMode = "air";
   let hudLanguage = "ru";
-  const loadoutByAircraft = new Map<string, string>();
+  const storesByAircraft = new Map<string, string[]>();
   const def = () => defs.get(aircraftId)!;
-  const loadoutId = () => loadoutByAircraft.get(aircraftId) ?? def().loadouts?.[0]?.id ?? "";
+  const stores = (): string[] => storesByAircraft.get(aircraftId) ?? [...(def().stores?.presets[0]?.stations ?? [])];
+  const storeErrors = () => def().stores?.validate(stores()) ?? [];
+  const storesSummary = () => {
+    const counts = new Map<string, number>();
+    for (const n of stores()) if (n) counts.set(n, (counts.get(n) ?? 0) + 1);
+    return counts.size ? [...counts].map(([n, c]) => `${c} × ${n}`).join("  ·  ") : "No stores";
+  };
 
   const screen = el("main", "game-screen");
   // Each flight gets its own focusable surface inside this frame (fresh listeners per session).
@@ -163,7 +169,7 @@ export function mountGameScreen(root: HTMLElement): void {
     for (const id of catalog.ids) {
       const d = defs.get(id)!;
       const tags = el("span", "card-tags");
-      tags.append(el("span", "tag", `${d.engines.length} engine${d.engines.length > 1 ? "s" : ""}`), el("span", "tag", `${d.loadouts?.length ?? 0} loadouts`));
+      tags.append(el("span", "tag", `${d.engines.length} engine${d.engines.length > 1 ? "s" : ""}`), el("span", "tag", `${d.stores?.stations.length ?? 0} stations`));
       grid.append(choiceCard(d.displayName, d.dataNote.length > 170 ? `${d.dataNote.slice(0, 167)}…` : d.dataNote, id === aircraftId, () => { aircraftId = id; preview?.show(d.exteriorModelId); go("aircraft"); }, tags));
     }
     p.append(grid);
@@ -205,36 +211,51 @@ export function mountGameScreen(root: HTMLElement): void {
 
   const renderLoadout = () => {
     const d = def();
-    const p = panel(`Loadout — ${d.displayName}`, d.loadouts?.length ? "Stations shown left wingtip to right wingtip." : undefined);
-    const options = d.loadouts ?? [];
-    if (options.length === 0) { p.append(el("p", "panel-sub", "This aircraft has no selectable stores.")); return p; }
-    const current = options.find((l) => l.id === loadoutId()) ?? options[0]!;
-    // Station diagram.
+    const plan = d.stores;
+    const p = panel(`Loadout — ${d.displayName}`, plan ? "Choose a store for each station (left wingtip → right wingtip), or start from a preset." : undefined);
+    if (!plan) { p.append(el("p", "panel-sub", "This aircraft has no selectable stores.")); return p; }
+    const current = stores();
+    const set = (next: string[]) => { storesByAircraft.set(aircraftId, next); go("loadout"); };
+    // Station diagram with a selector per station.
     const diagram = el("div", "pylons");
     diagram.setAttribute("aria-label", "Stations");
-    current.stations.forEach((name, i) => {
-      const st = el("div", `pylon${name ? "" : " empty"}`);
-      st.append(el("span", "pylon-no", String(i + 1)), el("span", "pylon-store", name || "empty"));
-      diagram.append(st);
+    plan.stations.forEach((station, i) => {
+      const name = current[i] ?? "";
+      const cell = el("div", `pylon${name ? "" : " empty"}${station.allowed.length === 0 ? " locked" : ""}`);
+      cell.title = station.note ?? station.label;
+      const pick = el("select", "pylon-select");
+      pick.setAttribute("aria-label", station.label);
+      for (const v of ["", ...station.allowed]) {
+        const o = el("option", undefined, v || "—");
+        o.value = v;
+        o.selected = v === name;
+        pick.append(o);
+      }
+      pick.disabled = station.allowed.length === 0;
+      pick.addEventListener("change", () => { const next = [...current]; next[i] = pick.value; set(next); });
+      cell.append(el("span", "pylon-no", station.id.replace(/\D/g, "") || String(i + 1)), el("span", "pylon-store", name || (station.allowed.length ? "empty" : "n/a")), pick);
+      diagram.append(cell);
     });
-    const counts = new Map<string, number>();
-    for (const n of current.stations) if (n) counts.set(n, (counts.get(n) ?? 0) + 1);
-    const summary = el("p", "loadout-summary", counts.size ? [...counts].map(([n, c]) => `${c} × ${n}`).join("  ·  ") : "No stores");
+    const errs = plan.validate(current);
+    const summary = el("p", "loadout-summary", storesSummary());
+    const problems = el("ul", "loadout-errors");
+    problems.setAttribute("role", "alert");
+    for (const e of errs) problems.append(el("li", undefined, e));
     const grid = el("div", "cards compact");
     grid.setAttribute("role", "radiogroup");
     grid.setAttribute("aria-label", "Loadout");
-    for (const l of options) grid.append(choiceCard(l.label, l.description, l.id === current.id, () => { loadoutByAircraft.set(aircraftId, l.id); go("loadout"); }));
-    p.append(diagram, summary, grid);
+    for (const l of plan.presets) grid.append(choiceCard(l.label, l.description, l.stations.join("|") === current.join("|"), () => set([...l.stations])));
+    p.append(diagram, summary, problems, grid);
     return p;
   };
 
   const renderBriefing = () => {
     const d = def();
     const s = SCENARIOS.find((x) => x.id === scenario)!;
-    const lo = d.loadouts?.find((l) => l.id === loadoutId());
+
     const p = panel("Briefing", s.description);
     const facts = el("dl", "facts");
-    for (const [k, v] of [["Aircraft", d.displayName], ["Mission", s.label], ["Start", startMode === "air" ? "Air start, 1,800 m above ground, heading north" : "Runway 36, engine at idle"], ["Loadout", lo?.label ?? "—"]] as const) {
+    for (const [k, v] of [["Aircraft", d.displayName], ["Mission", s.label], ["Start", startMode === "air" ? "Air start, 1,800 m above ground, heading north" : "Runway 36, engine at idle"], ["Loadout", d.stores ? storesSummary() : "—"]] as const) {
       facts.append(el("dt", undefined, k), el("dd", undefined, v));
     }
     const tips = el("ul", "tips");
@@ -260,6 +281,7 @@ export function mountGameScreen(root: HTMLElement): void {
     const statusEl = el("p", "game-status", status);
     statusEl.setAttribute("role", "status");
     const next = idx < STEPS.length - 1 ? button("Next", "menu-btn primary") : button("Launch", "menu-btn primary launch");
+    if (idx === STEPS.length - 1 && storeErrors().length > 0) { next.disabled = true; next.title = storeErrors().join("; "); }
     next.addEventListener("click", () => { if (idx < STEPS.length - 1) { step = STEPS[idx + 1]!.id; go(step); } else launch(next); });
     foot.append(prev, statusEl, next);
     wrap.append(top, renderStepper(), body, foot);
@@ -345,7 +367,7 @@ export function mountGameScreen(root: HTMLElement): void {
       surface.setAttribute("aria-label", `${d.displayName} cockpit view. Click, then use the keyboard to fly.`);
       frame.append(surface);
       const options: Record<string, string> = { hudLanguage };
-      if (loadoutId()) options["loadout"] = loadoutId();
+      if (d.stores) options["stores"] = stores().join("|");
       session = startAircraftSession(ThreeCockpitView, surface, d, startMode, scenario, options, {
         onMissionEnd: (r) => { lastResult = r; session?.setPaused(true); go("debrief"); }
       });
