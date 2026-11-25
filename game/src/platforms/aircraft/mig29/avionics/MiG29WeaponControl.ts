@@ -20,6 +20,9 @@ import { ScanningIrst } from "../../../../sensors/irst/ScanningIrst.js";
 import { PulseDopplerRadar, type RadarTrackReport } from "../../../../sensors/radar/PulseDopplerRadar.js";
 import type { AvionicsContext, AvionicsControl, AvionicsSuite } from "../../common/Avionics.js";
 import { KOLS_PROFILE } from "./KolsProfile.js";
+import { SOVIET_AAM } from "../../../../weapons/catalog/SovietAirToAir.js";
+import { launchZone, type LauncherLink, type MissileSpec } from "../../../../weapons/missiles/Missile.js";
+import { add, scale } from "../../../../physics/sensing/SweepGeometry.js";
 import { N019_PROFILE } from "./N019Profile.js";
 
 /** РЕЖ.СУВ selector positions used here (RLPK slide 61: КБР, НВГ, РЛС, СТРОБ/ТП, Б.БОЙ, ШЛЕМ, ОПТ, φ0). */
@@ -55,9 +58,10 @@ export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "end", label: "Track-while-scan: off / head-on / tail", control: "СНП ППС–ЗПС switch, panel ПУР-31" },
   { key: "insert", label: "Radar + IRST work together on/off", control: "ТОРМОЗ–БЕЗ ТОРМОЗА switch, panel С-31" },
   { key: "delete", label: "Laser rangefinder on/off", control: "OEPS laser enable" },
-  { key: "c", label: "Radar sidelobe guard on/off", control: "КОМПЕНС switch, panel ПУР-31 (guard channel)" },
   { key: "[", label: "IRST gain down", control: "УСИЛ.ТП knob, panel ПСР-31" },
   { key: "]", label: "IRST gain up", control: "УСИЛ.ТП knob, panel ПСР-31" },
+  { key: "f", label: "Select missile type", control: "Weapon selector" },
+  { key: "l", label: "Launch missile", control: "ПУСК (launch) button on the stick" },
   { key: "k", label: "Cannon sight (hold = trigger first stage)", control: "Gun trigger, first stage (НО), BP-29 p.25" }
 ];
 
@@ -92,6 +96,17 @@ export class MiG29WeaponControl implements AvionicsSuite {
   private lockPressed = false;
   /** СНП priority target chosen by the pilot (overrides the automatic most-dangerous choice). */
   private priorityId: number | null = null;
+  /**
+   * Stores: test loadout carrying one of each type (wing stations 1–6). A real squadron fit is
+   * symmetric (e.g. 2 × R-27R + 4 × R-60M, BP-29 fig.1); this mix is for trying every missile.
+   */
+  private stores: (MissileSpec | null)[] = [SOVIET_AAM.R73A, SOVIET_AAM.R60M, SOVIET_AAM.R27R, SOVIET_AAM.R27ER, SOVIET_AAM.R27T, SOVIET_AAM.R27ET];
+  private selected = 0;
+  /** Smoothed launch zone of the selected missile on the current target, m. */
+  private dlz: { maxM: number; minM: number; t: number; specId: string } | null = null;
+  private launchPressed = false;
+  private killCue: { text: string; t: number } | null = null;
+  private eventsSeen = 0;
 
   public constructor(seed = 29) {
     this.radar = new PulseDopplerRadar(N019_PROFILE, seed);
@@ -100,6 +115,116 @@ export class MiG29WeaponControl implements AvionicsSuite {
 
   private static initial(): Mig29WcsStatus {
     return { master: "РЛС", radarMode: "В", zone: 0, dhKm: 0, strobeKm: 40, strobeAzDeg: 0, strobeElDeg: 0, emission: "ИЗЛ", snp: "ОТКЛ", interaction: false, laser: true, compensation: true, irstGain: 0.5, optAzDeg: 0, optElDeg: 0, gun: false };
+  }
+
+  /** Selected missile type (null when none left). */
+  public get weapon(): MissileSpec | null { return this.stores[this.selected] ?? this.stores.find((x) => x) ?? null; }
+  public get remaining(): number { const w = this.weapon; return w ? this.stores.filter((x) => x?.id === w.id).length : 0; }
+
+  private cycleWeapon(): void {
+    const types = [...new Set(this.stores.filter((x): x is MissileSpec => !!x).map((x) => x.id))];
+    if (types.length === 0) return;
+    const cur = this.weapon?.id;
+    const next = types[(types.indexOf(cur ?? "") + 1) % types.length];
+    this.selected = this.stores.findIndex((x) => x?.id === next);
+    this.dlz = null;
+  }
+
+  /** Best available estimate of the attacked target: radar lock, else TWS priority track. */
+  private targetEstimate(own: SensorOwnship): { positionEnuM: Vector3; velocityEnuMps: Vector3 } | null {
+    const rl = this.radar.lock(own);
+    if (rl) return { positionEnuM: rl.positionEnuM, velocityEnuMps: rl.velocityEnuMps };
+    const pt = this.snpActive() ? this.priorityTrack(own) : undefined;
+    if (pt) return { positionEnuM: pt.positionEnuM, velocityEnuMps: pt.velocityEnuMps };
+    const kl = this.kols.lock(own);
+    if (kl && Number.isFinite(kl.laserRangeM)) return { positionEnuM: add(own.positionEnuM, scale(kl.losEnu, kl.laserRangeM)), velocityEnuMps: [0, 0, 0] };
+    return null;
+  }
+
+  /** IR missile seeker on the rail: cued by the IRST/radar lock, the helmet (off-boresight missiles) or the boresight. */
+  private irSeekerLos(ctx: AvionicsContext, spec: MissileSpec): Vector3 | null {
+    const sk = spec.seeker.value;
+    if (sk.kind !== "ir") return null;
+    const own = ctx.own;
+    const kl = this.kols.lock(own), rl = this.radar.lock(own);
+    let cue: Vector3 = kl ? kl.losEnu : rl ? unit(sub(rl.positionEnuM, own.positionEnuM)) : this.bodyDir(own, 0, 0);
+    if (!kl && !rl && this.s.master === "ШЛЕМ" && spec.offBoresight) cue = this.bodyDir(own, ctx.head.az, ctx.head.el);
+    const b = bodyAngles(own, cue);
+    if (Math.hypot(b.az, b.el) > sk.gimbalRad) return null;
+    let best: { los: Vector3; snr: number } | null = null;
+    for (const pt of ctx.scene.infrared({ originEnuM: own.positionEnuM, fieldFrom: cue, fieldTo: cue, fieldHalfRad: sk.fovRad, maxRangeM: 40000 })) {
+      const snr = Math.abs(pt.irradianceWm2) / sk.neiWm2;
+      if (!best || snr > best.snr) best = { los: pt.losEnu, snr };
+    }
+    return best && best.snr >= sk.lockSnr ? best.los : null;
+  }
+
+  private bodyDir(own: SensorOwnship, az: number, el: number): Vector3 {
+    const q = own.bodyToWorld;
+    const v: Vector3 = [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), -Math.sin(el)];
+    // rotate body → world
+    const [x, y, z, w] = q;
+    const t: Vector3 = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
+    return [v[0] + w * t[0] + (y * t[2] - z * t[1]), v[1] + w * t[1] + (z * t[0] - x * t[2]), v[2] + w * t[2] + (x * t[1] - y * t[0])];
+  }
+
+  /** Launch-allowed conditions for the selected missile. */
+  private launchState(ctx: AvionicsContext): { ok: boolean; seekerLos: Vector3 | null; rangeM: number } {
+    const w = this.weapon;
+    const own = ctx.own;
+    if (!w) return { ok: false, seekerLos: null, rangeM: Number.NaN };
+    const est = this.targetEstimate(own);
+    const rangeM = est ? norm(sub(est.positionEnuM, own.positionEnuM)) : Number.NaN;
+    const inZone = !!this.dlz && Number.isFinite(rangeM) && rangeM <= this.dlz.maxM && rangeM >= this.dlz.minM;
+    if (w.seeker.value.kind === "sarh") return { ok: !!this.radar.lock(own) && !this.radar.lock(own)!.memory && inZone, seekerLos: null, rangeM };
+    const los = this.irSeekerLos(ctx, w);
+    // IR missiles: seeker lock required; zone checked when a range is known.
+    return { ok: !!los && (!Number.isFinite(rangeM) || inZone), seekerLos: los, rangeM };
+  }
+
+  private launch(ctx: AvionicsContext): void {
+    const w = this.weapon;
+    const port = ctx.weapons;
+    if (!w || !port) return;
+    const ls = this.launchState(ctx);
+    if (!ls.ok) return;
+    const own = ctx.own;
+    const radar = this.radar;
+    const liveOwn = () => this.ctx?.own ?? own;
+    const g = w.guidance.value;
+    const est0 = this.targetEstimate(own);
+    const t0 = own.timeS;
+    const link = (): LauncherLink => {
+      const o = liveOwn();
+      const rl = radar.lock(o);
+      if (w.seeker.value.kind === "sarh" || g.midcourse === "inertial+radio") {
+        // Illumination and radio correction need the radar lock: RLPK slide 7 — illumination 0.9 kW average × transmit directivity 2000.
+        return rl && !rl.memory ? { illuminatorPositionEnuM: o.positionEnuM, illuminatorErpW: 900 * 2000, targetEstimate: { positionEnuM: rl.positionEnuM, velocityEnuMps: rl.velocityEnuMps } }
+          : { illuminatorPositionEnuM: null, illuminatorErpW: 0, targetEstimate: null };
+      }
+      // IR missiles: inertial only, from the estimate at launch, extrapolated.
+      const dtl = o.timeS - t0;
+      return { illuminatorPositionEnuM: null, illuminatorErpW: 0, targetEstimate: est0 ? { positionEnuM: add(est0.positionEnuM, scale(est0.velocityEnuMps, dtl)), velocityEnuMps: est0.velocityEnuMps } : null };
+    };
+    const station = this.stores.findIndex((x) => x?.id === w.id);
+    const below = this.bodyDir(own, 0, -Math.PI / 2);
+    port.launch(w, add(own.positionEnuM, scale(below, 1.5)), own.velocityEnuMps, link, ls.seekerLos);
+    this.stores[station] = null;
+    if (!this.weapon || this.remaining === 0) this.cycleWeapon();
+  }
+
+  private updateDlz(ctx: AvionicsContext): void {
+    const w = this.weapon;
+    const own = ctx.own;
+    const est = this.targetEstimate(own);
+    if (!w || !est) { this.dlz = null; return; }
+    if (this.dlz && this.dlz.specId === w.id && own.timeS - this.dlz.t < 1) return;
+    const los = unit(sub(est.positionEnuM, own.positionEnuM));
+    const z = launchZone(w, { positionEnuM: own.positionEnuM, velocityEnuMps: own.velocityEnuMps }, { losEnu: los, velocityEnuMps: est.velocityEnuMps });
+    if (!Number.isFinite(z.maxM)) return;
+    // Exponential smoothing (≈2 s) so the marks move steadily instead of jumping with each track update.
+    const k = this.dlz && this.dlz.specId === w.id ? 0.4 : 1;
+    this.dlz = { maxM: this.dlz && k < 1 ? this.dlz.maxM + k * (z.maxM - this.dlz.maxM) : z.maxM, minM: this.dlz && k < 1 ? this.dlz.minM + k * (z.minM - this.dlz.minM) : z.minM, t: own.timeS, specId: w.id };
   }
 
   public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); }
@@ -128,10 +253,11 @@ export class MiG29WeaponControl implements AvionicsSuite {
       case "end": s.snp = cycle<Snp>(["ОТКЛ", "ППС", "ЗПС"], s.snp); break;
       case "insert": s.interaction = !s.interaction; break;
       case "delete": s.laser = !s.laser; break;
-      case "c": s.compensation = !s.compensation; break;
       case "[": s.irstGain = Math.max(0, Math.round((s.irstGain - 0.1) * 10) / 10); break;
       case "]": s.irstGain = Math.min(1, Math.round((s.irstGain + 0.1) * 10) / 10); break;
       case "k": s.gun = true; break;
+      case "f": this.cycleWeapon(); break;
+      case "l": this.launchPressed = true; break;
     }
     return true;
   }
@@ -243,12 +369,20 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.kols.setGain(s.irstGain);
 
     if (this.lockPressed) { this.lockPressed = false; this.designate(ctx); }
+    this.updateDlz(ctx);
+    if (this.launchPressed) { this.launchPressed = false; this.launch(ctx); }
+    const evs = ctx.weapons?.events() ?? [];
+    for (const e of evs.slice(this.eventsSeen)) if (e.kind === "kill" || e.kind === "miss") this.killCue = { text: e.kind === "kill" ? "KILL" : "MISS", t: ctx.own.timeS };
+    this.eventsSeen = evs.length;
+    // HMS: the lock is made where the pilot is looking now — an acquisition in progress follows the head.
+    if (s.master === "ШЛЕМ") this.kols.steerAcquisition({ az: ctx.head.az, el: ctx.head.el });
 
     // СНП: the most dangerous track (min Д/Ḋ) is framed; auto-lock at the max launch range (BP-29 p.14).
     // At the max launch range the radar stops scanning and searches a 40° × 8° box on the target for up to 3 cycles (N019-WEB).
     if (this.snpActive() && this.radar.state === "search") {
       const md = this.priorityTrack(ctx.own);
-      if (md && md.rangeM / 1000 < r27MaxLaunchKm(this.aspectDeg(md, ctx.own.positionEnuM), ctx.own.positionEnuM[2])) {
+      const rmaxKm = this.dlz ? this.dlz.maxM / 1000 : md ? r27MaxLaunchKm(this.aspectDeg(md, ctx.own.positionEnuM), ctx.own.positionEnuM[2]) : 0;
+      if (md && md.rangeM / 1000 < rmaxKm) {
         this.radar.designate({ look: md.look, frame: "stabilized", rangeM: md.rangeM, rangeWindowM: 10000, box: { widthRad: 40 * DEG, bars: 3, spacingRad: 2.25 * DEG, periods: 3 } });
       }
     }
@@ -408,17 +542,12 @@ export class MiG29WeaponControl implements AvionicsSuite {
       if (Number.isFinite(rangeM)) { rangeArrow(ry(rangeM / 1000)); T(0.95, 0.66, `R ${(rangeM / 1000).toFixed(rangeM < 10000 ? 2 : 1)}`, "right", 0.065); }
       if (useRadar) {
         const asp = this.aspectDeg(rl!, own.positionEnuM);
-        const rmax = r27MaxLaunchKm(asp, own.positionEnuM[2]);
-        const rmin = asp < 90 ? 1.2 : 0.5;
-        for (const km of [rmax, rmin]) L([[-0.78, ry(km)], [-0.86, ry(km)]], { width: 2.5 });
         T(0.95, 0.56, `Vc ${Math.round((rl!.closureMps * 3.6) / 10) * 10}`, "right", 0.06);
         T(-1.0, -0.2, asp < 90 ? "HEAD" : "TAIL", "left", 0.06);
-        if (rangeM / 1000 <= rmax && rangeM / 1000 >= rmin) T(0, -0.62, "LA", "center", 0.1);
-        T(0.95, -0.82, "R27R", "right", 0.07);
-      } else {
-        T(0.95, -0.82, "R60M", "right", 0.07);
-        if (!Number.isFinite(rangeM)) T(0.95, 0.66, "R --", "right", 0.065);
-      }
+      } else if (!Number.isFinite(rangeM)) T(0.95, 0.66, "R --", "right", 0.065);
+      // Launch zone of the selected missile (flyout-computed, smoothed).
+      if (this.dlz) for (const m of [this.dlz.maxM, this.dlz.minM]) L([[-0.78, ry(m / 1000)], [-0.86, ry(m / 1000)]], { width: 2.5 });
+      if (this.ctx && this.launchState(this.ctx).ok) T(0, -0.62, "LA", "center", 0.1);
     } else if (s.master === "РЛС" && s.radarMode !== "БЛ.БОЙ") {
       // ---------- radar search: range scale, targets as dot dashes (dots = target size), cursor box, scan-sector bar ----------
       const ry = rangeScale(SCALE_KM[s.radarMode], "RL");
@@ -505,6 +634,14 @@ export class MiG29WeaponControl implements AvionicsSuite {
   private footer(out: DisplayPrimitive[], own: SensorOwnship, hud: boolean): DisplayPrimitive[] {
     const s = this.s;
     const T = (x: number, y: number, text: string, align: "left" | "center" | "right" = "left", size = 0.05) => { out.push({ kind: "text", frame: "screen", at: [x, y], text, align, size }); };
+    // Selected missile and count; IR seeker lock cue (conformal) for heat seekers.
+    const w = this.weapon;
+    T(-0.95, -0.82, w ? `${w.display} ${this.remaining}` : "NO MSL", "left", 0.065);
+    if (w && hud && this.ctx && w.seeker.value.kind === "ir") {
+      const los = this.irSeekerLos(this.ctx, w);
+      if (los) { const b = bodyAngles(own, los); out.push({ kind: "circle", frame: "angle", at: [b.az, b.el], radius: 0.05 }); T(-0.95, -0.72, "IR LOCK", "left", 0.05); }
+    }
+    if (this.killCue && own.timeS - this.killCue.t < 2.5) T(0, 0.55, this.killCue.text, "center", 0.1);
     const em = { "ИЗЛ": "TX", "ЭКВ": "STBY", "ОТКЛ": "OFF" }[s.emission];
     const tags = [s.emission !== "ИЗЛ" ? `RDR ${em}` : "", s.interaction ? "COOP" : "", s.snp !== "ОТКЛ" ? `TWS ${s.snp === "ППС" ? "HEAD" : "TAIL"}` : "", s.compensation ? "" : "NO GUARD"].filter(Boolean);
     if (!hud || tags.length) T(0.95, -0.95, tags.join(" "), "right");
@@ -530,7 +667,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const lockOn = !!kl || !!rl;
     const rangeM = kl && Number.isFinite(kl.laserRangeM) ? kl.laserRangeM : rl ? rl.rangeM : Number.NaN;
     // R-60M envelope approximation (BP-29 p.24: 0.3 … 12 km head-on, 9 km tail) for the launch cue (display only).
-    const inRange = Number.isFinite(rangeM) && rangeM >= 300 && rangeM <= 8000;
+    const inRange = this.launchState(ctx).ok;
     const flashOn = Math.floor(own.timeS * 4) % 2 === 0;
     const out: DisplayPrimitive[] = [];
     const circle = (rDeg: number, dash: boolean) => out.push({ kind: "circle", frame: "angle", at: [h.az, h.el], radius: rDeg, dash });

@@ -61,7 +61,7 @@ export interface CockpitViewSource {
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
-  worldObjects?(): readonly { readonly id: string; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
+  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
@@ -359,6 +359,18 @@ export class ThreeCockpitView {
     for (const o of list) {
       seen.add(o.id);
       let m = this.others.get(o.id);
+      if (!m && o.kind === "missile") {
+        m = new THREE.Group();
+        {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), new THREE.MeshStandardMaterial({ color: "#d9d9d0" }));
+          body.rotation.x = Math.PI / 2;
+          const flame = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffb347" }));
+          flame.position.set(0, 0, 2.3);
+          m.add(body, flame);
+          this.world.add(m);
+          this.others.set(o.id, m);
+        }
+      }
       if (!m) {
         m = new THREE.Group();
         const mat = new THREE.MeshStandardMaterial({ color: "#6d747c", roughness: 0.6 });

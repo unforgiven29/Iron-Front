@@ -17,6 +17,14 @@ export interface AvionicsContext {
   readonly scene: SensorScene;
   /** Pilot's head direction relative to the aircraft body (helmet sight), rad. */
   readonly head: { readonly az: number; readonly el: number };
+  /** Weapon release and in-flight weapon status (absent where no world supports weapons). */
+  readonly weapons?: WeaponPort;
+}
+
+/** The world's side of weapon release: the avionics launch; the world flies the missile. */
+export interface WeaponPort {
+  launch(spec: import("../../../weapons/missiles/Missile.js").MissileSpec, positionEnuM: import("../../../core/coordinates/CoordinateFrames.js").Vector3, velocityEnuMps: import("../../../core/coordinates/CoordinateFrames.js").Vector3, link: () => import("../../../weapons/missiles/Missile.js").LauncherLink, irCue: import("../../../core/coordinates/CoordinateFrames.js").Vector3 | null): string;
+  events(sinceS?: number): readonly import("../../../world/weapons/MissileWorld.js").WeaponEvent[];
 }
 
 export interface AvionicsControl {

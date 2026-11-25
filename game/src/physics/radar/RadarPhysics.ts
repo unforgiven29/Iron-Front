@@ -86,6 +86,12 @@ export interface RadarBeamQuery {
   /** Echoes weaker than this (linear SNR) are not reported. */
   readonly reportFloorSnr: number;
   readonly maxRangeM: number;
+  /**
+   * Bistatic reception (e.g. a semi-active missile seeker): the target is lit by this separate
+   * illuminator; the receiver is at `originEnuM`. SNR = ERP·σ_b·Gr·λ² / ((4π)³·Rt²·Rr²·k·Ts·L) · T,
+   * with σ_b the RCS seen along the bistatic bisector.
+   */
+  readonly illuminator?: { readonly positionEnuM: Vector3; readonly erpW: number };
 }
 
 const BOLTZMANN = 1.380649e-23;
@@ -178,7 +184,11 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
     const los = scale(r, 1 / range);
     const rel = sweepRelation(los, query.beamFrom, query.beamTo);
     if (!rel.crossed) continue;
-    const sigma = aspectRcsM2(s.rcs, unit(s.toBody(los)));
+    const bistatic = query.illuminator;
+    const toIllum = bistatic ? unit(sub(bistatic.positionEnuM, s.positionEnuM)) : null;
+    // Bistatic RCS approximated by the monostatic RCS along the bisector of the two directions.
+    const aspectDir = toIllum ? unit(scale(add3(scale(los, -1), toIllum), -1)) : los;
+    const sigma = aspectRcsM2(s.rcs, unit(s.toBody(aspectDir)));
     // Offset from the beam at closest approach, split into the beam's right/up axes (non-round apertures).
     const along = sub(query.beamTo, query.beamFrom);
     let centre: Vector3 = unit(query.beamFrom);
@@ -188,7 +198,10 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
       centre = unit(sub(los, scale(across, dot(los, across))));
     }
     const off = beamOffsets(centre, los);
-    const meanSnr = radarEquationSnr(query.look, query.integrationTimeS, sigma, range, off.right, off.up) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
+    const meanSnr = bistatic
+      ? (bistatic.erpW * sigma * query.look.antenna.receiveGain * query.look.antenna.gain2(off.right, off.up) * query.look.antenna.wavelengthM ** 2 * query.integrationTimeS) /
+        ((4 * Math.PI) ** 3 * norm(sub(s.positionEnuM, bistatic.positionEnuM)) ** 2 * range ** 2 * 1.380649e-23 * query.look.systemNoiseTempK * 10 ** (query.look.lossesDb / 10))
+      : radarEquationSnr(query.look, query.integrationTimeS, sigma, range, off.right, off.up) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
     if (meanSnr < query.reportFloorSnr) continue;
     if (!lineOfSightClear(terrain, query.originEnuM, s.positionEnuM)) continue;
     const closure = -dot(sub(s.velocityEnuMps, query.ownVelocityEnuMps), los);

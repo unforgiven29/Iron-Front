@@ -7,6 +7,7 @@ import { mountDataPanel } from "./DataPanel.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
 import { createTestRange, targetsFor, type TargetScenario } from "./TestRange.js";
 import { AirTargetWorld } from "../world/targets/AirTargets.js";
+import { MissileWorld } from "../world/weapons/MissileWorld.js";
 import { AVIONICS_RATE_HZ } from "../platforms/aircraft/common/Avionics.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
 import type { AircraftDefinition } from "../platforms/aircraft/common/AircraftDefinition.js";
@@ -52,6 +53,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
 
   // Air targets (world truth) and the aircraft's avionics, stepped at a fixed rate in simulation time.
   const targets = new AirTargetWorld(targetsFor(scenario), { heightAt: (x, y) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; } });
+  const groundAt = (x: number, y: number) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; };
+  const missiles = new MissileWorld(targets, groundAt);
   const avionics = definition.createAvionics?.();
   let simTime = 0, avionicsAcc = 0;
   const stepWorld = (dt: number, head: { az: number; el: number }) => {
@@ -61,9 +64,10 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       avionicsAcc -= h;
       simTime += h;
       targets.step(h);
+      missiles.step(h);
       if (avionics) {
         const s = jet.snapshot();
-        avionics.step({ own: { timeS: simTime, positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, bodyToWorld: s.bodyToWorld, headingRad: s.headingRad, pitchRad: s.pitchRad, rollRad: s.rollRad }, snapshot: s, scene: targets, head }, h);
+        avionics.step({ own: { timeS: simTime, positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, bodyToWorld: s.bodyToWorld, headingRad: s.headingRad, pitchRad: s.pitchRad, rollRad: s.rollRad }, snapshot: s, scene: targets, head, weapons: missiles }, h);
       }
     }
   };
@@ -78,12 +82,21 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     hudOverlay: () => avionics?.hud() ?? [],
     hudOwnedByPackage: () => avionics?.ownsHud === true,
     helmetOverlay: () => avionics?.helmet?.() ?? [],
-    worldObjects: () => targets.states().map((t) => ({ id: t.id, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu }))
+    worldObjects: () => [
+      ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
+      ...missiles.states().map((m) => {
+        const v = m.velocityEnuMps, n = Math.hypot(...v) || 1;
+        const f: [number, number, number] = [v[0] / n, v[1] / n, v[2] / n];
+        const r = Math.hypot(f[1], f[0]) > 1e-6 ? [f[1] / Math.hypot(f[0], f[1]), -f[0] / Math.hypot(f[0], f[1]), 0] as [number, number, number] : [1, 0, 0] as [number, number, number];
+        const d: [number, number, number] = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
+        return { id: m.id, kind: "missile" as const, positionEnuM: m.positionEnuM, forwardEnu: f, rightEnu: r, downEnu: d };
+      })
+    ]
   };
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   let paused = false;
-  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); avionics?.reset(); simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
+  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); avionics?.reset(); simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
 
   const held = new Set<string>();
   let stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };

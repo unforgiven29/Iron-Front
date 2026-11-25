@@ -105,6 +105,8 @@ export class ScanningIrst {
     this.acq = { look, frame, windowAz, windowEl, t: 0, hits: 0 };
   }
   public setLaser(on: boolean): void { this.lasing = on; }
+  /** Move an acquisition in progress to a new direction (e.g. the helmet sight following the pilot's head). */
+  public steerAcquisition(look: LookAngles): void { if (this.acq && !this.acq.los) this.acq.look = look; }
   /**
    * Gain knob 0..1 (KOLS УСИЛ.ТП). It sets the detection threshold relative to noise: 0.5 = the design
    * false-alarm rate; turned up, weak targets appear sooner but noise crosses the threshold and the
