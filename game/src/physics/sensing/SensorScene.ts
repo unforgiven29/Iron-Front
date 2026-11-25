@@ -8,13 +8,15 @@
  */
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import type { IrFieldQuery, IrPoint } from "../infrared/InfraredPhysics.js";
-import type { ClutterPatch, ClutterQuery, RadarBeamQuery, RadarEcho } from "../radar/RadarPhysics.js";
+import type { BistaticClutterQuery, ClutterPatch, ClutterQuery, RadarBeamQuery, RadarEcho } from "../radar/RadarPhysics.js";
 
 export interface SensorScene {
   /** Returns from one tick of beam motion (main lobe and sidelobes). */
   radar(query: RadarBeamQuery): readonly RadarEcho[];
   /** Ground clutter seen by a look (the world supplies terrain height and reflectivity). */
   radarClutter(query: Omit<ClutterQuery, "groundHeightM" | "gammaDb">): readonly ClutterPatch[];
+  /** Ground clutter at a semi-active receiver lit by a separate illuminator (optional; absent = none). */
+  bistaticClutter?(query: Omit<BistaticClutterQuery, "groundHeightM" | "gammaDb">): readonly ClutterPatch[];
   /** Point sources inside one tick of detector-field motion. */
   infrared(query: IrFieldQuery): readonly IrPoint[];
   /** Unit vector toward the sun (ENU). */

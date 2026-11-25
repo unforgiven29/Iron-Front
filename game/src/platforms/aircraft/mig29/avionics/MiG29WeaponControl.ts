@@ -204,17 +204,26 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const g = w.guidance.value;
     const est0 = this.targetEstimate(own);
     const t0 = own.timeS;
+    // Radio correction: the command frame for one missile takes (30.72 + 20.48) ms × 7 = 358.4 ms (RLPK slide 56),
+    // so the missile's target estimate is refreshed at that rate, not continuously.
+    let rc: { t: number; est: { positionEnuM: Vector3; velocityEnuMps: Vector3 } } | null = null;
     const link = (): LauncherLink => {
       const o = liveOwn();
       const rl = radar.lock(o);
       if (w.seeker.value.kind === "sarh" || g.midcourse === "inertial+radio") {
-        // Illumination and radio correction need the radar lock: RLPK slide 7 — illumination 0.9 kW average × transmit directivity 2000.
-        return rl && !rl.memory ? { illuminatorPositionEnuM: o.positionEnuM, illuminatorErpW: 900 * 2000, targetEstimate: { positionEnuM: rl.positionEnuM, velocityEnuMps: rl.velocityEnuMps } }
-          : { illuminatorPositionEnuM: null, illuminatorErpW: 0, targetEstimate: null };
+        if (!rl || rl.memory) return { illumination: null, targetEstimate: rc ? { positionEnuM: add(rc.est.positionEnuM, scale(rc.est.velocityEnuMps, o.timeS - rc.t)), velocityEnuMps: rc.est.velocityEnuMps } : null };
+        if (!rc || o.timeS - rc.t >= 0.3584) rc = { t: o.timeS, est: { positionEnuM: rl.positionEnuM, velocityEnuMps: rl.velocityEnuMps } };
+        const est = { positionEnuM: add(rc.est.positionEnuM, scale(rc.est.velocityEnuMps, o.timeS - rc.t)), velocityEnuMps: rc.est.velocityEnuMps };
+        // Illumination (RLPK slide 7: КНП average 0.9 kW) through the N019 antenna (transmit directivity 2000),
+        // on the lock line of sight, alternating with tracking: 30.72 ms illumination / 20.48 ms track (slides 7, 56).
+        return {
+          illumination: { positionEnuM: o.positionEnuM, velocityEnuMps: o.velocityEnuMps, erpW: 900 * radar.hw.antenna.transmitGain, duty: 30.72 / (30.72 + 20.48), boresight: unit(sub(rl.positionEnuM, o.positionEnuM)), pattern: radar.hw.antenna, wavelengthM: radar.hw.wavelengthM },
+          targetEstimate: est
+        };
       }
       // IR missiles: inertial only, from the estimate at launch, extrapolated.
       const dtl = o.timeS - t0;
-      return { illuminatorPositionEnuM: null, illuminatorErpW: 0, targetEstimate: est0 ? { positionEnuM: add(est0.positionEnuM, scale(est0.velocityEnuMps, dtl)), velocityEnuMps: est0.velocityEnuMps } : null };
+      return { illumination: null, targetEstimate: est0 ? { positionEnuM: add(est0.positionEnuM, scale(est0.velocityEnuMps, dtl)), velocityEnuMps: est0.velocityEnuMps } : null };
     };
     const station = this.stores.findIndex((x) => x?.id === w.id);
     const below = this.bodyDir(own, 0, -Math.PI / 2);

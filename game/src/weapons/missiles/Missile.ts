@@ -18,7 +18,8 @@ import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { standardAtmosphere } from "../../physics/environment/Atmosphere.js";
 import type { SensorScene } from "../../physics/sensing/SensorScene.js";
 import { add, angleBetween, dot, norm, scale, sub, unit } from "../../physics/sensing/SweepGeometry.js";
-import { antennaPattern } from "../../physics/radar/Aperture.js";
+import { SemiActiveSeeker, type Illumination, type SarhSeekerProfile } from "../../sensors/weapon-seeker/SemiActiveSeeker.js";
+import { bistaticDoppler } from "../../physics/radar/RadarPhysics.js";
 
 const G = 9.80665;
 
@@ -41,7 +42,7 @@ export interface MissileSpec {
   readonly responseS: Sourced<number>;
   readonly guidance: Sourced<{ readonly navConstant: number; readonly safeSeparationS: number; readonly maxFlightS: number; readonly midcourse: "inertial" | "inertial+radio" | "none" }>;
   readonly seeker: Sourced<
-    | { readonly kind: "sarh"; readonly gimbalRad: number; readonly antennaDiameterM: number; readonly noiseFigureDb: number; readonly bandwidthHz: number; readonly lockSnrDb: number }
+    | { readonly kind: "sarh"; readonly gimbalRad: number; readonly profile: SarhSeekerProfile }
     | { readonly kind: "ir"; readonly gimbalRad: number; readonly fovRad: number; readonly apertureM: number; readonly neiWm2: number; readonly lockSnr: number; readonly lockOnAfterLaunch: boolean }
   >;
   readonly fuze: Sourced<{ readonly armingTimeS: number; readonly radiusM: number }>;
@@ -52,9 +53,9 @@ export interface MissileSpec {
 
 /** What the launcher provides each tick while it can: illumination (SARH) and its target estimate (radio correction). */
 export interface LauncherLink {
-  readonly illuminatorPositionEnuM: Vector3 | null;
-  /** Illuminator effective radiated power toward the target, W (CW/HPRF illumination × antenna gain). */
-  readonly illuminatorErpW: number;
+  /** The launcher radar's illumination this tick (SARH), or null when it is not illuminating. */
+  readonly illumination: Illumination | null;
+  /** Launcher's target estimate (radio correction), or null. */
   readonly targetEstimate: { readonly positionEnuM: Vector3; readonly velocityEnuMps: Vector3 } | null;
 }
 
@@ -97,6 +98,8 @@ export class Missile {
   private lastLos: Vector3 | null = null;
   private locked = false;
   private closest = Infinity;
+  private sarh: SemiActiveSeeker | null = null;
+  private sarhRate: Vector3 | null = null;
 
   /**
    * @param irCue pre-launch seeker pointing (IR missiles locked on the rail, HMS cue)
@@ -106,7 +109,22 @@ export class Missile {
     this.p = [...positionEnuM];
     this.v = [...velocityEnuMps];
     this.mass = spec.launchMassKg.value;
+    const sk = spec.seeker.value;
+    if (sk.kind === "sarh" && !idealTarget) {
+      this.sarh = new SemiActiveSeeker(sk.profile, id.length * 7919);
+      // Pre-launch data: expected line of sight and Doppler (BP-29 p.22: data put into the missile's memory before launch).
+      const l = link();
+      if (l.targetEstimate) {
+        const los = unit(sub(l.targetEstimate.positionEnuM, positionEnuM));
+        const fd = l.illumination ? bistaticDoppler(l.illumination.positionEnuM, l.illumination.velocityEnuMps, positionEnuM, velocityEnuMps, l.targetEstimate.positionEnuM, l.targetEstimate.velocityEnuMps, l.illumination.wavelengthM) : 0;
+        this.sarh.preset(los, fd);
+      }
+    }
   }
+
+  /** Seeker status for displays and tests. */
+  public get seekerStatus(): string { return this.sarh ? this.sarhStatus : this.locked ? "track" : "search"; }
+  private sarhStatus = "off";
 
   public get state(): MissileState {
     const ph = this.dead ? "dead" : motorAt(this.spec, this.t).thrustN > 0 ? "boost" : "coast";
@@ -132,20 +150,13 @@ export class Missile {
       }
       return best && best.snr >= sk.lockSnr ? best.los : null;
     }
-    // Semi-active: the launcher must be illuminating; the seeker receives the bistatic return
-    // (physics: ERP·σ·Gr·λ²/((4π)³·Rt²·Rr²·k·T·F·B)) and needs `lockSnrDb` in its Doppler filter.
-    if (!link.illuminatorPositionEnuM || link.illuminatorErpW <= 0) return null;
-    const ant = antennaPattern({ diameterM: sk.antennaDiameterM, taperExponent: 1, farSidelobeFloorDb: 30 }, 0.03);
-    const echoes = scene.radar({
-      originEnuM: this.p, ownVelocityEnuMps: this.v, beamFrom: cue, beamTo: cue,
-      look: { antenna: ant, averagePowerW: 0, systemNoiseTempK: 290 * 10 ** (sk.noiseFigureDb / 10), lossesDb: 3 },
-      integrationTimeS: 1 / sk.bandwidthHz, reportFloorSnr: 10 ** (sk.lockSnrDb / 10), maxRangeM: 80000,
-      illuminator: { positionEnuM: link.illuminatorPositionEnuM, erpW: link.illuminatorErpW }
-    });
-    let best: { los: Vector3; snr: number } | null = null;
-    for (const e of echoes) if (!best || e.meanSnr > best.snr) best = { los: e.losEnu, snr: e.meanSnr };
-    return best?.los ?? null;
+    // Semi-active: the 9B-1101K-class seeker model (sensors/weapon-seeker/SemiActiveSeeker).
+    const o = this.sarh!.step({ positionEnuM: this.p, velocityEnuMps: this.v, bodyAxis: axis, scene, illumination: link.illumination, cue: link.targetEstimate }, this.dtLast);
+    this.sarhStatus = o.status;
+    this.sarhRate = o.losRate;
+    return o.status === "track" || o.status === "memory" ? o.losEnu : null;
   }
+  private dtLast = 0.02;
 
   public step(scene: SensorScene, dt: number, groundHeightAt: (x: number, y: number) => number): void {
     if (this.dead) return;
@@ -164,12 +175,14 @@ export class Missile {
     // ---- guidance → commanded lateral acceleration ----
     let cmd: Vector3 = [0, 0, 0];
     const G_ = spec.guidance.value;
+    this.dtLast = dt;
     if (this.t > G_.safeSeparationS) {
       const los = this.seek(scene, link);
       this.locked = !!los;
       if (los) {
         if (this.lastLos) {
-          const losRate = scale(sub(los, this.lastLos), 1 / dt);
+          // LOS rate: from the seeker's own track filter when it has one, else by differencing.
+          const losRate = this.sarhRate ?? scale(sub(los, this.lastLos), 1 / dt);
           // Proportional navigation: a = N · Vc · u̇ (u = line-of-sight unit vector).
           const tgtEst = link.targetEstimate;
           const vc = tgtEst ? -dot(sub(tgtEst.velocityEnuMps, this.v), los) : speed;
@@ -231,7 +244,7 @@ export class Missile {
 export function launchZone(spec: MissileSpec, launch: { positionEnuM: Vector3; velocityEnuMps: Vector3 }, target: { losEnu: Vector3; velocityEnuMps: Vector3 }): { maxM: number; minM: number } {
   const hits = (rangeM: number): boolean => {
     let tp: Vector3 = add(launch.positionEnuM, scale(target.losEnu, rangeM));
-    const truth = () => ({ illuminatorPositionEnuM: launch.positionEnuM, illuminatorErpW: 1e9, targetEstimate: { positionEnuM: tp, velocityEnuMps: target.velocityEnuMps } });
+    const truth = (): LauncherLink => ({ illumination: null, targetEstimate: { positionEnuM: tp, velocityEnuMps: target.velocityEnuMps } });
     const ideal: SensorScene = {
       sunDirectionEnu: [0, 0, 1],
       radar: () => [],

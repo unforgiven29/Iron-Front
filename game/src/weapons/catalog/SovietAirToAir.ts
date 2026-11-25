@@ -10,6 +10,7 @@
  * the others are scaled from them by their published masses. Status is stated per value.
  */
 import type { MissileSpec } from "../missiles/Missile.js";
+import type { SarhSeekerProfile } from "../../sensors/weapon-seeker/SemiActiveSeeker.js";
 
 const DEG = Math.PI / 180;
 const BP = "BP-29";
@@ -18,7 +19,27 @@ const OS = "open-source figure (public references), not verified against a prima
 /** CD0 vs Mach (body reference area): Fleeman ch.2 slender-missile shape, level FITTED (×1.5) with the motor to BP-29 fig.17 (R-27R). */
 const CD_BODY = { mach: [0.5, 0.9, 1.1, 1.5, 2.5, 4.0], cd: [0.53, 0.6, 1.12, 0.93, 0.68, 0.53] };
 
-const R27_SARH = { kind: "sarh" as const, gimbalRad: 50 * DEG, antennaDiameterM: 0.2, noiseFigureDb: 6, bandwidthHz: 400, lockSnrDb: 13 };
+/**
+ * 9B-1101K semi-active radar seeker (R-27R / R-27ER). No primary hardware source is in the project:
+ * every value is ESTIMATED from the missile's size and the class of seeker, and labelled so. The
+ * illumination it works with is the N019's published one (RLPK slides 7, 56).
+ */
+export const SEEKER_9B1101K: SarhSeekerProfile = {
+  id: "9b-1101k", designation: "9B-1101K",
+  aperture: { value: { diameterM: 0.2, taperExponent: 1, farSidelobeFloorDb: 30 }, source: "ESTIMATED: dish ≈0.2 m in the 0.23 m body; gives ≈11° beam at 3 cm", status: "estimated" },
+  gimbal: { value: { maxRad: 50 * DEG, rateRadS: 20 * DEG }, source: "ESTIMATED gimbal limit and tracking rate", status: "estimated" },
+  noiseFigureDb: { value: 6, source: "ESTIMATED", status: "estimated" },
+  lossesDb: { value: 4, source: "ESTIMATED radome, plumbing, processing", status: "estimated" },
+  coherentS: { value: 0.02, source: "ESTIMATED Doppler filter integration (50 Hz filters)", status: "estimated" },
+  velocityGate: { value: { widthMps: 15, searchSpanMps: 150, searchRateMpsPerS: 300 }, source: "ESTIMATED speed gate and search around the preset Doppler", status: "estimated" },
+  falseAlarmProbability: { value: 1e-6, source: "ESTIMATED", status: "estimated" },
+  confirmHits: { value: 3, source: "ESTIMATED", status: "estimated" },
+  memoryS: { value: 1.5, source: "ESTIMATED track memory", status: "estimated" },
+  rearConeRad: { value: 70 * DEG, source: "ESTIMATED rear reference-antenna cone", status: "estimated" },
+  monopulseK: { value: 1.6, source: "Typical monopulse slope (Sherman, 'Monopulse Principles')", status: "estimated" }
+};
+
+const R27_SARH = { kind: "sarh" as const, gimbalRad: 50 * DEG, profile: SEEKER_9B1101K };
 
 const common = {
   responseS: { value: 0.15, source: "ESTIMATED airframe/autopilot time constant", status: "estimated" as const },
@@ -33,7 +54,7 @@ export const R27R: MissileSpec = {
   aero: { value: { k: 0.12, clMax: 9 }, source: "ESTIMATED (body + X-wing lift on body reference area)", status: "estimated" },
   maxG: { value: 25, source: `ESTIMATED; ${BP} p.22 gives target g up to 8`, status: "estimated" },
   guidance: { value: { navConstant: 4, safeSeparationS: 0.4, maxFlightS: 60, midcourse: "inertial+radio" }, source: `${BP} p.22: 0.4 s safety manoeuvre, then inertial guidance with radio correction until seeker lock; 60 s guided flight`, status: "published" },
-  seeker: { value: R27_SARH, source: "ESTIMATED semi-active seeker (9B-1101K class): gimbal, antenna, receiver", status: "estimated" },
+  seeker: { value: R27_SARH, source: "9B-1101K semi-active seeker (SEEKER_9B1101K; values ESTIMATED)", status: "estimated" },
   fuze: { value: { armingTimeS: 1.0, radiusM: 15 }, source: "ESTIMATED radar proximity fuze", status: "estimated" },
   warhead: { value: { massKg: 39, lethalRadiusM: 11 }, source: `${OS} (39 kg expanding-rod warhead); lethal radius ESTIMATED`, status: "estimated" },
   offBoresight: false

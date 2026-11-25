@@ -8,6 +8,12 @@ import type { AircraftSnapshot } from "../../src/platforms/aircraft/common/Fixed
 import { DEG } from "../../src/sensors/common/ScanGeometry.js";
 import { SOVIET_AAM } from "../../src/weapons/catalog/SovietAirToAir.js";
 import { closestApproach, launchZone } from "../../src/weapons/missiles/Missile.js";
+import { SEEKER_9B1101K } from "../../src/weapons/catalog/SovietAirToAir.js";
+import { SemiActiveSeeker } from "../../src/sensors/weapon-seeker/SemiActiveSeeker.js";
+import { bistaticDoppler } from "../../src/physics/radar/RadarPhysics.js";
+import { deriveHardware } from "../../src/sensors/radar/PulseDopplerRadar.js";
+import { N019_PROFILE } from "../../src/platforms/aircraft/mig29/avionics/N019Profile.js";
+import { sub, unit } from "../../src/physics/sensing/SweepGeometry.js";
 import { AirTargetWorld, SIGNATURES, type AirTargetSpec } from "../../src/world/targets/AirTargets.js";
 import { MissileWorld } from "../../src/world/weapons/MissileWorld.js";
 
@@ -37,15 +43,17 @@ function engage(target: AirTargetSpec, setup: (w: MiG29WeaponControl) => void, o
   const targets = new AirTargetWorld([target], flat);
   const missiles = new MissileWorld(targets, () => 0);
   setup(wcs);
+  let seekerTracked = false;
   let y = 0;
   for (let t = 0.02; t < seconds; t += 0.02) {
     y += 230 * 0.02;
     targets.step(0.02);
     missiles.step(0.02);
+    if (missiles.states().some((m) => m.seekerLocked)) seekerTracked = true;
     onTick(wcs, t);
     wcs.step({ own: { timeS: t, positionEnuM: [0, y, 6000], velocityEnuMps: [0, 230, 0], bodyToWorld: NORTH, headingRad: 0, pitchRad: 0, rollRad: 0 }, snapshot: {} as AircraftSnapshot, scene: targets, head: { az: 0, el: 0 }, weapons: missiles }, 0.02);
   }
-  return { wcs, targets, missiles };
+  return { wcs, targets, missiles, seekerTracked };
 }
 
 describe("engagements", { timeout: 120_000 }, () => {
@@ -59,7 +67,8 @@ describe("engagements", { timeout: 120_000 }, () => {
     }, 60);
   };
   it("R-27R: radar lock → launch → the target is destroyed while the radar illuminates", () => {
-    const { missiles, targets, wcs } = lockAndFire(true);
+    const { missiles, targets, wcs, seekerTracked } = lockAndFire(true);
+    expect(seekerTracked).toBe(true); // the 9B-1101K acquired and homed, not just radio correction
     expect(missiles.events().some((e) => e.kind === "launch")).toBe(true);
     expect(missiles.events().some((e) => e.kind === "kill")).toBe(true);
     expect(targets.states()).toHaveLength(0);
@@ -98,5 +107,43 @@ describe("HMS and radar automation", () => {
     const w = new MiG29WeaponControl();
     expect(w.controls.some((c) => c.key === "c")).toBe(false);
     expect(w.state.compensation).toBe(true);
+  });
+});
+
+describe("9B-1101K semi-active seeker", () => {
+  const n019 = deriveHardware(N019_PROFILE);
+  const setup = (opts: { rangeKm: number; illum?: boolean; presetErrMps?: number; launcherBehind?: boolean; targetAlt?: number; missileAlt?: number }) => {
+    const tAlt = opts.targetAlt ?? 6000, mAlt = opts.missileAlt ?? 6000;
+    const tgt: AirTargetSpec = { id: "t", label: "t", signature: SIGNATURES.fighter, positionEnuM: [0, opts.rangeKm * 1000, tAlt], headingRad: Math.PI, speedMps: 230, throttle: 0.8 };
+    const scene = new AirTargetWorld([tgt], flat);
+    const sk = new SemiActiveSeeker(SEEKER_9B1101K, 3);
+    const mPos: Vector3 = [0, 0, mAlt], mVel: Vector3 = [0, 600, 0];
+    const illPos: Vector3 = opts.launcherBehind === false ? [0, opts.rangeKm * 2000, 6000] : [0, -8000, 6000];
+    const illVel: Vector3 = [0, 250, 0];
+    const tPos = scene.states()[0]!.positionEnuM, tVel = scene.states()[0]!.velocityEnuMps;
+    const fd = bistaticDoppler(illPos, illVel, mPos, mVel, tPos, tVel, n019.wavelengthM) + ((opts.presetErrMps ?? 0) * 2) / n019.wavelengthM;
+    sk.preset(unit(sub(tPos, mPos)), fd);
+    const ill = opts.illum === false ? null : { positionEnuM: illPos, velocityEnuMps: illVel, erpW: 900 * n019.antenna.transmitGain, duty: 0.6, boresight: unit(sub(tPos, illPos)), pattern: n019.antenna, wavelengthM: n019.wavelengthM };
+    let out = sk.step({ positionEnuM: mPos, velocityEnuMps: mVel, bodyAxis: [0, 1, 0], scene, illumination: ill, cue: null }, 0.02);
+    for (let i = 0; i < 150; i++) out = sk.step({ positionEnuM: mPos, velocityEnuMps: mVel, bodyAxis: [0, 1, 0], scene, illumination: ill, cue: null }, 0.02);
+    return out;
+  };
+  it("locks a 3 m²-class fighter 10 km ahead when illuminated by the N019", () => {
+    expect(setup({ rangeKm: 10 }).status).toBe("track");
+  });
+  it("without illumination it sees nothing", () => {
+    expect(setup({ rangeKm: 10, illum: false }).status).not.toBe("track");
+  });
+  it("with the launcher outside the rear reference cone there is no coherent reference", () => {
+    const o = setup({ rangeKm: 10, launcherBehind: false });
+    expect(o.status).not.toBe("track");
+    expect(o.reason).toBe("no reference");
+  });
+  it("the velocity-gate search finds a target whose preset Doppler is off by 60 m/s, not one off by 400 m/s", () => {
+    expect(setup({ rangeKm: 10, presetErrMps: 60 }).status).toBe("track");
+    expect(setup({ rangeKm: 10, presetErrMps: 400 }).status).not.toBe("track");
+  });
+  it("received SNR falls with range (bistatic R⁻²·R⁻² law)", () => {
+    expect(setup({ rangeKm: 30 }).snrDb).toBeLessThan(setup({ rangeKm: 10 }).snrDb);
   });
 });
