@@ -25,6 +25,21 @@ export interface AvionicsContext {
 export interface WeaponPort {
   launch(spec: import("../../../weapons/missiles/Missile.js").MissileSpec, positionEnuM: import("../../../core/coordinates/CoordinateFrames.js").Vector3, velocityEnuMps: import("../../../core/coordinates/CoordinateFrames.js").Vector3, link: () => import("../../../weapons/missiles/Missile.js").LauncherLink, irCue: import("../../../core/coordinates/CoordinateFrames.js").Vector3 | null): string;
   events(sinceS?: number): readonly import("../../../world/weapons/MissileWorld.js").WeaponEvent[];
+  /**
+   * Launch a NOTIONAL low-fidelity missile (placeholder weapons; see weapons/catalog/NotionalAirToAir).
+   * `cue` is the launcher's own target estimate (radar lock), or null when it has none.
+   */
+  launchNotional?(spec: import("../../../weapons/catalog/NotionalAirToAir.js").NotionalMissileSpec, positionEnuM: import("../../../core/coordinates/CoordinateFrames.js").Vector3, velocityEnuMps: import("../../../core/coordinates/CoordinateFrames.js").Vector3, cue: import("../../../world/weapons/NotionalMissiles.js").LauncherCue): string;
+  notionalEvents?(sinceS?: number): readonly import("../../../world/weapons/NotionalMissiles.js").NotionalWeaponEvent[];
+}
+
+/** A selectable stores configuration offered by an aircraft package (menu loadout screen). */
+export interface LoadoutOption {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  /** Per-station store names, outboard-left to outboard-right ("" = empty station). */
+  readonly stations: readonly string[];
 }
 
 export interface AvionicsControl {

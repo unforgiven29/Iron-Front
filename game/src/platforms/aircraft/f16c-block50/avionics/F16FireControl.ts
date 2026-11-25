@@ -11,7 +11,8 @@
 import type { DisplayList, DisplayPrimitive } from "../../../../rendering/instruments/DisplayList.js";
 import { DEG, type RasterPattern } from "../../../../sensors/common/ScanGeometry.js";
 import { PulseDopplerRadar, type RadarProfile, type WaveformSpec } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AvionicsContext, AvionicsControl, AvionicsSuite } from "../../common/Avionics.js";
+import type { AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import { NOTIONAL_AAM, type NotionalMissileSpec } from "../../../../weapons/catalog/NotionalAirToAir.js";
 
 const E = (source: string) => ({ source: `ESTIMATED: ${source}`, status: "estimated" as const });
 
@@ -64,8 +65,23 @@ export const F16_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "pagedown", label: "Antenna elevation down", control: "ANT ELEV knob" },
   { key: "\\", label: "Scan width ±60 / ±30 / ±10°", control: "FCR azimuth OSB" },
   { key: "end", label: "Scan bars 1 / 2 / 4", control: "FCR bar OSB" },
-  { key: "home", label: "Radar transmit / standby", control: "FCR standby" }
+  { key: "home", label: "Radar transmit / standby", control: "FCR standby" },
+  { key: "f", label: "Select missile (AIM-120 / AIM-9X)", control: "DOGFIGHT / missile step (placeholder)" },
+  { key: "l", label: "Launch missile", control: "Weapon release (placeholder)" }
 ];
+
+/**
+ * Air-to-air loadouts. The missiles are NOTIONAL low-fidelity placeholders (invented gameplay
+ * values) until the F-16 weapons are reworked; station layout: 1 (left tip) … 9 (right tip).
+ */
+export const F16_LOADOUTS: readonly LoadoutOption[] = [
+  { id: "a2a-standard", label: "Air superiority", description: "2 × AIM-9X on the wingtips, 4 × AIM-120 on the wing stations.", stations: ["AIM-9X", "AIM-120", "AIM-120", "", "", "", "AIM-120", "AIM-120", "AIM-9X"] },
+  { id: "a2a-bvr", label: "Beyond visual range", description: "6 × AIM-120: maximum long-range shots, no heat-seekers.", stations: ["AIM-120", "AIM-120", "AIM-120", "", "", "", "AIM-120", "AIM-120", "AIM-120"] },
+  { id: "a2a-wvr", label: "Close-in fight", description: "4 × AIM-9X and 2 × AIM-120 for a turning fight.", stations: ["AIM-9X", "AIM-9X", "AIM-120", "", "", "", "AIM-120", "AIM-9X", "AIM-9X"] },
+  { id: "clean", label: "Clean (training)", description: "No stores: flying and radar practice.", stations: ["", "", "", "", "", "", "", "", ""] }
+];
+const BY_NAME: Record<string, NotionalMissileSpec> = { "AIM-9X": NOTIONAL_AAM.AIM9X, "AIM-120": NOTIONAL_AAM.AIM120 };
+const storesFor = (id: string): (NotionalMissileSpec | null)[] => (F16_LOADOUTS.find((l) => l.id === id) ?? F16_LOADOUTS[0]!).stations.map((n) => BY_NAME[n] ?? null);
 
 export class F16FireControl implements AvionicsSuite {
   public readonly controls = F16_AVIONICS_CONTROLS;
@@ -80,10 +96,50 @@ export class F16FireControl implements AvionicsSuite {
   private held = new Set<string>();
   private ctx: AvionicsContext | null = null;
   private tms = false;
+  private loadoutId = F16_LOADOUTS[0]!.id;
+  private stores: (NotionalMissileSpec | null)[] = storesFor(this.loadoutId);
+  private selectedId: string = "aim120";
+  private launch = false;
+  private message: { text: string; t: number } | null = null;
 
   public constructor(seed = 16) { this.radar = new PulseDopplerRadar(APG68_PROFILE, seed); }
 
-  public reset(): void { this.radar.breakLock("reset"); this.mode = "CRM"; }
+  public reset(): void { this.radar.breakLock("reset"); this.mode = "CRM"; this.stores = storesFor(this.loadoutId); this.selectFirst(); }
+
+  public setOption(key: string, value: string): void {
+    if (key === "loadout" && F16_LOADOUTS.some((l) => l.id === value)) { this.loadoutId = value; this.stores = storesFor(value); this.selectFirst(); }
+  }
+
+  private selectFirst(): void { const first = this.stores.find((x) => x); if (first) this.selectedId = first.id; }
+  public get weapon(): NotionalMissileSpec | null { return this.stores.find((x) => x?.id === this.selectedId) ?? null; }
+  public get inventory(): Readonly<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const w of this.stores) if (w) out[w.display] = (out[w.display] ?? 0) + 1;
+    return out;
+  }
+
+  private cycleWeapon(): void {
+    const types = [...new Set(this.stores.filter((x): x is NotionalMissileSpec => !!x).map((x) => x.id))];
+    if (types.length === 0) return;
+    this.selectedId = types[(types.indexOf(this.selectedId) + 1) % types.length]!;
+  }
+
+  private fire(ctx: AvionicsContext): void {
+    const w = this.weapon;
+    const port = ctx.weapons;
+    if (!w || !port?.launchNotional) { this.message = { text: "NO WPN", t: ctx.own.timeS }; return; }
+    const lock = this.radar.lock(ctx.own);
+    if (w.guidance === "radar" && !lock) { this.message = { text: "NO LOCK", t: ctx.own.timeS }; return; }
+    const radar = this.radar;
+    // Midcourse cue: the FCR track while the lock holds (one-way datalink), else nothing.
+    const cue = () => { const c = this.ctx; const l = c ? radar.lock(c.own) : null; return l ? { positionEnuM: l.positionEnuM, velocityEnuMps: l.velocityEnuMps } : null; };
+    const at = lock ? { positionEnuM: lock.positionEnuM, velocityEnuMps: lock.velocityEnuMps } : null;
+    let first = true;
+    port.launchNotional(w, [ctx.own.positionEnuM[0], ctx.own.positionEnuM[1], ctx.own.positionEnuM[2] - 1.5], ctx.own.velocityEnuMps, () => { if (first) { first = false; return at; } return cue(); });
+    this.stores[this.stores.findIndex((x) => x?.id === w.id)] = null;
+    this.message = { text: `${w.display} AWAY`, t: ctx.own.timeS };
+    if (!this.weapon) this.cycleWeapon();
+  }
 
   public key(k: string, down: boolean): boolean {
     if (!this.controls.some((c) => c.key === k)) return false;
@@ -100,6 +156,8 @@ export class F16FireControl implements AvionicsSuite {
       case "end": this.bars = (this.bars + 1) % BARS.length; break;
       case "home": this.transmit = !this.transmit; break;
       case "=": this.scale = (this.scale + 1) % SCALES.length; break;
+      case "f": this.cycleWeapon(); break;
+      case "l": this.launch = true; break;
     }
     return true;
   }
@@ -128,6 +186,7 @@ export class F16FireControl implements AvionicsSuite {
     }
     this.tms = false;
     this.radar.step(ctx.own, ctx.scene, dt);
+    if (this.launch) { this.launch = false; this.fire(ctx); }
   }
 
   private bscope(): DisplayPrimitive[] {
@@ -155,6 +214,18 @@ export class F16FireControl implements AvionicsSuite {
   public hud(): DisplayList {
     const ctx = this.ctx;
     const lock = ctx ? this.radar.lock(ctx.own) : null;
+    const w = this.weapon;
+    const n = w ? this.stores.filter((x) => x?.id === w.id).length : 0;
+    const out: DisplayPrimitive[] = [{ kind: "text", frame: "screen", at: [0.9, -0.95], text: w ? `${n} ${w.display}` : "NO WPN", align: "right", size: 0.06 }];
+    if (this.message && ctx && ctx.own.timeS - this.message.t < 3) out.push({ kind: "text", frame: "screen", at: [0, -0.62], text: this.message.text, align: "center", size: 0.07 });
+    if (lock && w) {
+      const inRange = lock.rangeM < w.maxLaunchRangeM && lock.rangeM > w.minLaunchRangeM && Math.hypot(lock.lookBody.az, lock.lookBody.el) < w.maxOffBoresightRad;
+      if (inRange) out.push({ kind: "text", frame: "screen", at: [0, -0.72], text: "SHOOT", align: "center", size: 0.09 });
+    }
+    return [...out, ...this.hudLock(lock)];
+  }
+
+  private hudLock(lock: ReturnType<PulseDopplerRadar["lock"]>): DisplayList {
     if (!lock) return this.mode === "ACM" ? [{ kind: "line", frame: "angle", points: [[-1.5 * DEG, -5 * DEG], [-1.5 * DEG, 55 * DEG]] }, { kind: "line", frame: "angle", points: [[1.5 * DEG, -5 * DEG], [1.5 * DEG, 55 * DEG]] }] : [];
     const { az, el } = lock.lookBody, d = 1.2 * DEG;
     return [{ kind: "line", frame: "angle", points: [[az - d, el - d], [az + d, el - d], [az + d, el + d], [az - d, el + d]], closed: true }];

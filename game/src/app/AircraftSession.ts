@@ -5,7 +5,10 @@
  */
 import { mountDataPanel } from "./DataPanel.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
-import { createTestRange, targetsFor, type TargetScenario } from "./TestRange.js";
+import { createTestRange, hostileSpecs, targetsFor, type TargetScenario } from "./TestRange.js";
+import { HostileFighter, type HostileEnvironment } from "../world/combat/HostileFighters.js";
+import { NotionalMissileWorld, type CombatTarget } from "../world/weapons/NotionalMissiles.js";
+import type { WeaponPort } from "../platforms/aircraft/common/Avionics.js";
 import { AirTargetWorld } from "../world/targets/AirTargets.js";
 import { MissileWorld } from "../world/weapons/MissileWorld.js";
 import { AVIONICS_RATE_HZ } from "../platforms/aircraft/common/Avionics.js";
@@ -29,11 +32,26 @@ export interface AircraftSessionHandle {
   readonly paused: boolean;
   setPaused(paused: boolean): void;
   restart(): void;
+  dispose(): void;
+}
+
+export interface MissionResult {
+  readonly outcome: "victory" | "shot-down" | "crashed";
+  readonly kills: number;
+  readonly hostiles: number;
+  readonly timeS: number;
+  readonly shotsFired: number;
+  readonly cause?: string;
+}
+
+export interface SessionCallbacks {
+  /** Called once when a combat mission ends (all hostiles destroyed, or the player is lost). */
+  onMissionEnd?(result: MissionResult): void;
 }
 
 export type StartMode = "runway" | "air";
 
-export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway", scenario: TargetScenario = "range", options: Readonly<Record<string, string>> = {}): AircraftSessionHandle {
+export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway", scenario: TargetScenario = "range", options: Readonly<Record<string, string>> = {}, callbacks: SessionCallbacks = {}): AircraftSessionHandle {
   const { terrain, airfield } = createTestRange();
   const runway = airfield.runways[0];
   const startState = () => {
@@ -52,9 +70,57 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   }, { ...startState(), positionEnuM: [...startState().positionEnuM] });
 
   // Air targets (world truth) and the aircraft's avionics, stepped at a fixed rate in simulation time.
-  const targets = new AirTargetWorld(targetsFor(scenario), { heightAt: (x, y) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; } });
   const groundAt = (x: number, y: number) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; };
+  // Combat bookkeeping: the player is "blue"; hostiles and range targets are "red".
+  let shotDown: string | null = null;
+  let missionOver = false;
+  let shotsFired = 0;
+  const hostileModel = new Map(hostileSpecs(scenario).map((h) => [h.id, h.modelId]));
+  let hostiles: HostileFighter[] = [];
+  const playerTarget = (): CombatTarget[] => {
+    if (shotDown) return [];
+    const s = jet.snapshot();
+    return [{ id: "player", side: "blue", positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps }];
+  };
+  const hostileEnv: HostileEnvironment = {
+    opponents: () => playerTarget(),
+    threats: () => [
+      ...notional.states().map((m) => ({ positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps, side: m.side })),
+      ...missiles.states().map((m) => ({ positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps, side: "blue" as const }))
+    ],
+    groundHeightAt: groundAt,
+    fire: (spec, shooter, targetId, cue) => { notional.launch(spec, "red", shooter.spec.id, shooter.positionEnuM, shooter.velocityEnuMps, cue, targetId); },
+    missileInFlight: (shooterId, specId) => notional.states().some((m) => m.shooterId === shooterId && m.spec.id === specId)
+  };
+  const targets = new AirTargetWorld(targetsFor(scenario), { heightAt: groundAt }, () => {
+    hostiles = hostileSpecs(scenario).map((h) => new HostileFighter(h, hostileEnv));
+    return hostiles;
+  });
   const missiles = new MissileWorld(targets, groundAt);
+  const notional = new NotionalMissileWorld(
+    () => [...playerTarget(), ...targets.states().map((t) => ({ id: t.id, side: "red" as const, positionEnuM: t.positionEnuM, velocityEnuMps: t.velocityEnuMps }))],
+    (id, m) => { if (id === "player") shotDown = `${m.spec.display}`; else targets.destroy(id); },
+    groundAt
+  );
+  const weaponPort: WeaponPort = {
+    launch: (...a) => { shotsFired++; return missiles.launch(...a); },
+    events: (since) => missiles.events(since),
+    launchNotional: (spec, p, v, cue) => { shotsFired++; return notional.launch(spec, "blue", "player", p, v, cue); },
+    notionalEvents: (since) => notional.events(since)
+  };
+  const hostileCount = hostileModel.size;
+  const kills = () => [...hostileModel.keys()].filter((id) => targets.isDestroyed(id)).length;
+  let endAt: number | null = null;
+  const checkMission = () => {
+    if (missionOver) return;
+    const crashed = jet.snapshot().ground.kind === "crashed";
+    const outcome = shotDown ? "shot-down" : crashed && hostileCount > 0 ? "crashed" : hostileCount > 0 && kills() === hostileCount ? "victory" : null;
+    if (!outcome) return;
+    endAt ??= simTime + (outcome === "victory" ? 3 : 2.5);
+    if (simTime < endAt) return;
+    missionOver = true;
+    callbacks.onMissionEnd?.({ outcome, kills: kills(), hostiles: hostileCount, timeS: simTime, shotsFired, ...(shotDown ? { cause: shotDown } : {}) });
+  };
   const avionics = definition.createAvionics?.();
   for (const [k, v] of Object.entries(options)) avionics?.setOption?.(k, v);
   let simTime = 0, avionicsAcc = 0;
@@ -66,16 +132,22 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       simTime += h;
       targets.step(h);
       missiles.step(h);
+      notional.step(h);
       if (avionics) {
         const s = jet.snapshot();
-        avionics.step({ own: { timeS: simTime, positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, bodyToWorld: s.bodyToWorld, headingRad: s.headingRad, pitchRad: s.pitchRad, rollRad: s.rollRad }, snapshot: s, scene: targets, head, weapons: missiles }, h);
+        avionics.step({ own: { timeS: simTime, positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, bodyToWorld: s.bodyToWorld, headingRad: s.headingRad, pitchRad: s.pitchRad, rollRad: s.rollRad }, snapshot: s, scene: targets, head, weapons: weaponPort }, h);
       }
+      checkMission();
     }
   };
 
   const source: CockpitViewSource = {
     snapshot: () => jet.renderSnapshot(),
-    hud: () => hud(jet.snapshot(), jet.definition.annunciate),
+    hud: () => {
+      const s = jet.snapshot();
+      const base = hud(s, jet.definition.annunciate);
+      return { ...base, warnings: [...combatWarnings(s), ...base.warnings] };
+    },
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     instrument: (id) => definition.cockpitInstruments?.[id]?.(jet.snapshot()) ?? [Number.NaN],
     cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); },
@@ -84,7 +156,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     hudOwnedByPackage: () => avionics?.ownsHud === true,
     helmetOverlay: () => avionics?.helmet?.() ?? [],
     worldObjects: () => [
-      ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
+      ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, ...(hostileModel.has(t.id) ? { modelId: hostileModel.get(t.id)! } : {}), positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
+      ...notional.states().map((m) => ({ id: m.id, kind: "missile" as const, ...orient(m.velocityEnuMps), positionEnuM: m.positionEnuM, missile: { geometry: m.spec.geometry, burning: m.burning } })),
       ...missiles.renderables().map(({ state: m, geometry, burning }) => {
         // Orient by the missile's own nose (6-DoF attitude), wings level about it.
         const v = m.noseEnu, n = Math.hypot(...v) || 1;
@@ -95,10 +168,29 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       })
     ]
   };
-  const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
+  // Low-fidelity missile warning (placeholder for an RWR/MAWS model): any hostile missile inside 60 km.
+  const combatWarnings = (s: AircraftSnapshot): { text: string; level: "caution" | "warning" }[] => {
+    if (shotDown) return [{ text: `SHOT DOWN — ${shotDown}`, level: "warning" }];
+    const out: { text: string; level: "caution" | "warning" }[] = [];
+    for (const m of notional.states()) {
+      if (m.side === "blue") continue;
+      const r = [m.positionEnuM[0] - s.positionEnuM[0], m.positionEnuM[1] - s.positionEnuM[1], m.positionEnuM[2] - s.positionEnuM[2]] as const;
+      const d = Math.hypot(...r);
+      if (d > 60000) continue;
+      const clock = ((Math.round(((Math.atan2(r[0], r[1]) - s.headingRad) * 6) / Math.PI) % 12) + 12) % 12 || 12;
+      out.push({ text: `MISSILE ${m.spec.display} ${clock} O'CLOCK ${(d / 1852).toFixed(1)} NM`, level: "warning" });
+      break;
+    }
+    return out;
+  };
+  const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield], definition.exteriorModelId);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   let paused = false;
-  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); avionics?.reset(); simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
+  const restart = () => {
+    const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); avionics?.reset();
+    simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
+    shotDown = null; missionOver = false; shotsFired = 0; endAt = null;
+  };
 
   const held = new Set<string>();
   let stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
@@ -115,6 +207,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     const bound = jet.switchKeys.find((b) => b.key === k);
     if (bound) { jet.controls.cycle(bound.switchId, "keyboard"); return; }
     if (k === "v") { view.resetLook(); return; }
+    if (k === "c") { view.toggleExternal(); return; }
     held.add(k);
   });
   frame.addEventListener("keyup", (e) => { held.delete(e.key.toLowerCase()); avionics?.key(e.key.toLowerCase(), false); });
@@ -138,22 +231,34 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (has("control")) throttle = Math.max(0, throttle - 0.4 * dt);
     jet.setPilotInputs(stick);
     jet.setThrottle(throttle);
-    if (!paused) {
-      jet.advanceFrame(dt);
+    if (!paused && !missionOver) {
+      // A shot-down aircraft stops flying; the world keeps running until the debrief.
+      if (!shotDown) jet.advanceFrame(dt);
       // Helmet sight = the pilot's view direction (view yaw is positive to the left).
       stepWorld(dt, { az: -view.look.yaw, el: view.look.pitch });
     }
     view.render();
     panel.update();
-    requestAnimationFrame(loop);
+    if (raf !== -1) raf = requestAnimationFrame(loop);
   };
-  requestAnimationFrame(loop);
+  let raf = requestAnimationFrame(loop);
   frame.focus();
   return {
     get paused() { return paused; },
     setPaused(p: boolean) { paused = p; held.clear(); if (!p) { last = null; frame.focus(); } },
-    restart
+    restart,
+    dispose() { cancelAnimationFrame(raf); raf = -1; view.dispose(); }
   };
+}
+
+/** Render basis from a velocity vector (wings level about it). */
+function orient(v: readonly [number, number, number]): { forwardEnu: [number, number, number]; rightEnu: [number, number, number]; downEnu: [number, number, number] } {
+  const n = Math.hypot(...v) || 1;
+  const f: [number, number, number] = [v[0] / n, v[1] / n, v[2] / n];
+  const h = Math.hypot(f[0], f[1]);
+  const r: [number, number, number] = h > 1e-6 ? [f[1] / h, -f[0] / h, 0] : [1, 0, 0];
+  const d: [number, number, number] = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
+  return { forwardEnu: f, rightEnu: r, downEnu: d };
 }
 
 function hud(s: AircraftSnapshot, annunciate?: (s: AircraftSnapshot) => readonly { readonly text: string; readonly level: "caution" | "warning" }[]): HudData {

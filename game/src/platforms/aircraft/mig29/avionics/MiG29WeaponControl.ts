@@ -18,7 +18,7 @@ import { norm, sub, unit } from "../../../../physics/sensing/SweepGeometry.js";
 import { bodyAngles, DEG, type LookAngles, type RasterPattern, type SensorOwnship } from "../../../../sensors/common/ScanGeometry.js";
 import { ScanningIrst } from "../../../../sensors/irst/ScanningIrst.js";
 import { PulseDopplerRadar, type RadarTrackReport } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AvionicsContext, AvionicsControl, AvionicsSuite } from "../../common/Avionics.js";
+import type { AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
 import { KOLS_PROFILE } from "./KolsProfile.js";
 import { SOVIET_AAM } from "../../../../weapons/catalog/SovietAirToAir.js";
 import { launchZone, type LauncherLink, type MissileSpec } from "../../../../weapons/missiles/Missile.js";
@@ -95,6 +95,17 @@ export function r27MaxLaunchKm(aspectFromNoseDeg: number, altitudeM: number): nu
 
 const fmtKm = (km: number) => (km >= 1 ? String(Math.round(km)) : km.toFixed(1));
 
+/** Stores options, stations 1 (left outboard) … 6 (right outboard). */
+export const MIG29_LOADOUTS: readonly LoadoutOption[] = [
+  { id: "test-mix", label: "Test mix (one of each)", description: "R-73, R-60M, R-27R, R-27ER, R-27T, R-27ET: try every missile.", stations: ["R-73", "R-60M", "R-27R", "R-27ER", "R-27T", "R-27ET"] },
+  { id: "standard", label: "2 × R-27R + 4 × R-73", description: "Symmetric air-to-air fit: semi-active medium range plus close-combat IR.", stations: ["R-73", "R-73", "R-27R", "R-27R", "R-73", "R-73"] },
+  { id: "extended", label: "R-27ER / R-27ET + R-73", description: "Extended-range pair (radar + IR) with four R-73.", stations: ["R-73", "R-73", "R-27ER", "R-27ET", "R-73", "R-73"] },
+  { id: "dogfight", label: "6 × R-73", description: "All close-combat missiles.", stations: ["R-73", "R-73", "R-73", "R-73", "R-73", "R-73"] },
+  { id: "clean", label: "Clean (training)", description: "No stores.", stations: ["", "", "", "", "", ""] }
+];
+const MIG_STORE: Record<string, MissileSpec> = { "R-73": SOVIET_AAM.R73A, "R-60M": SOVIET_AAM.R60M, "R-27R": SOVIET_AAM.R27R, "R-27ER": SOVIET_AAM.R27ER, "R-27T": SOVIET_AAM.R27T, "R-27ET": SOVIET_AAM.R27ET };
+const migStores = (id: string): (MissileSpec | null)[] => (MIG29_LOADOUTS.find((l) => l.id === id) ?? MIG29_LOADOUTS[0]!).stations.map((n) => MIG_STORE[n] ?? null);
+
 export class MiG29WeaponControl implements AvionicsSuite {
   public readonly controls = MIG29_AVIONICS_CONTROLS;
   public readonly ownsHud = true;
@@ -110,7 +121,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
    * Stores: test loadout carrying one of each type (wing stations 1–6). A real squadron fit is
    * symmetric (e.g. 2 × R-27R + 4 × R-60M, BP-29 fig.1); this mix is for trying every missile.
    */
-  private stores: (MissileSpec | null)[] = [SOVIET_AAM.R73A, SOVIET_AAM.R60M, SOVIET_AAM.R27R, SOVIET_AAM.R27ER, SOVIET_AAM.R27T, SOVIET_AAM.R27ET];
+  private loadoutId = MIG29_LOADOUTS[0]!.id;
+  private stores: (MissileSpec | null)[] = migStores(this.loadoutId);
   private selected = 0;
   /** Time the current weapon was selected (IR seeker cool-down starts then). */
   private selectedAtS = 0;
@@ -251,7 +263,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.dlz = { maxM: this.dlz && k < 1 ? this.dlz.maxM + k * (z.maxM - this.dlz.maxM) : z.maxM, minM: this.dlz && k < 1 ? this.dlz.minM + k * (z.minM - this.dlz.minM) : z.minM, t: own.timeS, specId: w.id };
   }
 
-  public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); }
+  public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); this.stores = migStores(this.loadoutId); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
 
   public get state(): Readonly<Mig29WcsStatus> { return this.s; }
 
@@ -737,7 +749,10 @@ export class MiG29WeaponControl implements AvionicsSuite {
 
   /** HUD/HDD legend language: "ru" as on the aircraft, or "en". */
   private lang: "ru" | "en" = "ru";
-  public setOption(key: string, value: string): void { if (key === "hudLanguage" && (value === "ru" || value === "en")) this.lang = value; }
+  public setOption(key: string, value: string): void {
+    if (key === "hudLanguage" && (value === "ru" || value === "en")) this.lang = value;
+    if (key === "loadout" && MIG29_LOADOUTS.some((l) => l.id === value)) { this.loadoutId = value; this.stores = migStores(value); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
+  }
 
   private localize(list: DisplayPrimitive[]): DisplayList {
     if (this.lang === "ru") return list;

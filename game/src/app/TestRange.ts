@@ -6,6 +6,8 @@ import { createTestTerrain } from "../debug/DebugFlyer.js";
 import { flattenTileForAirfield, type AirfieldSpec } from "../world/infrastructure/Airfield.js";
 import { generateSyntheticTile, TerrainSurface } from "../world/terrain/Terrain.js";
 import { SIGNATURES, type AirTargetSpec } from "../world/targets/AirTargets.js";
+import type { HostileFighterSpec } from "../world/combat/HostileFighters.js";
+import { NOTIONAL_AAM } from "../weapons/catalog/NotionalAirToAir.js";
 
 export interface TestRange {
   readonly terrain: TerrainSurface;
@@ -50,7 +52,35 @@ export function createRangeTargets(): readonly AirTargetSpec[] {
   ];
 }
 
-export type TargetScenario = "range" | "dummies" | "none";
+export type TargetScenario = "range" | "dummies" | "none" | "hostile-1" | "hostile-2" | "hostile-4";
+
+export interface ScenarioInfo { readonly id: TargetScenario; readonly label: string; readonly description: string; readonly hostile: boolean }
+
+export const SCENARIOS: readonly ScenarioInfo[] = [
+  { id: "hostile-1", label: "1 v 1 — Lone Viper", description: "A single hostile F-16C closes from the north. It carries AIM-120 and AIM-9X.", hostile: true },
+  { id: "hostile-2", label: "1 v 2 — Viper pair", description: "Two hostile F-16Cs in a loose pair, splitting to bracket you.", hostile: true },
+  { id: "hostile-4", label: "1 v 4 — Four-ship", description: "A four-ship of hostile F-16Cs in two elements. Survive.", hostile: true },
+  { id: "range", label: "Range traffic", description: "Scripted, non-hostile targets for sensor and weapons practice.", hostile: false },
+  { id: "dummies", label: "Sensor test dummies", description: "Six scripted targets, each isolating one sensor behaviour.", hostile: false },
+  { id: "none", label: "Free flight", description: "Empty sky.", hostile: false }
+];
+
+/**
+ * Hostile F-16C flights (LOW FIDELITY: point-mass AI with notional weapons; see HostileFighters).
+ * They start ~55 km north of the air-start point heading south.
+ */
+export function hostileSpecs(scenario: TargetScenario): readonly HostileFighterSpec[] {
+  const n = scenario === "hostile-1" ? 1 : scenario === "hostile-2" ? 2 : scenario === "hostile-4" ? 4 : 0;
+  const D = Math.PI / 180;
+  const slots: readonly [number, number, number][] = [[0, 0, 6500], [4000, -2500, 6000], [-9000, -6000, 7000], [-13000, -8500, 6500]];
+  const names = ["Bandit 1-1", "Bandit 1-2", "Bandit 2-1", "Bandit 2-2"];
+  return slots.slice(0, n).map(([x, y, z], i) => ({
+    id: `hostile-${i + 1}`, label: `${names[i]} (F-16C, hostile, low fidelity)`, modelId: "f16c-aggressor", signature: SIGNATURES.fighter, side: "red" as const,
+    positionEnuM: [x, 40000 + y, z] as const, headingRad: 180 * D, speedMps: 250,
+    loadout: [NOTIONAL_AAM.AIM120, NOTIONAL_AAM.AIM120, NOTIONAL_AAM.AIM9X, NOTIONAL_AAM.AIM9X],
+    skill: 0.45 + 0.1 * i
+  }));
+}
 
 /**
  * Dummy targets for sensor testing, laid out ahead of the air-start point (0, −18 km, heading north).
@@ -74,4 +104,5 @@ export function createDummyTargets(): readonly AirTargetSpec[] {
 
 export function targetsFor(scenario: TargetScenario): readonly AirTargetSpec[] {
   return scenario === "range" ? createRangeTargets() : scenario === "dummies" ? createDummyTargets() : [];
+  // Hostile scenarios add AI bodies instead (hostileSpecs).
 }

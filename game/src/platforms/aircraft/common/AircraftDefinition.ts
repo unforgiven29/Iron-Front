@@ -359,6 +359,10 @@ export interface AircraftDefinition {
   createSystems(): AircraftSystems;
   /** Optional avionics / weapon-control suite (sensors, modes, controls, symbology). Fresh instance per flight. */
   createAvionics?(): import("./Avionics.js").AvionicsSuite;
+  /** Stores configurations the player can choose; the chosen id reaches the avionics as setOption("loadout", id). */
+  readonly loadouts?: readonly import("./Avionics.js").LoadoutOption[];
+  /** Exterior render model id (looked up in the rendering model registry). */
+  readonly exteriorModelId?: string;
 }
 
 export type { Ambient };
