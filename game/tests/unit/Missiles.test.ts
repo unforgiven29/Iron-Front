@@ -7,13 +7,13 @@ import { MiG29WeaponControl } from "../../src/platforms/aircraft/mig29/avionics/
 import type { AircraftSnapshot } from "../../src/platforms/aircraft/common/FixedWingAircraft.js";
 import { DEG } from "../../src/sensors/common/ScanGeometry.js";
 import { SOVIET_AAM } from "../../src/weapons/catalog/SovietAirToAir.js";
-import { closestApproach, launchZone } from "../../src/weapons/missiles/Missile.js";
+import { closestApproach, launchZone, Missile } from "../../src/weapons/missiles/Missile.js";
 import { SEEKER_9B1101K } from "../../src/weapons/catalog/SovietAirToAir.js";
 import { SemiActiveSeeker } from "../../src/sensors/weapon-seeker/SemiActiveSeeker.js";
 import { bistaticDoppler } from "../../src/physics/radar/RadarPhysics.js";
 import { deriveHardware } from "../../src/sensors/radar/PulseDopplerRadar.js";
 import { N019_PROFILE } from "../../src/platforms/aircraft/mig29/avionics/N019Profile.js";
-import { sub, unit } from "../../src/physics/sensing/SweepGeometry.js";
+import { norm, sub, unit } from "../../src/physics/sensing/SweepGeometry.js";
 import { AirTargetWorld, SIGNATURES, type AirTargetSpec } from "../../src/world/targets/AirTargets.js";
 import { MissileWorld } from "../../src/world/weapons/MissileWorld.js";
 
@@ -145,5 +145,45 @@ describe("9B-1101K semi-active seeker", () => {
   });
   it("received SNR falls with range (bistatic R⁻²·R⁻² law)", () => {
     expect(setup({ rangeKm: 30 }).snrDb).toBeLessThan(setup({ rangeKm: 10 }).snrDb);
+  });
+});
+
+describe("missile systems: battery, fuze arming, inertial drift, flight model", { timeout: 60_000 }, () => {
+  const fly = (spec: (typeof SOVIET_AAM)[keyof typeof SOVIET_AAM], seconds: number, target?: Vector3) => {
+    const m = new Missile(`${spec.id}-t`, spec, [0, 0, 8000], [0, 250, 0], () => ({ illumination: null, targetEstimate: target ? { positionEnuM: target, velocityEnuMps: [0, 0, 0] } : null }));
+    const scene = new AirTargetWorld([], flat);
+    const trace: { t: number; mach: number; alpha: number; nav: number }[] = [];
+    for (let t = 0.02; t < seconds && m.alive; t += 0.02) {
+      m.step(scene, 0.02, () => 0);
+      trace.push({ t, mach: m.state.mach, alpha: m.state.alphaRad, nav: norm(sub(m.navPosition(), m.state.positionEnuM)) });
+    }
+    return { m, trace };
+  };
+  it("the R-60M self-destructs when its 23 s of on-board power runs out (BP-29 p.24)", () => {
+    const { m } = fly(SOVIET_AAM.R60M, 40);
+    expect(m.alive).toBe(false);
+    expect(m.state.reason).toBe("self-destruct");
+    expect(m.state.timeS).toBeCloseTo(23, 0);
+  });
+  it("the motor accelerates the missile supersonic, then drag slows it in the coast", () => {
+    const { trace } = fly(SOVIET_AAM.R27R, 30);
+    const peak = Math.max(...trace.map((x) => x.mach));
+    expect(peak).toBeGreaterThan(2.5);
+    expect(trace[trace.length - 1]!.mach).toBeLessThan(peak);
+  });
+  it("inertial navigation error grows with flight time (gyro drift and accelerometer bias)", () => {
+    const { trace } = fly(SOVIET_AAM.R27R, 40, [0, 40000, 8000]);
+    const at = (t: number) => trace.find((x) => x.t >= t)!.nav;
+    expect(at(30)).toBeGreaterThan(at(10) * 3);
+    expect(at(30)).toBeGreaterThan(20);
+  });
+  it("the fuze does not arm inside the safe-separation distance", () => {
+    const m = new Missile("f", SOVIET_AAM.R27R, [0, 0, 8000], [0, 250, 0], () => ({ illumination: null, targetEstimate: null }));
+    m.step(new AirTargetWorld([], flat), 0.02, () => 0);
+    expect(m.fuze(1)).toBe(false);
+  });
+  it("turning flies at an angle of attack (6-DoF body), not as a point mass", () => {
+    const { trace } = fly(SOVIET_AAM.R73A, 6, [3000, 4000, 8000]);
+    expect(Math.max(...trace.map((x) => x.alpha))).toBeGreaterThan(2 * DEG);
   });
 });

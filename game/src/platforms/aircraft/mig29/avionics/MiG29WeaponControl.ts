@@ -112,6 +112,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
    */
   private stores: (MissileSpec | null)[] = [SOVIET_AAM.R73A, SOVIET_AAM.R60M, SOVIET_AAM.R27R, SOVIET_AAM.R27ER, SOVIET_AAM.R27T, SOVIET_AAM.R27ET];
   private selected = 0;
+  /** Time the current weapon was selected (IR seeker cool-down starts then). */
+  private selectedAtS = 0;
   /** Smoothed launch zone of the selected missile on the current target, m. */
   private dlz: { maxM: number; minM: number; t: number; specId: string } | null = null;
   private launchPressed = false;
@@ -137,6 +139,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const cur = this.weapon?.id;
     const next = types[(types.indexOf(cur ?? "") + 1) % types.length];
     this.selected = this.stores.findIndex((x) => x?.id === next);
+    this.selectedAtS = this.ctx?.own.timeS ?? 0;
     this.dlz = null;
   }
 
@@ -156,6 +159,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const sk = spec.seeker.value;
     if (sk.kind !== "ir") return null;
     const own = ctx.own;
+    // Detector cool-down after selection (catalog `seekerCoolingS`): no lock until it is cold.
+    if (own.timeS - this.selectedAtS < (spec.seekerCoolingS?.value ?? 0)) return null;
     const kl = this.kols.lock(own), rl = this.radar.lock(own);
     let cue: Vector3 = kl ? kl.losEnu : rl ? unit(sub(rl.positionEnuM, own.positionEnuM)) : this.bodyDir(own, 0, 0);
     if (!kl && !rl && this.s.master === "ШЛЕМ" && spec.offBoresight) cue = this.bodyDir(own, ctx.head.az, ctx.head.el);
