@@ -59,5 +59,10 @@ export class MissileWorld {
   }
 
   public states(): readonly MissileState[] { return this.missiles.filter((m) => m.alive).map((m) => m.state); }
+
+  /** For rendering: each live missile's state with its airframe geometry and whether the motor is burning. */
+  public renderables(): readonly { readonly state: MissileState; readonly geometry: MissileSpec["geometry"]["value"]; readonly burning: boolean }[] {
+    return this.missiles.filter((m) => m.alive).map((m) => ({ state: m.state, geometry: m.spec.geometry.value, burning: m.state.phase === "boost" }));
+  }
   public events(sinceS = 0): readonly WeaponEvent[] { return this.log.filter((e) => e.timeS >= sinceS); }
 }

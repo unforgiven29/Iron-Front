@@ -85,12 +85,13 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     helmetOverlay: () => avionics?.helmet?.() ?? [],
     worldObjects: () => [
       ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
-      ...missiles.states().map((m) => {
-        const v = m.velocityEnuMps, n = Math.hypot(...v) || 1;
+      ...missiles.renderables().map(({ state: m, geometry, burning }) => {
+        // Orient by the missile's own nose (6-DoF attitude), wings level about it.
+        const v = m.noseEnu, n = Math.hypot(...v) || 1;
         const f: [number, number, number] = [v[0] / n, v[1] / n, v[2] / n];
         const r = Math.hypot(f[1], f[0]) > 1e-6 ? [f[1] / Math.hypot(f[0], f[1]), -f[0] / Math.hypot(f[0], f[1]), 0] as [number, number, number] : [1, 0, 0] as [number, number, number];
         const d: [number, number, number] = [f[1] * r[2] - f[2] * r[1], f[2] * r[0] - f[0] * r[2], f[0] * r[1] - f[1] * r[0]];
-        return { id: m.id, kind: "missile" as const, positionEnuM: m.positionEnuM, forwardEnu: f, rightEnu: r, downEnu: d };
+        return { id: m.id, kind: "missile" as const, positionEnuM: m.positionEnuM, forwardEnu: f, rightEnu: r, downEnu: d, missile: { geometry, burning } };
       })
     ]
   };

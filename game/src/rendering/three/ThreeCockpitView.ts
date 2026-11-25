@@ -61,7 +61,7 @@ export interface CockpitViewSource {
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
-  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
+  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
@@ -163,6 +163,7 @@ export class ThreeCockpitView {
     if (this.frame++ % 6 === 0) this.drawScreens();
     if (this.frame % 2 === 0) this.drawInstruments();
     this.drawOthers();
+    this.drawSmoke();
     this.renderer.render(this.scene, this.camera);
     this.drawHud(s);
   }
@@ -352,6 +353,58 @@ export class ThreeCockpitView {
     }, "#ffd84a");
   }
 
+  // ---------------- missile smoke ----------------
+  private readonly smoke: { p: Vector3; born: number; drift: Vector3 }[] = [];
+  private smokePoints: THREE.Points | null = null;
+  private lastPuff = new Map<string, Vector3>();
+
+  /** Smoke laid along the nozzle's path since the last frame, a puff every few metres (visual only). */
+  private addSmoke(id: string, pos: Vector3, fwd: Vector3, lengthM: number): void {
+    const now = performance.now() / 1000;
+    const tail: Vector3 = [pos[0] - fwd[0] * lengthM * 0.55, pos[1] - fwd[1] * lengthM * 0.55, pos[2] - fwd[2] * lengthM * 0.55];
+    const prev = this.lastPuff.get(id) ?? tail;
+    const d = Math.hypot(tail[0] - prev[0], tail[1] - prev[1], tail[2] - prev[2]);
+    const n = Math.min(60, Math.max(1, Math.round(d / 4)));
+    const j = () => (Math.random() - 0.5) * 0.6;
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      this.smoke.push({ p: [prev[0] + (tail[0] - prev[0]) * t, prev[1] + (tail[1] - prev[1]) * t, prev[2] + (tail[2] - prev[2]) * t], born: now, drift: [j(), j(), 0.3 + Math.random() * 0.3] });
+    }
+    this.lastPuff.set(id, tail);
+    while (this.smoke.length > 12000) this.smoke.shift();
+  }
+
+  /** Draw the smoke trail: puffs grow and fade over ~20 s, drifting slightly; they outlive the missile. */
+  private drawSmoke(): void {
+    const now = performance.now() / 1000;
+    while (this.smoke.length && now - (this.smoke[0] as { born: number }).born > 20) this.smoke.shift();
+    if (!this.smokePoints) {
+      const geo = new THREE.BufferGeometry();
+      const mat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false,
+        uniforms: {},
+        vertexShader: "attribute float age; varying float vAge; void main(){ vAge = age; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = clamp((3.0 + age * 3.0) * 300.0 / -mv.z, 1.5, 256.0); gl_Position = projectionMatrix * mv; }",
+        fragmentShader: "varying float vAge; void main(){ vec2 c = gl_PointCoord - 0.5; float r = length(c); if (r > 0.5) discard; float a = (1.0 - smoothstep(0.2, 0.5, r)) * clamp(1.0 - vAge / 20.0, 0.0, 1.0) * 0.35; gl_FragColor = vec4(vec3(0.92), a); }"
+      });
+      this.smokePoints = new THREE.Points(geo, mat);
+      this.smokePoints.frustumCulled = false;
+      this.world.add(this.smokePoints);
+    }
+    const n = this.smoke.length;
+    const pos = new Float32Array(n * 3), age = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const s = this.smoke[i] as { p: Vector3; born: number; drift: Vector3 };
+      const a = now - s.born;
+      const w = enuToThree([s.p[0] + s.drift[0] * a, s.p[1] + s.drift[1] * a, s.p[2] + s.drift[2] * a]);
+      pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z;
+      age[i] = a;
+    }
+    const geo = this.smokePoints.geometry;
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("age", new THREE.BufferAttribute(age, 1));
+    geo.setDrawRange(0, n);
+  }
+
   /** Simple meshes for other aircraft. */
   private drawOthers(): void {
     const list = this.source.worldObjects?.() ?? [];
@@ -359,17 +412,15 @@ export class ThreeCockpitView {
     for (const o of list) {
       seen.add(o.id);
       let m = this.others.get(o.id);
-      if (!m && o.kind === "missile") {
-        m = new THREE.Group();
-        {
-          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), new THREE.MeshStandardMaterial({ color: "#d9d9d0" }));
-          body.rotation.x = Math.PI / 2;
-          const flame = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffb347" }));
-          flame.position.set(0, 0, 2.3);
-          m.add(body, flame);
-          this.world.add(m);
-          this.others.set(o.id, m);
-        }
+      if (!m && o.kind === "missile" && o.missile) {
+        m = buildMissileMesh(o.missile.geometry);
+        this.world.add(m);
+        this.others.set(o.id, m);
+      }
+      if (o.kind === "missile" && o.missile && m) {
+        const flame = m.getObjectByName("flame");
+        if (flame) flame.visible = o.missile.burning;
+        if (o.missile.burning) this.addSmoke(o.id, o.positionEnuM, o.forwardEnu, o.missile.geometry.lengthM);
       }
       if (!m) {
         m = new THREE.Group();
@@ -572,4 +623,72 @@ function buildTerrainMesh(terrain: TerrainSurface, b: { readonly minM: readonly 
   geometry.setIndex(index);
   geometry.computeVertexNormals();
   return new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+}
+
+/** Airframe shape for rendering a missile (matches the weapons catalog geometry; structural typing). */
+export interface MissileShape {
+  readonly lengthM: number;
+  readonly diameterM: number;
+  readonly noseLengthM: number;
+  readonly surfaces: readonly { readonly spanM: number; readonly rootChordM: number; readonly tipChordM: number; readonly leadingEdgeM: number }[];
+}
+
+/**
+ * 3D missile from its catalog geometry: cylinder body, ogive nose, a cruciform set of trapezoidal panels
+ * for every lifting surface at its real station, nozzle and a motor flame (shown while burning).
+ * Built along −z = forward (nose), matching the aircraft meshes; origin at mid-length.
+ */
+function buildMissileMesh(g: MissileShape): THREE.Group {
+  const grp = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: "#e4e4dc", roughness: 0.45, metalness: 0.1 });
+  const grey = new THREE.MeshStandardMaterial({ color: "#8a8f94", roughness: 0.6 });
+  const r = g.diameterM / 2, L = g.lengthM, Ln = g.noseLengthM;
+  // Body (after the nose).
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L - Ln, 16), white);
+  body.rotation.x = Math.PI / 2;
+  body.position.z = -L / 2 + Ln + (L - Ln) / 2;
+  // Ogive nose by lathe.
+  const pts: THREE.Vector2[] = [];
+  const R = (Ln * Ln + r * r) / (2 * r);
+  for (let i = 0; i <= 12; i++) { const x = (Ln * i) / 12; pts.push(new THREE.Vector2(Math.max(0.001, Math.sqrt(Math.max(0, R * R - (Ln - x) ** 2)) - (R - r)), x)); }
+  const nose = new THREE.Mesh(new THREE.LatheGeometry(pts, 16), grey);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -L / 2;
+  grp.add(body, nose);
+  // Lifting surfaces: four panels each (cruciform), trapezoids in the body's x-span plane.
+  for (const s of g.surfaces) {
+    const semi = Math.max(0.01, (s.spanM - g.diameterM) / 2);
+    const sweep = Math.max(0, s.rootChordM - s.tipChordM) * 0.8;
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.lineTo(s.rootChordM, 0);
+    shape.lineTo(sweep + s.tipChordM, semi);
+    shape.lineTo(sweep, semi);
+    shape.closePath();
+    const panelGeo = new THREE.ShapeGeometry(shape);
+    for (let k = 0; k < 4; k++) {
+      const panel = new THREE.Mesh(panelGeo, new THREE.MeshStandardMaterial({ color: "#d8d8d0", side: THREE.DoubleSide }));
+      const holder = new THREE.Group();
+      // Shape x = along the body (aft +), y = outward. Map to z (aft) and radial direction.
+      panel.rotation.set(0, -Math.PI / 2, 0);
+      panel.position.set(0, 0, -L / 2 + s.leadingEdgeM);
+      panel.translateX(0);
+      const radial = new THREE.Group();
+      radial.add(panel);
+      panel.position.y = r;
+      holder.add(radial);
+      holder.rotation.z = Math.PI / 4 + (k * Math.PI) / 2;
+      grp.add(holder);
+    }
+  }
+  // Nozzle and flame.
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r * 0.8, r, 12, 1, true), grey);
+  nozzle.rotation.x = Math.PI / 2;
+  nozzle.position.z = L / 2 + r / 2;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(r * 0.9, L * 0.35, 10), new THREE.MeshBasicMaterial({ color: "#ffd27a" }));
+  flame.name = "flame";
+  flame.rotation.x = -Math.PI / 2;
+  flame.position.z = L / 2 + r + L * 0.17;
+  grp.add(nozzle, flame);
+  return grp;
 }
