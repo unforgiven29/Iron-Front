@@ -108,10 +108,10 @@ export class ScanningIrst {
   /**
    * Gain knob 0..1 (KOLS УСИЛ.ТП). It sets the detection threshold relative to noise: 0.5 = the design
    * false-alarm rate; turned up, weak targets appear sooner but noise crosses the threshold and the
-   * picture fills with false marks. Threshold law ESTIMATED: T = T0 · (1.25 − 0.75·gain).
+   * picture fills with false marks. Threshold law ESTIMATED: T = T0 · (1.5 − gain) (gain 0.5 = design Pfa).
    */
   public setGain(g: number): void { this.gain = Math.max(0, Math.min(1, g)); }
-  private get thresholdNow(): number { return this.threshold * (1.25 - 0.75 * this.gain); }
+  private get thresholdNow(): number { return this.threshold * (1.5 - this.gain); }
   public breakLock(reason = "pilot"): void { if (this.trk || this.acq) this.lastLoss = { reason, timeS: this.time }; this.trk = null; this.acq = null; }
 
   public get state(): IrstStatus { return this.status; }

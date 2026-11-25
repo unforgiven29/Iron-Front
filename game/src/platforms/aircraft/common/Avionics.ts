@@ -36,6 +36,8 @@ export interface AvionicsSuite {
   hud(): DisplayList;
   /** True when `hud()` is the aircraft's complete HUD (its own flight symbology, units and layout). */
   readonly ownsHud?: boolean;
+  /** Helmet-mounted sight symbology at the pilot's line of sight (angle frame, circle radii in degrees). */
+  helmet?(): DisplayList;
   /** Content for a named cockpit screen, or undefined when the suite does not drive it. */
   screen(id: string): DisplayList | undefined;
   /** Short status lines for data panels and tests. */

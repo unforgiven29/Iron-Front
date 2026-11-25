@@ -77,6 +77,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     display: (id) => avionics?.screen(id),
     hudOverlay: () => avionics?.hud() ?? [],
     hudOwnedByPackage: () => avionics?.ownsHud === true,
+    helmetOverlay: () => avionics?.helmet?.() ?? [],
     worldObjects: () => targets.states().map((t) => ({ id: t.id, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu }))
   };
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);

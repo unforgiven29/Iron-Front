@@ -313,7 +313,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     return (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
   }
 
-  // ======================= ИЛС / ИПВ symbology =======================
+  // ======================= ИЛС / ИПВ symbology (English legends) =======================
 
   /** The ИЛС picture. `hud` adds the flight symbology and conformal elements; otherwise the head-down repeat. */
   private picture(hud: boolean): DisplayPrimitive[] {
@@ -323,54 +323,80 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const s = this.s, own = ctx.own;
     const L = (pts: [number, number][], o: { closed?: boolean; dash?: boolean; width?: number } = {}) => { out.push({ kind: "line", frame: "screen", points: pts, ...o }); };
     const T = (x: number, y: number, text: string, align: "left" | "center" | "right" = "left", size = 0.075) => { out.push({ kind: "text", frame: "screen", at: [x, y], text, align, size }); };
-    const O = (x: number, y: number, r: number, dash = false) => { out.push({ kind: "circle", frame: "screen", at: [x, y], radius: r, dash }); };
+    const O = (x: number, y: number, r: number, dash = false, fill = false) => { out.push({ kind: "circle", frame: "screen", at: [x, y], radius: r, dash, fill }); };
+    const A = (az: number, el: number, r: number, dash = false) => { out.push({ kind: "circle", frame: "angle", at: [az, el], radius: r, dash }); };
+    const AL = (pts: [number, number][]) => { out.push({ kind: "line", frame: "angle", points: pts }); };
     const rl = this.radar.lock(own);
     const kl = this.kols.lock(own);
 
-    // ---------- flight symbology (BP-29 figs 19–25, 55): IAS km/h + trend index, heading scale, altitude m ----------
+    // ---------- flight data (all modes): IAS km/h with trend index, heading tape, altitude m ----------
     if (hud) {
       const snap = ctx.snapshot as Partial<typeof ctx.snapshot>;
       const ias = (snap.equivalentAirspeedMps ?? norm(own.velocityEnuMps)) * 3.6;
       const alt = snap.altitudeMslM ?? own.positionEnuM[2];
-      T(-0.82, 0.93, `${Math.round(ias / 10) * 10}`, "center", 0.09);
-      L([[-0.92, 0.86], [-0.72, 0.86]]);
-      L([[-0.84, 0.8], [-0.8, 0.86], [-0.76, 0.8]], { closed: true });
-      T(0.85, 0.93, `${Math.round(alt / 10) * 10}`, "center", 0.09);
+      T(-0.62, 0.86, `${Math.round(ias / 10) * 10}`, "center", 0.1);
+      L([[-0.74, 0.8], [-0.5, 0.8]]);
+      L([[-0.66, 0.74], [-0.62, 0.79], [-0.58, 0.74]], { closed: true });
+      T(0.62, 0.86, `${Math.round(alt / 10) * 10}`, "center", 0.1);
       const hdg = ((own.headingRad / DEG) % 360 + 360) % 360;
-      const centreTen = Math.round(hdg / 10);
-      const px = 0.025;
-      L([[-0.32, 0.86], [0.32, 0.86]]);
-      for (let d = -1; d <= 1; d++) {
-        const ten = centreTen + d;
+      const px = 0.02;
+      L([[-0.26, 0.8], [0.26, 0.8]]);
+      for (let ten = Math.floor(hdg / 10) - 1; ten <= Math.floor(hdg / 10) + 2; ten++) {
         const x = (ten * 10 - hdg) * px;
-        if (Math.abs(x) <= 0.32) { L([[x, 0.86], [x, 0.89]]); T(x, 0.94, String(((ten % 36) + 36) % 36).padStart(2, "0"), "center", 0.07); }
-        if (Math.abs(x + 0.125) <= 0.32) L([[x + 0.125, 0.86], [x + 0.125, 0.875]]);
+        if (Math.abs(x) <= 0.26) { L([[x, 0.8], [x, 0.84]]); T(x, 0.89, String(((ten % 36) + 36) % 36).padStart(2, "0"), "center", 0.06); }
+        if (Math.abs(x + 0.1) <= 0.26) L([[x + 0.1, 0.8], [x + 0.1, 0.82]]);
       }
-      L([[-0.025, 0.8], [0, 0.85], [0.025, 0.8]], { closed: true });
+      L([[-0.025, 0.74], [0, 0.79], [0.025, 0.74]], { closed: true });
       this.horizon(out, own);
-      // Aircraft silhouette (fig.55 item 13) at the fixed aiming point.
-      L([[-0.12, 0], [-0.04, 0]]); L([[0.04, 0], [0.12, 0]]); L([[0, 0.02], [0, 0.07]]);
     }
 
     const rangeScale = (scaleKm: number, label: string) => {
-      L([[-0.78, -0.7], [-0.78, 0.7]]);
-      for (let i = 0; i <= 5; i++) { const y = -0.7 + (1.4 * i) / 5; L([[-0.78, y], [-0.74, y]]); if (i > 0) T(-0.81, y, fmtKm((scaleKm * i) / 5), "right", 0.06); }
-      T(-0.97, 0.2, label, "left", 0.075);
-      return (km: number) => -0.7 + 1.4 * Math.min(1, Math.max(0, km / scaleKm));
+      L([[-0.78, -0.55], [-0.78, 0.7]]);
+      for (let i = 0; i <= 5; i++) { const y = -0.55 + (1.25 * i) / 5; L([[-0.78, y], [-0.74, y]]); if (i > 0) T(-0.81, y, fmtKm((scaleKm * i) / 5), "right", 0.055); }
+      T(-1.0, 0.3, label, "left", 0.08);
+      return (km: number) => -0.55 + 1.25 * Math.min(1, Math.max(0, km / scaleKm));
     };
     const rangeArrow = (y: number) => L([[-0.74, y], [-0.66, y + 0.035], [-0.66, y - 0.035]], { closed: true });
+    const wings = () => { L([[-0.22, 0], [-0.06, 0]]); L([[0.06, 0], [0.22, 0]]); L([[-0.22, 0], [-0.22, -0.03]]); L([[0.22, 0], [0.22, -0.03]]); };
+    const lead = this.oepsLeads() ? "IR" : "RL";
 
-    const lead = this.oepsLeads() ? "ТП" : "РЛ";
-    const locked = (lead === "РЛ" && rl) || (lead === "ТП" && (kl || rl));
+    // ---------- cannon sight (first trigger stage held; BP-29 figs 24–25, 55) ----------
+    if (s.gun) {
+      const useRadar = !!rl && (lead === "RL" || !kl);
+      const rangeM = kl && Number.isFinite(kl.laserRangeM) ? kl.laserRangeM : rl ? rl.rangeM : Number.NaN;
+      const ry = (km: number) => -0.55 + 1.25 * Math.min(1, Math.max(0, km / 1.0));
+      L([[-0.78, -0.55], [-0.78, 0.7]]);
+      for (let i = 1; i <= 5; i++) { const y = ry(i * 0.2); L([[-0.78, y], [-0.74, y]]); T(-0.81, y, (i * 0.2).toFixed(1), "right", 0.055); }
+      T(-1.0, 0.3, useRadar ? "RL" : "IR", "left", 0.08);
+      if (rl || kl) T(-1.0, 0.05, "A", "left", 0.08);
+      // Permitted firing range 200–800 m marks (fig.55 items 1–2).
+      for (const km of [0.2, 0.8]) L([[-0.78, ry(km)], [-0.86, ry(km)]], { width: 2.5 });
+      if (Number.isFinite(rangeM)) rangeArrow(ry(rangeM / 1000));
+      // Lead: the gun line is ahead of the target by LOS rate × time of flight, plus gravity drop (v0 ≈ 875 m/s, BP-29 p.25).
+      const tgt = useRadar ? rl!.lookBody : kl?.lookBody;
+      if (hud) {
+        if (tgt && Number.isFinite(rangeM)) {
+          const tof = rangeM / 875;
+          const rate = kl ? kl.losRateRadS : 0;
+          const drop = (0.5 * 9.81 * tof * tof) / Math.max(200, rangeM);
+          A(tgt.az, tgt.el + drop + rate * tof * 0.2, 0.08);
+          AL([[tgt.az - 0.6 * DEG, tgt.el], [tgt.az + 0.6 * DEG, tgt.el]]);
+        } else A(0, -0.5 * DEG, 0.08);
+      }
+      L([[0.4, -0.62], [0.5, -0.62], [0.5, -0.52], [0.4, -0.52]], { closed: true });
+      T(0.45, -0.57, "4", "center", 0.07);
+      return this.footer(out, own, hud);
+    }
+
+    const locked = (lead === "RL" && rl) || (lead === "IR" && (kl || rl));
     if (locked) {
-      // ---------- target locked (BP-29 fig.20 radar, fig.22 OEPS) ----------
-      const useRadar = lead === "РЛ" ? true : !kl;
+      // ---------- target locked (BP-29 fig.20 radar, fig.22 IRST) ----------
+      const useRadar = lead === "RL" ? true : !kl;
       const look = useRadar ? rl!.lookBody : kl!.lookBody;
       const rangeM = useRadar ? rl!.rangeM : Number.isFinite(kl!.laserRangeM) ? kl!.laserRangeM : rl ? rl.rangeM : Number.NaN;
       const scaleKm = useRadar ? (rangeM > 25000 ? 50 : rangeM > 10000 ? 25 : 10) : 10;
-      const ry = rangeScale(scaleKm, useRadar ? "РЛ" : "ТП");
-      T(-0.97, 0.0, "А", "left", 0.08);
-      // Aiming ring: ±45° (radar) / ±30° (OEPS) to the field edge; diamond ±70° (fig.20).
+      const ry = rangeScale(scaleKm, useRadar ? "RL" : "IR");
+      T(-1.0, 0.05, "A", "left", 0.08);
       const ringScale = useRadar ? 45 * DEG : 30 * DEG;
       const rx = Math.max(-0.95, Math.min(0.95, (look.az / ringScale) * 0.9)), ry2 = Math.max(-0.95, Math.min(0.95, (look.el / ringScale) * 0.9));
       O(rx, ry2, 0.08, useRadar ? rl!.memory : kl!.memory);
@@ -378,28 +404,32 @@ export class MiG29WeaponControl implements AvionicsSuite {
         const dx = (look.az / (70 * DEG)) * 0.9, dy = (look.el / (70 * DEG)) * 0.9;
         L([[dx, dy + 0.035], [dx + 0.025, dy], [dx, dy - 0.035], [dx - 0.025, dy]], { closed: true });
       }
-      if (hud) out.push({ kind: "circle", frame: "angle", at: [look.az, look.el], radius: 0.035, dash: true });
-      if (Number.isFinite(rangeM)) { rangeArrow(ry(rangeM / 1000)); T(0.95, 0.72, `Д ${(rangeM / 1000).toFixed(rangeM < 10000 ? 2 : 1)}`, "right", 0.07); }
+      if (hud) A(look.az, look.el, 0.035, true);
+      if (Number.isFinite(rangeM)) { rangeArrow(ry(rangeM / 1000)); T(0.95, 0.66, `R ${(rangeM / 1000).toFixed(rangeM < 10000 ? 2 : 1)}`, "right", 0.065); }
       if (useRadar) {
         const asp = this.aspectDeg(rl!, own.positionEnuM);
         const rmax = r27MaxLaunchKm(asp, own.positionEnuM[2]);
         const rmin = asp < 90 ? 1.2 : 0.5;
-        for (const km of [rmax, rmin]) { const y = ry(km); L([[-0.78, y], [-0.86, y]], { width: 2.5 }); }
-        T(0.95, 0.62, `${Math.round((rl!.closureMps * 3.6) / 10) * 10}`, "right", 0.065);
-        T(-0.97, -0.25, asp < 90 ? "ППС" : "ЗПС", "left", 0.065);
-        if (rangeM / 1000 <= rmax && rangeM / 1000 >= rmin) T(0, -0.62, "ПР", "center", 0.1);
-        T(0.95, -0.85, "27Р", "right", 0.075);
+        for (const km of [rmax, rmin]) L([[-0.78, ry(km)], [-0.86, ry(km)]], { width: 2.5 });
+        T(0.95, 0.56, `Vc ${Math.round((rl!.closureMps * 3.6) / 10) * 10}`, "right", 0.06);
+        T(-1.0, -0.2, asp < 90 ? "HEAD" : "TAIL", "left", 0.06);
+        if (rangeM / 1000 <= rmax && rangeM / 1000 >= rmin) T(0, -0.62, "LA", "center", 0.1);
+        T(0.95, -0.82, "R27R", "right", 0.07);
       } else {
-        T(0.95, -0.85, "60М", "right", 0.075);
-        if (!Number.isFinite(rangeM)) T(0.95, 0.72, "Д —", "right", 0.07);
+        T(0.95, -0.82, "R60M", "right", 0.07);
+        if (!Number.isFinite(rangeM)) T(0.95, 0.66, "R --", "right", 0.065);
       }
     } else if (s.master === "РЛС" && s.radarMode !== "БЛ.БОЙ") {
-      // ---------- radar search (BP-29 fig.19): scale 150/100/50 km, azimuth ±25° ----------
-      const ry = rangeScale(SCALE_KM[s.radarMode], "РЛ");
+      // ---------- radar search: range scale, targets as dot dashes (dots = target size), cursor box, scan-sector bar ----------
+      const ry = rangeScale(SCALE_KM[s.radarMode], "RL");
       const ax = (deg: number) => (deg / 25) * 0.62;
       for (const p of this.radar.recentPlots) {
         const x = ax(p.look.az / DEG), y = ry(p.rangeM / 1000);
-        if (Math.abs(x) <= 0.66) L([[x - 0.04, y], [x + 0.04, y]], { width: 3 });
+        if (Math.abs(x) > 0.66) continue;
+        // Size class from the radar's own RCS estimate: 1 dot ≈ ≤1 m², 2 ≈ 3, 3 ≈ 10, 4 ≈ 30, 5 ≈ ≥100 m².
+        const rcs = p.rcsEstimateM2 ?? 3;
+        const dots = Math.max(1, Math.min(5, Math.round(1 + 2 * Math.log10(Math.max(1, rcs)))));
+        for (let i = 0; i < dots; i++) O(x + (i - (dots - 1) / 2) * 0.022, y, 0.006, false, true);
       }
       const md = this.snpActive() ? this.priorityTrack(own) : undefined;
       for (const t of this.radar.tracks(own)) {
@@ -408,59 +438,114 @@ export class MiG29WeaponControl implements AvionicsSuite {
         O(x, y, 0.025);
         if (md && t.id === md.id) L([[x - 0.07, y - 0.055], [x + 0.07, y - 0.055], [x + 0.07, y + 0.055], [x - 0.07, y + 0.055]], { closed: true });
       }
-      // Capture strobe (cursor): a box over the mark to lock.
       const sx = ax(s.strobeAzDeg), sy = ry(s.strobeKm);
       L([[sx - 0.06, sy - 0.045], [sx + 0.06, sy - 0.045], [sx + 0.06, sy + 0.045], [sx - 0.06, sy + 0.045]], { closed: true, width: 1.5 });
-      L([[ax(-25), -0.78], [ax(25), -0.78]]);
-      L([[ax(this.radar.beam.look.az / DEG), -0.82], [ax(this.radar.beam.look.az / DEG), -0.74]]);
-      T(0.95, 0.75, `${s.dhKm > 0 ? "+" : ""}${s.dhKm}`, "right", 0.07);
-      if (this.radar.acquisitionPhase) T(0, -0.62, "ЗАХВ", "center", 0.07);
+      wings();
+      // Bottom bar: the selected scan sector across the ±65° coverage (the display does not show the beam itself).
+      const pat = this.searchPattern();
+      const bx = (deg: number) => (deg / 65) * 0.75;
+      L([[bx(pat.center.az / DEG - pat.widthRad / DEG / 2), -0.75], [bx(pat.center.az / DEG + pat.widthRad / DEG / 2), -0.75]], { width: 2.5 });
+      T(0.95, 0.66, `dH ${s.dhKm > 0 ? "+" : ""}${s.dhKm}`, "right", 0.06);
+      if (this.radar.acquisitionPhase) T(0, -0.62, "ACQ", "center", 0.07);
     } else if (s.master === "РЛС" || (s.master === "ББ" && !this.oepsLeads())) {
       // ---------- radar close combat (BP-29 figs 12–13): two vertical lines bounding the zone ----------
-      if (hud) for (const x of [-3, 3]) out.push({ kind: "line", frame: "angle", points: [[x * DEG, -13 * DEG], [x * DEG, 37 * DEG]] });
+      if (hud) for (const x of [-3, 3]) AL([[x * DEG, -13 * DEG], [x * DEG, 37 * DEG]]);
       else for (const x of [-0.06, 0.06]) L([[x, -0.4], [x, 0.9]]);
-      T(-0.97, 0.2, "РЛ", "left", 0.075);
-      T(0.95, -0.85, "Б.Б", "right", 0.075);
+      T(-1.0, 0.3, "RL", "left", 0.08);
+      T(0.95, -0.82, "CC", "right", 0.07);
     } else if (s.master === "ТП") {
-      // ---------- OEPS search (BP-29 fig.21): ±30° az, ±15° el; 4° × 6° capture strobe ----------
-      const ax = (deg: number) => (deg / 30) * 0.8, ay = (deg: number) => (deg / 15) * 0.6;
-      L([[-0.8, -0.6], [0.8, -0.6], [0.8, 0.6], [-0.8, 0.6]], { closed: true, dash: true });
-      T(-0.97, 0.2, "ТП", "left", 0.075);
-      for (const p of this.kols.recentPlots) out.push({ kind: "circle", frame: "screen", at: [ax(p.look.az / DEG), ay(p.look.el / DEG)], radius: 0.018, fill: true });
+      // ---------- IRST search: ±30° az, ±15° el field (L frame), marks, noise dots with gain, cursor box ----------
+      const ax = (deg: number) => (deg / 30) * 0.75, ay = (deg: number) => 0.1 + (deg / 15) * 0.6;
+      L([[-0.78, 0.7], [-0.78, -0.55], [0.8, -0.55]]);
+      T(-1.0, 0.3, "IR", "left", 0.08);
+      for (const p of this.kols.recentPlots) O(ax(p.look.az / DEG), ay(p.look.el / DEG), p.noise ? 0.005 : 0.016, false, true);
       const x = ax(s.strobeAzDeg), y = ay(s.strobeElDeg);
-      L([[x - ax(2), y - ay(3)], [x + ax(2), y - ay(3)], [x + ax(2), y + ay(3)], [x - ax(2), y + ay(3)]], { closed: true });
-      if (this.kols.state === "acquire") T(0, -0.62, "ЗАХВ", "center", 0.07);
+      L([[x - ax(2), y - (ay(3) - ay(0))], [x + ax(2), y - (ay(3) - ay(0))], [x + ax(2), y + (ay(3) - ay(0))], [x - ax(2), y + (ay(3) - ay(0))]], { closed: true });
+      wings();
+      T(0.95, 0.66, `GAIN ${Math.round(s.irstGain * 10)}`, "right", 0.06);
+      if (this.kols.state === "acquire") T(0, -0.62, "ACQ", "center", 0.07);
     } else if (s.master === "ББ") {
-      // ---------- OEPS close combat (BP-29 fig.15): 4°-wide vertical strip, shown −12° … +12° on the ИЛС ----------
-      if (hud) for (const x of [-2, 2]) out.push({ kind: "line", frame: "angle", points: [[x * DEG, -12 * DEG], [x * DEG, 12 * DEG]] });
+      // ---------- IRST close combat (BP-29 fig.15): 4°-wide vertical strip, −12° … +12° ----------
+      if (hud) for (const x of [-2, 2]) AL([[x * DEG, -12 * DEG], [x * DEG, 12 * DEG]]);
       else for (const x of [-0.05, 0.05]) L([[x, -0.6], [x, 0.6]]);
-      T(-0.97, 0.2, "ТП", "left", 0.075);
-      T(0.95, -0.85, "Б.Б", "right", 0.075);
+      T(-1.0, 0.3, "IR", "left", 0.08);
+      T(0.95, -0.82, "CC", "right", 0.07);
     } else if (s.master === "ШЛЕМ") {
-      // ---------- helmet (BP-29 fig.16): sight circle with cross at the head direction ----------
-      const h = this.kols.head.look;
-      if (hud) {
-        out.push({ kind: "circle", frame: "angle", at: [h.az, h.el], radius: 0.06 });
-        out.push({ kind: "line", frame: "angle", points: [[h.az - 1.3 * DEG, h.el], [h.az + 1.3 * DEG, h.el]] });
-        out.push({ kind: "line", frame: "angle", points: [[h.az, h.el - 1.3 * DEG], [h.az, h.el + 1.3 * DEG]] });
-      }
-      T(-0.97, 0.2, "ТП", "left", 0.075);
-      T(0.95, -0.85, "ШЛЕМ", "right", 0.07);
+      // ---------- helmet: sighting is on the helmet (see helmet()); the ИЛС shows only the mode ----------
+      T(0.95, -0.82, "HMS", "right", 0.07);
     } else if (s.master === "ОПТ") {
-      // ---------- optical (BP-29 fig.23): fixed aiming ring, ±3.36° scale, range scale 10 km ----------
-      rangeScale(10, "ТП");
-      if (hud) out.push({ kind: "circle", frame: "angle", at: [0, 0], radius: 0.07 });
-      else O(0, 0, 0.12);
-      T(0.95, -0.85, "ОПТ", "right", 0.07);
+      // ---------- OPT: movable sight cursor, IRST follows it; laser range on a 10 km scale ----------
+      rangeScale(10, "IR");
+      const c = { az: s.optAzDeg * DEG, el: s.optElDeg * DEG };
+      if (hud) { A(c.az, c.el, 0.06); AL([[c.az - 1.5 * DEG, c.el], [c.az - 0.6 * DEG, c.el]]); AL([[c.az + 0.6 * DEG, c.el], [c.az + 1.5 * DEG, c.el]]); AL([[c.az, c.el + 0.6 * DEG], [c.az, c.el + 1.5 * DEG]]); }
+      else O((c.az / (30 * DEG)) * 0.75, (c.el / (30 * DEG)) * 0.75, 0.06);
+      T(0.95, -0.82, "OPT", "right", 0.07);
+    } else if (s.master === "БРСТ") {
+      // ---------- boresight: fixed 2.5° circle on the axis; sensors stare along it ----------
+      if (hud) A(0, 0, 0.1); else O(0, 0, 0.1);
+      T(0.95, -0.82, "BRST", "right", 0.07);
     } else {
-      T(0.95, -0.85, "НВГ", "right", 0.07);
+      // ---------- navigation (photo 1): bank scale and roll line ----------
+      if (hud) {
+        const cy = -0.05, r = 0.4;
+        for (const b of [-60, -45, -30, -20, -10, 10, 20, 30, 45, 60]) {
+          const a = (b * Math.PI) / 180;
+          L([[Math.sin(a) * r, cy - Math.cos(a) * r], [Math.sin(a) * (r + 0.05), cy - Math.cos(a) * (r + 0.05)]]);
+        }
+        const roll = own.rollRad;
+        L([[-Math.sin(roll) * 0.08, cy + Math.cos(roll) * 0.08], [Math.sin(roll) * r, cy - Math.cos(roll) * r]], { width: 1.5 });
+        L([[-0.04, cy], [0.04, cy]]); L([[0, cy - 0.04], [0, cy + 0.04]]);
+      }
+      T(0.95, -0.82, "NAV", "right", 0.07);
     }
+    return this.footer(out, own, hud);
+  }
 
-    // Switch-state line (simulation aid; the real ИЛС has no such line).
-    if (!hud || s.emission !== "ИЗЛ" || s.interaction || s.snp !== "ОТКЛ" || !s.compensation) T(0.95, -0.95, `${s.emission}${s.interaction ? " ТОРМ" : ""}${s.snp !== "ОТКЛ" ? ` СНП ${s.snp}` : ""}${s.compensation ? "" : " БЕЗ КОМП"}`, "right", 0.05);
-    if (!hud) T(-0.95, -0.95, `РЛС ${this.radar.state.toUpperCase()}  КОЛС ${this.kols.state.toUpperCase()}`, "left", 0.05);
+  /** Switch-state line (simulation aid) and lock-break cue. */
+  private footer(out: DisplayPrimitive[], own: SensorOwnship, hud: boolean): DisplayPrimitive[] {
+    const s = this.s;
+    const T = (x: number, y: number, text: string, align: "left" | "center" | "right" = "left", size = 0.05) => { out.push({ kind: "text", frame: "screen", at: [x, y], text, align, size }); };
+    const em = { "ИЗЛ": "TX", "ЭКВ": "STBY", "ОТКЛ": "OFF" }[s.emission];
+    const tags = [s.emission !== "ИЗЛ" ? `RDR ${em}` : "", s.interaction ? "COOP" : "", s.snp !== "ОТКЛ" ? `TWS ${s.snp === "ППС" ? "HEAD" : "TAIL"}` : "", s.compensation ? "" : "NO GUARD"].filter(Boolean);
+    if (!hud || tags.length) T(0.95, -0.95, tags.join(" "), "right");
+    if (!hud) T(-0.95, -0.95, `RDR ${this.radar.state.toUpperCase()} ${RADAR_MODE_EN[s.radarMode]}  IRST ${this.kols.state.toUpperCase()}`, "left");
     const loss = this.radar.lossEvent ?? this.kols.lossEvent;
-    if (loss && own.timeS - loss.timeS < 2.5 && !["mode change", "pilot", "rescan", "reset"].includes(loss.reason)) T(0, 0.72, "СРЫВ", "center", 0.08);
+    if (loss && own.timeS - loss.timeS < 2.5 && !["mode change", "pilot", "rescan", "reset"].includes(loss.reason)) T(0, 0.68, "BREAK", "center", 0.08);
+    return out;
+  }
+
+  /**
+   * Helmet-mounted sight symbology (ШЛЕМ mode), drawn on the helmet visor at the pilot's line of sight,
+   * in yellow. States per the HMS table: mode on (double circle with ticks); lock by IRST/radar
+   * (flashing, shown dashed); lock and launch allowed (circles with a 3° cross); IR-missile lock without
+   * range or outside max range (flashing cross). Nothing outside ±60° of the aircraft axis.
+   */
+  public helmet(): DisplayList {
+    const ctx = this.ctx;
+    if (!ctx || this.s.master !== "ШЛЕМ") return [];
+    const h = ctx.head;
+    if (Math.abs(h.az) > 60 * DEG || Math.abs(h.el) > 60 * DEG) return [];
+    const own = ctx.own;
+    const kl = this.kols.lock(own), rl = this.radar.lock(own);
+    const lockOn = !!kl || !!rl;
+    const rangeM = kl && Number.isFinite(kl.laserRangeM) ? kl.laserRangeM : rl ? rl.rangeM : Number.NaN;
+    // R-60M envelope approximation (BP-29 p.24: 0.3 … 12 km head-on, 9 km tail) for the launch cue (display only).
+    const inRange = Number.isFinite(rangeM) && rangeM >= 300 && rangeM <= 8000;
+    const flashOn = Math.floor(own.timeS * 4) % 2 === 0;
+    const out: DisplayPrimitive[] = [];
+    const circle = (rDeg: number, dash: boolean) => out.push({ kind: "circle", frame: "angle", at: [h.az, h.el], radius: rDeg, dash });
+    const seg = (a: [number, number], b: [number, number]) => out.push({ kind: "line", frame: "angle", points: [[h.az + a[0] * DEG, h.el + a[1] * DEG], [h.az + b[0] * DEG, h.el + b[1] * DEG]] });
+    const cross = () => { seg([-1.5, 0], [-0.3, 0]); seg([0.3, 0], [1.5, 0]); seg([0, -1.5], [0, -0.3]); seg([0, 0.3], [0, 1.5]); };
+    if (!lockOn) {
+      circle(1.25, false); circle(0.5, false);
+      seg([-1.25 * 0.707, -1.25 * 0.707], [-1.7 * 0.707, -1.7 * 0.707]); seg([1.25 * 0.707, 1.25 * 0.707], [1.7 * 0.707, 1.7 * 0.707]);
+    } else if (inRange) {
+      circle(1.25, false); circle(0.5, false); cross();
+    } else if (!Number.isFinite(rangeM)) {
+      if (flashOn) { circle(1.25, true); circle(0.5, true); cross(); }
+    } else if (flashOn) {
+      circle(1.25, true); circle(0.5, true);
+    }
     return out;
   }
 
@@ -472,7 +557,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       const b = bodyAngles(own, d);
       return [b.az, b.el];
     };
-    for (const pitch of [0, 10, -10]) {
+    for (const pitch of [0, 10, -10, 20, -20]) {
       const el = pitch * DEG;
       const w = pitch === 0 ? 9 : 4;
       const g = pitch === 0 ? 1.5 : 1;
@@ -481,7 +566,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       const tick = pitch === 0 ? -0.6 * DEG : (pitch > 0 ? -0.5 : 0.5) * DEG;
       out.push({ kind: "line", frame: "angle", points: [at(-g * DEG, el), at(-g * DEG, el + tick)] });
       out.push({ kind: "line", frame: "angle", points: [at(g * DEG, el), at(g * DEG, el + tick)] });
-      out.push({ kind: "text", frame: "angle", at: at((w + 1.6) * DEG, el), text: pitch === 0 ? "00" : "10", size: 0.06 });
+      out.push({ kind: "text", frame: "angle", at: at((w + 1.6) * DEG, el), text: pitch === 0 ? "00" : String(Math.abs(pitch)), size: 0.06 });
     }
   }
 

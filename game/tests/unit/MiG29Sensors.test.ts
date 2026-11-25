@@ -212,7 +212,7 @@ describe("KOLS IRST against BP-29 (effective D* fitted to the sky figure only)",
     for (let t = 0.02; t < 600; t += 0.02) {
       y += v * 0.02; w.step(0.02);
       s.step(own(t, y, alt, v), w, 0.02);
-      if (s.recentPlots.length) return (w.states()[0]!.positionEnuM[1] - y) / 1000;
+      if (s.recentPlots.some((p) => !p.noise)) return (w.states()[0]!.positionEnuM[1] - y) / 1000;
     }
     return -1;
   }
@@ -266,24 +266,26 @@ describe("MiG-29 ИЛС formats per mode (BP-29 figs 13, 15, 16, 19–23)", () =
   });
   it("radar search: range scale follows the mode (В 150, АВТ 100, Д 50 km) with the РЛ index", () => {
     const w = new MiG29WeaponControl(); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["РЛ", "150"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["RL", "150"]));
     w.key("-", true); w.key("-", false); stepOnce(w);
     expect(texts(w.hud())).toContain("50");
     w.key("-", true); w.key("-", false); stepOnce(w);
     expect(texts(w.hud())).toContain("100");
   });
-  it("ТП, ББ, ШЛЕМ and ОПТ show their own formats with the ТП index", () => {
+  it("IRST, CC, HMS, OPT and BRST show their own formats", () => {
     const w = new MiG29WeaponControl();
     w.set("master", "ТП"); stepOnce(w);
-    expect(texts(w.hud())).toContain("ТП");
-    expect(w.hud().some((p) => p.kind === "line" && p.dash === true)).toBe(true); // ±30°/±15° field frame
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["IR", "GAIN 5"]));
     w.set("master", "ББ"); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["ТП", "Б.Б"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["IR", "CC"]));
     expect(w.hud().filter((p) => p.kind === "line" && p.frame === "angle").length).toBeGreaterThan(6);
     w.set("master", "ШЛЕМ"); stepOnce(w);
-    expect(w.hud().some((p) => p.kind === "circle" && p.frame === "angle")).toBe(true);
+    expect(w.hud().some((p) => p.kind === "circle" && p.frame === "angle")).toBe(false); // HMS is on the helmet, not the ИЛС
+    expect(w.helmet().filter((p) => p.kind === "circle").length).toBe(2); // mode-on double circle
     w.set("master", "ОПТ"); stepOnce(w);
-    expect(texts(w.hud())).toEqual(expect.arrayContaining(["ОПТ", "10"]));
+    expect(texts(w.hud())).toEqual(expect.arrayContaining(["OPT", "10"]));
+    w.set("master", "БРСТ"); stepOnce(w);
+    expect(texts(w.hud())).toContain("BRST");
   });
   it("ИЗЛ–ЭКВ–ОТКЛ: dummy load keeps the radar silent, ОТКЛ powers it off", () => {
     const w = new MiG29WeaponControl();
@@ -384,5 +386,21 @@ describe("N019 antenna N019-01: twist-Cassegrain geometry (RLPK slide 23)", () =
     const q = { originEnuM: [0, 0, 1000] as Vector3, ownVelocityEnuMps: [0, 230, 0] as Vector3, beamDirection: [0, Math.cos(0.05), -Math.sin(0.05)] as Vector3, integrationTimeS: 4.48e-3, groundHeightM: 0, gammaDb: -15, maxRangeM: 40000 };
     const sum = (pol: "horizontal" | "vertical") => groundClutterPatches({ ...q, look: { ...look, antenna: { ...a, polarization: pol } } }).reduce((t, p) => t + p.cnr, 0);
     expect(sum("horizontal")).toBeLessThan(sum("vertical"));
+  });
+});
+
+describe("cannon sight and IRST gain", () => {
+  const stepOnce = (w: MiG29WeaponControl, t = 1) => w.step({ own: own(t, 0, 6000, 230), snapshot: {} as AircraftSnapshot, scene: EMPTY_SENSOR_SCENE, head: { az: 0, el: 0 } }, 0.02);
+  it("cannon sight shows only while the first trigger stage is held", () => {
+    const w = new MiG29WeaponControl();
+    w.key("k", true); stepOnce(w);
+    expect(w.hud().some((p) => p.kind === "text" && p.text === "0.8")).toBe(true);
+    w.key("k", false); stepOnce(w);
+    expect(w.hud().some((p) => p.kind === "text" && p.text === "0.8")).toBe(false);
+  });
+  it("IRST gain up fills the picture with noise marks; gain down clears it", () => {
+    const run = (gain: number) => { const w = new MiG29WeaponControl(3); w.set("master", "ТП"); w.set("irstGain", gain); for (let t = 0.02; t < 3; t += 0.02) stepOnce(w, t); return w.kols.recentPlots.filter((p) => p.noise).length; };
+    expect(run(1)).toBeGreaterThan(20);
+    expect(run(0)).toBe(0);
   });
 });
