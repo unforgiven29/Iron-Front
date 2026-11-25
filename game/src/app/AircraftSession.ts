@@ -3,6 +3,7 @@
  * Three.js cockpit view, keyboard input and the frame loop. Nothing here is aircraft-specific:
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
+import { mountDebugOverlay } from "./DebugOverlay.js";
 import { mountDataPanel } from "./DataPanel.js";
 import { WarningTones } from "./WarningTones.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
@@ -170,6 +171,19 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield], definition.exteriorModelId);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   const tones = new WarningTones();
+  const debug = mountDebugOverlay(frame, {
+    timeS: () => simTime,
+    ownPositionEnuM: () => jet.snapshot().positionEnuM,
+    avionics: () => avionics?.status() ?? null,
+    missiles: () => [
+      ...missiles.states().map((m) => ({ id: m.id, type: m.specId, side: "blue", timeS: m.timeS, positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps, phase: m.phase,
+        seeker: m.seekerLocked ? "LOCKED" : "searching", extra: `M${m.mach.toFixed(2)} α ${(m.alphaRad * DEG).toFixed(1)}° batt ${m.batteryLeftS.toFixed(0)} s` })),
+      ...notional.states().map((m) => ({ id: m.id, type: m.spec.id, side: m.side, timeS: m.timeS, positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps,
+        phase: m.burning ? "boost" : "coast", seeker: m.seekerTargetId ? `on ${m.seekerTargetId}` : "midcourse/none", extra: `shooter ${m.shooterId}` }))
+    ],
+    events: () => [...missiles.events(), ...notional.events()].sort((a, b) => a.timeS - b.timeS),
+    truthTargets: () => targets.states().map((t) => ({ id: t.id, positionEnuM: t.positionEnuM, destroyed: targets.isDestroyed(t.id) }))
+  });
   let paused = false;
   const restart = () => {
     const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); avionics?.reset();
@@ -193,6 +207,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (bound) { jet.controls.cycle(bound.switchId, "keyboard"); return; }
     if (k === "v") { view.resetLook(); return; }
     if (k === "c") { view.toggleExternal(); return; }
+    if (k === "`") { debug.toggle(); return; }
     held.add(k);
   });
   frame.addEventListener("keyup", (e) => { held.delete(e.key.toLowerCase()); avionics?.key(e.key.toLowerCase(), false); });
@@ -224,6 +239,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     }
     view.render();
     panel.update();
+    debug.update();
     if (!paused && avionics?.audioCues) tones.update(avionics.audioCues()); else tones.update(null);
     if (raf !== -1) raf = requestAnimationFrame(loop);
   };
@@ -233,7 +249,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     get paused() { return paused; },
     setPaused(p: boolean) { paused = p; held.clear(); if (!p) { last = null; frame.focus(); } },
     restart,
-    dispose() { cancelAnimationFrame(raf); raf = -1; tones.dispose(); view.dispose(); }
+    dispose() { cancelAnimationFrame(raf); raf = -1; tones.dispose(); debug.dispose(); view.dispose(); }
   };
 }
 

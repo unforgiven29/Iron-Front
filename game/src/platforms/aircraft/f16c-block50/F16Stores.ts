@@ -10,7 +10,12 @@
 import { stationErrors, type StoresPlan } from "../common/Avionics.js";
 
 const AAM = ["AIM-9X", "AIM-120"] as const;
-const st = (n: number, label: string, allowed: readonly string[], note?: string) => ({ id: `sta${n}`, label: `STA ${n} (${label})`, allowed, ...(note ? { note } : {}) });
+/** Launch points, body FRD metres from the CG: ESTIMATED from the general arrangement (not measured). */
+const LAUNCH: Readonly<Record<number, readonly [number, number, number]>> = {
+  1: [-0.9, -4.7, 0.1], 2: [-0.6, -3.9, 0.45], 3: [-0.3, -3.1, 0.5], 4: [0, -2.1, 0.55], 5: [0.3, 0, 0.9],
+  6: [0, 2.1, 0.55], 7: [-0.3, 3.1, 0.5], 8: [-0.6, 3.9, 0.45], 9: [-0.9, 4.7, 0.1]
+};
+const st = (n: number, label: string, allowed: readonly string[], note?: string) => ({ id: `sta${n}`, label: `STA ${n} (${label})`, allowed, launchPointM: LAUNCH[n]!, ...(note ? { note } : {}) });
 const HEAVY = "Tanks / air-to-ground only (not modelled)";
 
 export const F16_STORES: StoresPlan = {

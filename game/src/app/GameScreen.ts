@@ -260,8 +260,8 @@ export function mountGameScreen(root: HTMLElement): void {
     }
     const tips = el("ul", "tips");
     for (const t of s.hostile
-      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile.", "A MISSILE warning gives the clock position: turn to put it on your beam and dive.", "Press C for the external view, Esc to pause."]
-      : ["Shift/Ctrl set throttle; W/S/A/D fly. Press C for the external view.", "Esc pauses the game."]) tips.append(el("li", undefined, t));
+      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile.", "A MISSILE warning gives the clock position: turn to put it on your beam and dive.", "Press C for the external view, ` for radar/weapon debug info, Esc to pause."]
+      : ["Shift/Ctrl set throttle; W/S/A/D fly. Press C for the external view.", "` shows radar/weapon debug info. Esc pauses the game."]) tips.append(el("li", undefined, t));
     p.append(facts, tips);
     return p;
   };

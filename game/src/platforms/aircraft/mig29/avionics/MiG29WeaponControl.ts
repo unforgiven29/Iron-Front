@@ -18,7 +18,7 @@ import { norm, sub, unit } from "../../../../physics/sensing/SweepGeometry.js";
 import { bodyAngles, DEG, type LookAngles, type RasterPattern, type SensorOwnship } from "../../../../sensors/common/ScanGeometry.js";
 import { ScanningIrst } from "../../../../sensors/irst/ScanningIrst.js";
 import { PulseDopplerRadar, type RadarTrackReport } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import { decodeStores, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
+import { decodeStores, stationLaunchPoint, type AudioCues, type AvionicsContext, type AvionicsControl, type AvionicsSuite } from "../../common/Avionics.js";
 import { MIG29_STORES } from "../MiG29Stores.js";
 import { spo15Display } from "./Spo15.js";
 import { Spo15Lm } from "./Spo15Lm.js";
@@ -241,8 +241,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       return { illumination: null, targetEstimate: est0 ? { positionEnuM: add(est0.positionEnuM, scale(est0.velocityEnuMps, dtl)), velocityEnuMps: est0.velocityEnuMps } : null };
     };
     const station = this.stores.findIndex((x) => x?.id === w.id);
-    const below = this.bodyDir(own, 0, -Math.PI / 2);
-    port.launch(w, add(own.positionEnuM, scale(below, 1.5)), own.velocityEnuMps, link, ls.seekerLos);
+    port.launch(w, stationLaunchPoint(MIG29_STORES, station, own), own.velocityEnuMps, link, ls.seekerLos);
     this.stores[station] = null;
     if (!this.weapon || this.remaining === 0) this.cycleWeapon();
   }
@@ -781,7 +780,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
     return {
       master: this.s.master, radarMode: this.s.radarMode, radar: this.radar.state, kols: this.kols.state,
       plots: this.radar.recentPlots.length, tracks: own ? this.radar.tracks(own).length : 0,
-      lockRangeM: rl ? Math.round(rl.rangeM) : Number.NaN, loss: this.radar.lossEvent?.reason ?? ""
+      lockRangeM: rl ? Math.round(rl.rangeM) : Number.NaN, loss: this.radar.lossEvent?.reason ?? "",
+      weapon: this.weapon?.id ?? "", stores: this.stores.map((x) => x?.id ?? "·").join(" ")
     };
   }
 }
