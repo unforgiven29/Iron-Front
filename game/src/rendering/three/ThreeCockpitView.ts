@@ -18,6 +18,7 @@ import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import { drawInstrument } from "../instruments/Gauges.js";
 import { drawDisplayList, type DisplayList } from "../instruments/DisplayList.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
+import { Explosions, type ExplosionRequest } from "./Explosions.js";
 import { buildAircraftModel } from "./models/AircraftModels.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
@@ -62,6 +63,8 @@ export interface CockpitViewSource {
   /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
   helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
+  /** Explosions that started since the last call (visual effects only). */
+  explosions?(): readonly ExplosionRequest[];
   worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly modelId?: string; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
@@ -87,6 +90,8 @@ export class ThreeCockpitView {
   private readonly others = new Map<string, THREE.Group>();
   private frame = 0;
   private ownModelExt: boolean | null = null;
+  private explosionFx: Explosions | null = null;
+  private lastFrameS: number | null = null;
   /** External (chase) camera instead of the cockpit eye. */
   private external = false;
   private ownModel: THREE.Group | null = null;
@@ -205,6 +210,11 @@ export class ThreeCockpitView {
     if (this.frame % 2 === 0) this.drawInstruments();
     this.drawOthers();
     this.drawSmoke();
+    this.explosionFx ??= new Explosions(this.world);
+    for (const e of this.source.explosions?.() ?? []) this.explosionFx.spawn(e);
+    const nowS = performance.now() / 1000;
+    this.explosionFx.update(this.lastFrameS === null ? 0 : Math.min(0.1, nowS - this.lastFrameS));
+    this.lastFrameS = nowS;
     if (ext || !this.ownModel) this.renderer.render(this.scene, this.camera);
     else {
       // The cockpit sits inside the exterior model's fuselage, so the shell is drawn first and the

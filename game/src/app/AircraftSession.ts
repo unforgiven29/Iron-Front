@@ -3,6 +3,8 @@
  * Three.js cockpit view, keyboard input and the frame loop. Nothing here is aircraft-specific:
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
+import type { Vector3 } from "../core/coordinates/CoordinateFrames.js";
+import type { ExplosionRequest } from "../rendering/three/Explosions.js";
 import { mountDebugOverlay } from "./DebugOverlay.js";
 import { mountDataPanel } from "./DataPanel.js";
 import { WarningTones } from "./WarningTones.js";
@@ -145,7 +147,33 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     }
   };
 
+  // Explosion effects: detonations and kills from the weapon logs, at the last rendered positions.
+  const lastPos = new Map<string, Vector3>();
+  let seenGuided = 0, seenNotional = 0, ownExploded = false;
+  const pendingFx: ExplosionRequest[] = [];
+  const collectExplosions = (): readonly ExplosionRequest[] => {
+    for (const m of missiles.states()) lastPos.set(m.id, m.positionEnuM);
+    for (const m of notional.states()) lastPos.set(m.id, m.positionEnuM);
+    for (const t of targets.states()) lastPos.set(t.id, t.positionEnuM);
+    const own = jet.snapshot();
+    lastPos.set("player", own.positionEnuM);
+    const handle = (e: { missileId: string; kind: string; detail: string; targetId?: string }) => {
+      const p = lastPos.get(e.missileId);
+      if (e.kind === "kill" || e.kind === "miss") {
+        if (p) pendingFx.push({ positionEnuM: p, kind: "warhead" });
+        const tp = e.targetId ? lastPos.get(e.targetId) : undefined;
+        if (e.kind === "kill" && (tp ?? p)) pendingFx.push({ positionEnuM: tp ?? p!, kind: "aircraft" });
+      } else if (e.kind === "lost" && /ground/.test(e.detail) && p) pendingFx.push({ positionEnuM: p, kind: "ground" });
+      lastPos.delete(e.missileId);
+    };
+    const g = missiles.events(), n = notional.events();
+    for (; seenGuided < g.length; seenGuided++) handle(g[seenGuided]!);
+    for (; seenNotional < n.length; seenNotional++) handle(n[seenNotional]!);
+    if (!ownExploded && (own.ground.kind === "crashed" || shotDown)) { ownExploded = true; pendingFx.push({ positionEnuM: own.positionEnuM, kind: own.ground.kind === "crashed" ? "ground" : "aircraft" }); }
+    return pendingFx.splice(0);
+  };
   const source: CockpitViewSource = {
+    explosions: collectExplosions,
     snapshot: () => jet.renderSnapshot(),
     hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
@@ -189,6 +217,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); avionics?.reset();
     simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
     shotDown = null; missionOver = false; shotsFired = 0; endAt = null;
+    seenGuided = 0; seenNotional = 0; ownExploded = false; lastPos.clear(); pendingFx.length = 0;
   };
 
   const held = new Set<string>();
