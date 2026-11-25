@@ -17,28 +17,32 @@ const E = (source: string) => ({ source: `ESTIMATED: ${source}`, status: "estima
 
 const MPRF: WaveformSpec = {
   id: "MPRF", label: "MED PRF", prfsHz: { value: [10.2e3, 11.0e3, 11.9e3, 12.9e3, 14.0e3, 15.2e3, 16.5e3, 17.9e3], ...E("medium-PRF set typical of the class") },
-  pulseWidthS: { value: 1.1e-6, ...E("") }, requiredPrfs: 3, mainlobeNotchMps: { value: 50, ...E("main-lobe clutter filter") }, ranging: { kind: "pulse" }, rangeGated: true
+  pulseWidthS: { value: 1.1e-6, ...E("") }, averagePowerW: { value: 250, ...E("not validated") }, mainlobeNotchMps: { value: 50, ...E("main-lobe clutter filter") },
+  searchRangeSigmaM: { value: 50, ...E("") }, rangeGated: true, twsRangeGateM: { value: 2000, ...E("") }
 };
 const HPRF: WaveformSpec = {
-  id: "HPRF", label: "HI PRF", prfsHz: { value: [150e3, 160e3, 170e3], ...E("") }, pulseWidthS: { value: 1.3e-6, ...E("") }, requiredPrfs: 2,
-  mainlobeNotchMps: { value: 50, ...E("") }, ranging: { kind: "fm", fractionalError: { value: 0.03, ...E("") } }, rangeGated: false
+  id: "HPRF", label: "HI PRF", prfsHz: { value: [150e3, 160e3, 170e3], ...E("") }, pulseWidthS: { value: 1.3e-6, ...E("") }, averagePowerW: { value: 900, ...E("not validated") },
+  mainlobeNotchMps: { value: 50, ...E("") }, searchRangeSigmaM: { value: 2000, ...E("") }, rangeGated: false, twsRangeGateM: { value: 8000, ...E("") }
 };
 
 export const APG68_PROFILE: RadarProfile = {
   id: "apg68v5.f16c50", designation: "AN/APG-68(V)5 (provisional)",
   frequencyHz: { value: 9.7e9, ...E("X band") },
   aperture: { value: { diameterM: 0.62, taperExponent: 1, farSidelobeFloorDb: 40 }, ...E("planar array modelled as a circular aperture") },
-  peakPowerW: { value: 900, ...E("not fitted: no sourced F-16 range figure yet") },
   noiseFigureDb: { value: 3.5, ...E("") }, antennaTemperatureK: { value: 150, ...E("") },
   lossesDb: { value: { radome: 1.0, plumbing: 1.2, beamShapeScan: 1.3, filterMismatch: 1.2, cfar: 1.0, straddle: 1.0 }, ...E("") },
   falseAlarmProbability: { value: 1e-6, ...E("") },
+  clutterSpreadDbc: { value: -65, ...E("") },
+  timing: { value: { searchTactS: 10e-3, searchCoherentS: 5e-3, trackTactS: 20e-3, trackCoherentS: 10e-3, confirmTacts: 2 }, ...E("") },
   scanRateRadS: { value: 60 * DEG, ...E("") }, barTurnaroundS: { value: 0.1, ...E("") }, slewRateRadS: { value: 120 * DEG, ...E("") },
   searchGimbal: { value: { azMaxRad: 60 * DEG, elMinRad: -60 * DEG, elMaxRad: 60 * DEG }, ...E("±60° gimbal") },
   trackGimbal: { value: { azMaxRad: 60 * DEG, elMinRad: -60 * DEG, elMaxRad: 60 * DEG }, ...E("") },
   stabilization: { value: { rollMaxRad: 180 * DEG, pitchMaxRad: 60 * DEG }, ...E("") },
   minTrackRangeM: { value: 300, ...E("") }, instrumentedRangeM: { value: 160 * 1852, ...E("160 nm scale") },
-  acquisitionTimeS: { value: 1.0, ...E("") }, trackMemoryS: { value: 2.0, ...E("") }, maxTrackLosRateRadS: { value: 70 * DEG, ...E("") },
-  waveforms: { MPRF, HPRF }, twsCapacity: { value: 10, ...E("") }, warmUpS: { value: 180, ...E("") }
+  acquisition: { value: { offsetAzRad: -3 * DEG, offsetElRad: 1.5 * DEG, boxWidthRad: 6 * DEG, boxSpacingRad: 3 * DEG, boxRateRadS: 30 * DEG, periods: 2, pullInS: 0.8, attempts: 4 }, ...E("") },
+  trackMemoryS: { value: 2.0, ...E("") }, maxTrackLosRateRadS: { value: 70 * DEG, ...E("") },
+  trackAccuracy: { value: { rangeM: 100, angleRad: 0.2 * DEG, speedMps: 5 }, ...E("") }, rangeFilter: { value: { alpha: 0.5, beta: 0.05 }, ...E("") },
+  waveforms: { MPRF, HPRF }, tws: { value: { capacity: 10, dropAfterS: 13, gateAzRad: 4 * DEG, gateElRad: 2 * DEG }, ...E("") }, warmUpS: { value: 180, ...E("") }
 };
 
 type Mode = "CRM" | "ACM";
@@ -120,7 +124,7 @@ export class F16FireControl implements AvionicsSuite {
     if (this.tms && this.mode === "CRM") {
       const azDeg = this.cursor.x * 60;
       const plot = this.radar.recentPlots.filter((p) => !p.falseAlarm && Math.abs(p.look.az / DEG - azDeg) < 5 && Math.abs(p.rangeM / NM - this.cursor.rNm) < sc * 0.06).sort((a, b) => b.timeS - a.timeS)[0];
-      if (plot) this.radar.designate({ look: plot.look, frame: "stabilized", rangeM: plot.rangeM, rangeWindowM: 2 * NM, timeoutS: 2 });
+      if (plot) this.radar.designate({ look: plot.look, frame: "stabilized", rangeM: plot.rangeM, rangeWindowM: 2 * NM });
     }
     this.tms = false;
     this.radar.step(ctx.own, ctx.scene, dt);

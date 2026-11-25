@@ -56,6 +56,8 @@ export interface CockpitViewSource {
   display?(screen: string): DisplayList | undefined;
   /** Package HUD symbology drawn over the shared HUD (screen frame = HUD field box, angle frame = conformal). */
   hudOverlay?(): DisplayList;
+  /** True when the package draws the complete HUD itself (the shared flight symbology is then omitted; warnings stay). */
+  hudOwnedByPackage?(): boolean;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
   worldObjects?(): readonly { readonly id: string; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
@@ -327,6 +329,17 @@ export class ThreeCockpitView {
     }
   }
 
+  private drawOverlay(g: CanvasRenderingContext2D, s: CockpitViewSnapshot, cx: number, cy: number, u: number, color: string): void {
+    const overlay = this.source.hudOverlay?.();
+    if (!overlay) return;
+    const half = 20 * u;
+    drawDisplayList(g, overlay, {
+      unitPx: half,
+      screen: (x, y) => [cx + x * half, cy - 4 * u - y * half],
+      angle: (az, el) => this.project(rotateVector(s.bodyToWorld, [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), -Math.sin(el)]))
+    }, color);
+  }
+
   /** Simple meshes for other aircraft. */
   private drawOthers(): void {
     const list = this.source.worldObjects?.() ?? [];
@@ -408,6 +421,11 @@ export class ThreeCockpitView {
     g.beginPath();
     g.rect(cx - 22 * u, cy - 26 * u, 44 * u, 44 * u);
     g.clip();
+    if (this.source.hudOwnedByPackage?.()) {
+      this.drawOverlay(g, s, cx, cy, u, color);
+      g.restore();
+      return;
+    }
 
     // Gun cross.
     g.beginPath();
@@ -463,15 +481,7 @@ export class ThreeCockpitView {
     g.fillText(`${d.nzG.toFixed(1)}G`, cx - 20 * u, cy + 8 * u);
     g.fillText(`M ${d.mach.toFixed(2)}`, cx - 20 * u, cy + 11 * u);
     g.fillText(`α ${d.alphaDeg.toFixed(1)}`, cx - 20 * u, cy + 14 * u);
-    const overlay = this.source.hudOverlay?.();
-    if (overlay) {
-      const half = 20 * u;
-      drawDisplayList(g, overlay, {
-        unitPx: half,
-        screen: (x, y) => [cx + x * half, cy - 4 * u - y * half],
-        angle: (az, el) => this.project(rotateVector(s.bodyToWorld, [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), -Math.sin(el)]))
-      }, color);
-    }
+    this.drawOverlay(g, s, cx, cy, u, color);
     g.restore();
 
   }

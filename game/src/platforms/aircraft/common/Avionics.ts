@@ -34,6 +34,8 @@ export interface AvionicsSuite {
   step(ctx: AvionicsContext, dt: number): void;
   /** HUD symbology for the current state. */
   hud(): DisplayList;
+  /** True when `hud()` is the aircraft's complete HUD (its own flight symbology, units and layout). */
+  readonly ownsHud?: boolean;
   /** Content for a named cockpit screen, or undefined when the suite does not drive it. */
   screen(id: string): DisplayList | undefined;
   /** Short status lines for data panels and tests. */

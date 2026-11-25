@@ -60,9 +60,8 @@ export interface RadarScatterer {
 /** Transmitter, antenna and receiver state for one look: the radar equation's inputs. */
 export interface RadarLook {
   readonly antenna: AntennaPattern;
-  readonly peakPowerW: number;
-  /** Transmit duty cycle = pulse width × PRF. Average power = peak × duty. */
-  readonly dutyCycle: number;
+  /** Average transmitted power during the look, W (peak × duty cycle). */
+  readonly averagePowerW: number;
   /** System noise temperature, K (T0·F for a receiver of noise figure F, plus antenna temperature). */
   readonly systemNoiseTempK: number;
   /** Total RF/processing losses (radome, plumbing, filter mismatch, straddle, CFAR...), dB, positive. */
@@ -91,15 +90,15 @@ const BOLTZMANN = 1.380649e-23;
 
 /**
  * Radar equation, matched-filter SNR of one look (Skolnik, "Radar Handbook", 3rd ed., ch. 1):
- *   SNR = Pavg·G²·g(θ)²·λ²·σ·Tint / ((4π)³·R⁴·k·Ts·L)
- * where G is the antenna's peak gain, g(θ) its one-way relative pattern at the target's offset.
+ *   SNR = Pavg·Gt·Gr·g(θ)²·λ²·σ·Tcoh / ((4π)³·R⁴·k·Ts·L)
+ * Gt, Gr: transmit/receive gains; g(θ): one-way relative pattern at the target's offset; Tcoh: the
+ * coherent integration time (its reciprocal is the Doppler filter's noise bandwidth).
  */
 export function radarEquationSnr(look: RadarLook, integrationTimeS: number, rcsM2: number, rangeM: number, offBeamRad: number): number {
-  const g = look.antenna.peakGainLinear * look.antenna.gain(offBeamRad);
+  const g = look.antenna.gain(offBeamRad);
   const lambda = look.antenna.wavelengthM;
-  const pavg = look.peakPowerW * look.dutyCycle;
   const L = 10 ** (look.lossesDb / 10);
-  return (pavg * g * g * lambda * lambda * rcsM2 * integrationTimeS) / ((4 * Math.PI) ** 3 * rangeM ** 4 * BOLTZMANN * look.systemNoiseTempK * L);
+  return (look.averagePowerW * look.antenna.transmitGain * look.antenna.receiveGain * g * g * lambda * lambda * rcsM2 * integrationTimeS) / ((4 * Math.PI) ** 3 * rangeM ** 4 * BOLTZMANN * look.systemNoiseTempK * L);
 }
 
 /** One physical return. Geometry is exact; measurement errors are added by the receiver. */

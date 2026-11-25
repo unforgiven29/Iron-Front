@@ -80,6 +80,10 @@ export interface RasterPattern {
   readonly barSpacingRad: number;
   /** "horizontal": bars sweep in azimuth, stepped in elevation; "vertical": sweep in elevation, stepped in azimuth. */
   readonly orientation: "horizontal" | "vertical";
+  /** Scan rate for this pattern, rad/s (defaults to the equipment's rate). */
+  readonly rateRadS?: number;
+  /** Bar-reversal time for this pattern, s (defaults to the equipment's). */
+  readonly turnaroundS?: number;
 }
 
 /** Raster scan state machine: sweeps at a constant rate, reverses at the edges and steps bars. */
@@ -123,14 +127,15 @@ export class RasterScan {
       }
       const edge = this.dir > 0 ? half : -half;
       const remaining = Math.abs(edge - this.along);
-      const move = this.rateRadS * t;
+      const rate = p.rateRadS ?? this.rateRadS;
+      const move = rate * t;
       if (move < remaining) { this.along += this.dir * move; t = 0; break; }
       this.along = edge;
-      t -= remaining / this.rateRadS;
+      t -= remaining / rate;
       this.dir = -this.dir;
       this.bar += 1;
       if (this.bar >= bars) { this.bar = 0; this.frames += 1; }
-      this.turnaround = this.turnaroundS;
+      this.turnaround = p.turnaroundS ?? this.turnaroundS;
     }
   }
 

@@ -44,6 +44,15 @@ export class AlphaBetaTrack {
     this.updates += 1;
   }
 
+  /**
+   * Replace the velocity component along a unit line of sight with a directly measured value
+   * (e.g. from a Doppler speed channel), keeping the cross-line components.
+   */
+  public setLineOfSightVelocity(losUnit: Vector3, speedAlongLos: number): void {
+    const along = this.v[0] * losUnit[0] + this.v[1] * losUnit[1] + this.v[2] * losUnit[2];
+    for (let i = 0; i < 3; i++) this.v[i] = (this.v[i] as number) + (speedAlongLos - along) * (losUnit[i] as number);
+  }
+
   /** Coast: move the estimate forward without a measurement. */
   public coast(t: number): void {
     this.p = [...this.predict(t)] as [number, number, number];

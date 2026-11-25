@@ -40,11 +40,22 @@ export interface ApertureSpec {
   readonly taperExponent: 0 | 1 | 2 | 3;
   /** Floor on far sidelobes from blockage/surface errors, dB below peak (one-way). */
   readonly farSidelobeFloorDb: number;
+  /**
+   * Measured directivity (linear) when published. Real antennas lose gain to feed spillover,
+   * blockage, polarisation twist and ohmic loss, and transmit/receive paths can differ (e.g. a
+   * monopulse receive feed). When given, these replace the ideal-aperture gain; the pattern SHAPE
+   * still comes from diameter, taper and wavelength.
+   */
+  readonly directivity?: { readonly transmit: number; readonly receive: number };
 }
 
 export interface AntennaPattern {
   readonly wavelengthM: number;
+  /** Ideal-aperture peak gain η·(πD/λ)². */
   readonly peakGainLinear: number;
+  /** Gains actually used by the radar equation (measured directivity when published, else ideal). */
+  readonly transmitGain: number;
+  readonly receiveGain: number;
   readonly halfPowerBeamwidthRad: number;
   readonly firstSidelobeDb: number;
   readonly taperEfficiency: number;
@@ -76,6 +87,8 @@ export function antennaPattern(spec: ApertureSpec, wavelengthM: number): Antenna
   return {
     wavelengthM,
     peakGainLinear: taperEfficiency * k * k,
+    transmitGain: spec.directivity?.transmit ?? taperEfficiency * k * k,
+    receiveGain: spec.directivity?.receive ?? taperEfficiency * k * k,
     halfPowerBeamwidthRad: 2 * Math.asin(Math.min(1, uHalf / k)),
     firstSidelobeDb: 10 * Math.log10(sl),
     taperEfficiency,
