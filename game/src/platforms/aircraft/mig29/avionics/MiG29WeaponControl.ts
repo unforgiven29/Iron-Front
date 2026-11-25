@@ -23,12 +23,15 @@ import { KOLS_PROFILE } from "./KolsProfile.js";
 import { N019_PROFILE } from "./N019Profile.js";
 
 /** РЕЖ.СУВ selector positions used here (RLPK slide 61: КБР, НВГ, РЛС, СТРОБ/ТП, Б.БОЙ, ШЛЕМ, ОПТ, φ0). */
-export type Master = "НВГ" | "РЛС" | "ТП" | "ББ" | "ШЛЕМ" | "ОПТ";
+export type Master = "НВГ" | "РЛС" | "ТП" | "ББ" | "ШЛЕМ" | "ОПТ" | "БРСТ";
 export type RadarMode = "В" | "Д" | "АВТ" | "БЛ.БОЙ";
 export type Emission = "ИЗЛ" | "ЭКВ" | "ОТКЛ";
 export type Snp = "ОТКЛ" | "ППС" | "ЗПС";
 
-const MASTERS: readonly Master[] = ["НВГ", "РЛС", "ТП", "ББ", "ШЛЕМ", "ОПТ"];
+const MASTERS: readonly Master[] = ["НВГ", "РЛС", "ТП", "ББ", "ШЛЕМ", "ОПТ", "БРСТ"];
+/** English names shown on the ИЛС and in the controls list. */
+export const MASTER_EN: Record<Master, string> = { "НВГ": "NAV", "РЛС": "RDR", "ТП": "IRST", "ББ": "CC", "ШЛЕМ": "HMS", "ОПТ": "OPT", "БРСТ": "BRST" };
+export const RADAR_MODE_EN: Record<RadarMode, string> = { "В": "HEAD-ON", "Д": "TAIL", "АВТ": "AUTO", "БЛ.БОЙ": "DOGFIGHT" };
 const RADAR_MODES: readonly RadarMode[] = ["В", "Д", "АВТ", "БЛ.БОЙ"];
 /** ΔH switch positions, km (RLPK slide 61, ПУР-31: −6 … +10). */
 const DH_KM = [-6, -4, -2, -1, 0, 1, 2, 4, 6, 8, 10] as const;
@@ -37,13 +40,13 @@ const SCALE_KM: Record<RadarMode, number> = { "В": 150, "АВТ": 100, "Д": 50
 const CLOSE_COMBAT_PATTERN: RasterPattern = { frame: "body", center: { az: 0, el: 12 * DEG }, widthRad: 50 * DEG, bars: 2, barSpacingRad: 3 * DEG, orientation: "vertical", rateRadS: 90 * DEG, turnaroundS: 0.05 };
 
 export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
-  { key: "arrowup", label: "Radar cursor: farther (ТП: up)", control: "KU-31 strobe knob (BP-29 p.9)" },
-  { key: "arrowdown", label: "Radar cursor: nearer (ТП: down)", control: "KU-31 strobe knob" },
-  { key: "arrowleft", label: "Radar cursor: left", control: "KU-31 strobe knob" },
-  { key: "arrowright", label: "Radar cursor: right", control: "KU-31 strobe knob" },
+  { key: "arrowup", label: "Cursor up / farther", control: "KU-31 strobe knob (BP-29 p.9)" },
+  { key: "arrowdown", label: "Cursor down / nearer", control: "KU-31 strobe knob" },
+  { key: "arrowleft", label: "Cursor left", control: "KU-31 strobe knob" },
+  { key: "arrowright", label: "Cursor right", control: "KU-31 strobe knob" },
   { key: "enter", label: "Lock target under the cursor", control: "МРК.ЗАХВ.ПЗ lock button (BP-29 p.16)" },
   { key: "backspace", label: "Break lock", control: "Lock reset" },
-  { key: "=", label: "Sight mode: NAV / RADAR / IRST / CLOSE COMBAT / HELMET / OPTICAL", control: "РЕЖ.СУВ selector НВГ/РЛС/ТП/ББ/ШЛЕМ/ОПТ, panel ПСР-31" },
+  { key: "=", label: "Sight mode: NAV / RDR / IRST / CC / HMS / OPT / BRST", control: "РЕЖ.СУВ selector НВГ/РЛС/ТП/ББ/ШЛЕМ/ОПТ, panel ПСР-31; BRST = boresight" },
   { key: "-", label: "Radar mode: head-on / tail-chase / auto / dogfight", control: "РЕЖИМЫ РЛС В/Д/АВТ/Б.БОЙ, panel ПУР-31" },
   { key: "pageup", label: "Scan elevation up (target above you)", control: "ΔН switch, panel ПУР-31" },
   { key: "pagedown", label: "Scan elevation down (target below you)", control: "ΔН switch" },
@@ -52,12 +55,21 @@ export const MIG29_AVIONICS_CONTROLS: readonly AvionicsControl[] = [
   { key: "end", label: "Track-while-scan: off / head-on / tail", control: "СНП ППС–ЗПС switch, panel ПУР-31" },
   { key: "insert", label: "Radar + IRST work together on/off", control: "ТОРМОЗ–БЕЗ ТОРМОЗА switch, panel С-31" },
   { key: "delete", label: "Laser rangefinder on/off", control: "OEPS laser enable" },
-  { key: "c", label: "Radar sidelobe guard on/off", control: "КОМПЕНС switch, panel ПУР-31 (guard channel)" }
+  { key: "c", label: "Radar sidelobe guard on/off", control: "КОМПЕНС switch, panel ПУР-31 (guard channel)" },
+  { key: "[", label: "IRST gain down", control: "УСИЛ.ТП knob, panel ПСР-31" },
+  { key: "]", label: "IRST gain up", control: "УСИЛ.ТП knob, panel ПСР-31" },
+  { key: "k", label: "Cannon sight (hold = trigger first stage)", control: "Gun trigger, first stage (НО), BP-29 p.25" }
 ];
 
 export interface Mig29WcsStatus {
   master: Master; radarMode: RadarMode; zone: number; dhKm: number; strobeKm: number; strobeAzDeg: number; strobeElDeg: number;
   emission: Emission; snp: Snp; interaction: boolean; laser: boolean; compensation: boolean;
+  /** IRST gain 0..1 (УСИЛ.ТП). */
+  irstGain: number;
+  /** OPT mode cursor, body angles, deg. */
+  optAzDeg: number; optElDeg: number;
+  /** Cannon sight (НО) selected. */
+  gun: boolean;
 }
 
 /** Approximate R-27R max launch range, km, from BP-29 p.21 (ППС 50–60 km, ЗПС 16–18 km at altitude) and fig.17's trend; display only. */
@@ -87,7 +99,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
   }
 
   private static initial(): Mig29WcsStatus {
-    return { master: "РЛС", radarMode: "В", zone: 0, dhKm: 0, strobeKm: 40, strobeAzDeg: 0, strobeElDeg: 0, emission: "ИЗЛ", snp: "ОТКЛ", interaction: false, laser: true, compensation: true };
+    return { master: "РЛС", radarMode: "В", zone: 0, dhKm: 0, strobeKm: 40, strobeAzDeg: 0, strobeElDeg: 0, emission: "ИЗЛ", snp: "ОТКЛ", interaction: false, laser: true, compensation: true, irstGain: 0.5, optAzDeg: 0, optElDeg: 0, gun: false };
   }
 
   public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); }
@@ -99,7 +111,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
 
   public key(k: string, down: boolean): boolean {
     if (!this.controls.some((c) => c.key === k)) return false;
-    if (!down) { this.held.delete(k); return true; }
+    if (!down) { this.held.delete(k); if (k === "k") this.s.gun = false; return true; }
     if (this.held.has(k)) return true;
     this.held.add(k);
     const s = this.s;
@@ -117,6 +129,9 @@ export class MiG29WeaponControl implements AvionicsSuite {
       case "insert": s.interaction = !s.interaction; break;
       case "delete": s.laser = !s.laser; break;
       case "c": s.compensation = !s.compensation; break;
+      case "[": s.irstGain = Math.max(0, Math.round((s.irstGain - 0.1) * 10) / 10); break;
+      case "]": s.irstGain = Math.min(1, Math.round((s.irstGain + 0.1) * 10) / 10); break;
+      case "k": s.gun = true; break;
     }
     return true;
   }
@@ -177,7 +192,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
   /** RLPK slide 65: the OEPS leads in ТП, ШЛЕМ, ОПТ and in close combat when the laser is on. */
   private oepsLeads(): boolean {
     const m = this.s.master;
-    return m === "ТП" || m === "ШЛЕМ" || m === "ОПТ" || (m === "ББ" && this.s.laser);
+    return m === "ТП" || m === "ШЛЕМ" || m === "ОПТ" || m === "БРСТ" || (m === "ББ" && this.s.laser);
   }
 
   public step(ctx: AvionicsContext, dt: number): void {
@@ -185,7 +200,13 @@ export class MiG29WeaponControl implements AvionicsSuite {
     const s = this.s;
     const scale = SCALE_KM[s.radarMode];
     const tp = s.master === "ТП";
-    if (this.held.has("arrowup")) { if (tp) s.strobeElDeg = Math.min(15, s.strobeElDeg + 15 * dt); else s.strobeKm = Math.min(scale, s.strobeKm + scale * 0.3 * dt); }
+    if (s.master === "ОПТ") {
+      // OPT: a movable sight cursor that the IRST head follows (within its ±30° / −15…+30° field).
+      if (this.held.has("arrowup")) s.optElDeg = Math.min(30, s.optElDeg + 10 * dt);
+      if (this.held.has("arrowdown")) s.optElDeg = Math.max(-15, s.optElDeg - 10 * dt);
+      if (this.held.has("arrowright")) s.optAzDeg = Math.min(30, s.optAzDeg + 10 * dt);
+      if (this.held.has("arrowleft")) s.optAzDeg = Math.max(-30, s.optAzDeg - 10 * dt);
+    } else if (this.held.has("arrowup")) { if (tp) s.strobeElDeg = Math.min(15, s.strobeElDeg + 15 * dt); else s.strobeKm = Math.min(scale, s.strobeKm + scale * 0.3 * dt); }
     if (this.held.has("arrowdown")) { if (tp) s.strobeElDeg = Math.max(-15, s.strobeElDeg - 15 * dt); else s.strobeKm = Math.max(0.5, s.strobeKm - scale * 0.3 * dt); }
     const azLim = tp ? 30 : 25;
     if (this.held.has("arrowright")) s.strobeAzDeg = Math.min(azLim, s.strobeAzDeg + 20 * dt);
@@ -198,7 +219,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.kols.setPower(acOk && s.master !== "НВГ");
 
     // The radar emits in РЛС, in ББ without the laser, and as the slaved channel with ТОРМОЗ (interaction).
-    const radarWanted = s.master === "РЛС" || (s.master === "ББ" && !s.laser) || (s.interaction && s.master !== "НВГ");
+    const radarWanted = s.master === "РЛС" || s.master === "БРСТ" || (s.master === "ББ" && !s.laser) || (s.interaction && s.master !== "НВГ");
     this.radar.setRadiate(s.emission === "ИЗЛ" && radarWanted);
     this.radar.setSearch({
       pattern: s.master === "ББ" ? CLOSE_COMBAT_PATTERN : this.searchPattern(),
@@ -215,9 +236,11 @@ export class MiG29WeaponControl implements AvionicsSuite {
     else if (s.master === "ББ") this.kols.setScan({ frame: "body", center: { az: 0, el: 1 * DEG }, widthRad: 30 * DEG, bars: 1, barSpacingRad: 4 * DEG, orientation: "vertical" }, true);
     else this.kols.setScan(null);
     if (s.master === "ШЛЕМ") this.kols.setSlave({ az: Math.max(-30 * DEG, Math.min(30 * DEG, ctx.head.az)), el: Math.max(-15 * DEG, Math.min(30 * DEG, ctx.head.el)) });
-    else if (s.master === "ОПТ") this.kols.setSlave({ az: 0, el: 0 });
+    else if (s.master === "ОПТ") this.kols.setSlave({ az: s.optAzDeg * DEG, el: s.optElDeg * DEG });
+    else if (s.master === "БРСТ") this.kols.setSlave({ az: 0, el: 0 });
     else this.kols.setSlave(null);
     this.kols.setLaser(s.laser);
+    this.kols.setGain(s.irstGain);
 
     if (this.lockPressed) { this.lockPressed = false; this.designate(ctx); }
 
@@ -269,7 +292,11 @@ export class MiG29WeaponControl implements AvionicsSuite {
     } else if (s.master === "ШЛЕМ") {
       this.kols.designate({ az: ctx.head.az, el: ctx.head.el }, "body", 4 * DEG, 4 * DEG);
     } else if (s.master === "ОПТ") {
-      this.kols.designate({ az: 0, el: 0 }, "body", 2 * DEG, 2 * DEG);
+      this.kols.designate({ az: s.optAzDeg * DEG, el: s.optElDeg * DEG }, "body", 2 * DEG, 2 * DEG);
+    } else if (s.master === "БРСТ") {
+      // Boresight: IRST at the boresight; with the radar emitting it also stares along the axis.
+      this.kols.designate({ az: 0, el: 0 }, "body", 2.5 * DEG, 2.5 * DEG);
+      if (s.emission === "ИЗЛ") this.radar.designate({ look: { az: 0, el: 0 }, frame: "body", rangeM: 5000, rangeWindowM: 5000, minRangeM: 250, maxRangeM: 10000, stare: true, trackMinRangeM: 250 });
     }
   }
 

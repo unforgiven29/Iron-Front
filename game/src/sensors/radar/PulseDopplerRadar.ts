@@ -26,7 +26,7 @@
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { createScopedRandom, type SeededRandom } from "../../core/random/SeededRandom.js";
 import { antennaPattern, type AntennaPattern, type ApertureSpec } from "../../physics/radar/Aperture.js";
-import { clutterInCell, type ClutterPatch, type RadarEcho, type RadarLook } from "../../physics/radar/RadarPhysics.js";
+import { clutterInCell, radarEquationSnr, type ClutterPatch, type RadarEcho, type RadarLook } from "../../physics/radar/RadarPhysics.js";
 import type { SensorScene } from "../../physics/sensing/SensorScene.js";
 import { angleBetween, dot, norm, scale, sub } from "../../physics/sensing/SweepGeometry.js";
 import { AlphaBetaTrack } from "../common/TrackFilter.js";
@@ -176,6 +176,11 @@ export interface RadarPlot {
   readonly snrDb: number;
   readonly waveformId: string;
   readonly falseAlarm?: boolean;
+  /**
+   * The radar's own estimate of target size, m²: received power × R⁴ compared with what the radar
+   * equation gives for 1 m² on the beam axis. Noisy (fluctuation, position in the beam), as in reality.
+   */
+  readonly rcsEstimateM2?: number;
 }
 
 export interface RadarTrackReport {
@@ -365,6 +370,10 @@ export class PulseDopplerRadar {
     return patches;
   }
 
+  private sensitivityScale(wf: WaveformSpec, coherentS: number): number {
+    return wf.sensitivityDbw ? 10 ** ((receiverSensitivityDbw(this.profile, coherentS) - wf.sensitivityDbw.value) / 10) : 1;
+  }
+
   private gauss(): number { return Math.sqrt(-2 * Math.log(1 - this.rng.nextFloat() + 1e-12)) * Math.cos(2 * Math.PI * this.rng.nextFloat()); }
   private expo(): number { return -Math.log(1 - this.rng.nextFloat() + 1e-12); }
 
@@ -499,7 +508,8 @@ export class PulseDopplerRadar {
       if (!r.detected) continue;
       const m = this.measureSearch(e, wf, r.snr, own, to);
       if (m.rangeM < (wf.minSearchRangeM?.value ?? 0)) continue;
-      found.push({ timeS: own.timeS, rangeM: m.rangeM, closureMps: m.closure, look: stabilizedAngles(own, m.los), losEnu: m.los, snrDb: 10 * Math.log10(r.snr), waveformId: wf.id });
+      const ref = radarEquationSnr(look, T.searchCoherentS, 1, e.rangeM, 0) * this.sensitivityScale(wf, T.searchCoherentS);
+      found.push({ rcsEstimateM2: r.snr / Math.max(1e-30, ref), timeS: own.timeS, rangeM: m.rangeM, closureMps: m.closure, look: stabilizedAngles(own, m.los), losEnu: m.los, snrDb: 10 * Math.log10(r.snr), waveformId: wf.id });
     }
     for (const p of found) this.addPlot(p, own);
     // Once per new beam position (one dwell), not every tick.
