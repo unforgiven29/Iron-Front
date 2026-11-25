@@ -4,6 +4,7 @@
  */
 import { loadAircraftCatalog } from "./AircraftCatalog.js";
 import { el, startAircraftSession, type AircraftSessionHandle } from "./AircraftSession.js";
+import type { TargetScenario } from "./TestRange.js";
 
 export function mountGameScreen(root: HTMLElement): void {
   document.body.classList.add("game-mode");
@@ -29,6 +30,14 @@ export function mountGameScreen(root: HTMLElement): void {
     const opt = el("option", undefined, catalog.definition(id).displayName);
     opt.value = id;
     picker.append(opt);
+  }
+  // Air targets for sensor testing.
+  const targetPicker = el("select", "game-select");
+  targetPicker.setAttribute("aria-label", "Targets");
+  for (const [v, label] of [["range", "Targets: range traffic"], ["dummies", "Targets: dummy test set"], ["none", "Targets: none"]] as const) {
+    const opt = el("option", undefined, label);
+    opt.value = v;
+    targetPicker.append(opt);
   }
   const status = el("p", "game-status", "");
   const fly = el("button", "game-button primary", "Fly");
@@ -63,7 +72,7 @@ export function mountGameScreen(root: HTMLElement): void {
   picker.addEventListener("change", () => { definition = catalog.definition(picker.value); renderControls(); });
   const debug = el("a", "game-link", "Developer tools →");
   debug.href = "#debug";
-  card.append(title, subtitle, picker, status, fly, airStart, restart, controls, note, debug);
+  card.append(title, subtitle, picker, targetPicker, status, fly, airStart, restart, controls, note, debug);
   menu.append(card);
   screen.append(frame, menu);
   root.append(screen);
@@ -74,6 +83,7 @@ export function mountGameScreen(root: HTMLElement): void {
     fly.textContent = paused ? "Resume" : "Fly";
     airStart.hidden = paused;
     picker.hidden = paused;
+    targetPicker.hidden = paused;
     restart.hidden = !paused;
     status.textContent = paused ? "Paused" : "";
     fly.focus();
@@ -90,7 +100,7 @@ export function mountGameScreen(root: HTMLElement): void {
     status.textContent = "Loading…";
     try {
       const { ThreeCockpitView } = await import("../rendering/three/ThreeCockpitView.js");
-      session = startAircraftSession(ThreeCockpitView, frame, definition, mode);
+      session = startAircraftSession(ThreeCockpitView, frame, definition, mode, targetPicker.value as TargetScenario);
       status.textContent = "";
       hideMenu();
     } catch (e) {

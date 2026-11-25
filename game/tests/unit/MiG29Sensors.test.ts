@@ -293,3 +293,13 @@ describe("MiG-29 ИЛС formats per mode (BP-29 figs 13, 15, 16, 19–23)", () =
     expect(w.radar.state).toBe("off");
   });
 });
+
+describe("dummy target set", () => {
+  it("is well-formed: unique ids, all airborne", async () => {
+    const { createDummyTargets } = await import("../../src/app/TestRange.js");
+    const specs = createDummyTargets();
+    expect(specs.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(specs.map((s) => s.id)).size).toBe(specs.length);
+    for (const s of specs) expect(s.positionEnuM[2]).toBeGreaterThan(100);
+  });
+});

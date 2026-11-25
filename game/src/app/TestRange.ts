@@ -49,3 +49,29 @@ export function createRangeTargets(): readonly AirTargetSpec[] {
       script: [{ kind: "turn", rateDegS: 2.5, durationS: 144 }, { kind: "power", throttle: 1, afterburner: 1 }, { kind: "turn", rateDegS: 6, durationS: 30 }, { kind: "power", throttle: 0.75, afterburner: 0 }] }
   ];
 }
+
+export type TargetScenario = "range" | "dummies" | "none";
+
+/**
+ * Dummy targets for sensor testing, laid out ahead of the air-start point (0, −18 km, heading north).
+ * Each one isolates one behaviour; all use the σ = 3 m² reference fighter. Synthetic, not AI.
+ */
+export function createDummyTargets(): readonly AirTargetSpec[] {
+  const D = Math.PI / 180;
+  const ref = SIGNATURES.fighter;
+  const at = (x: number, yAhead: number, alt: number) => [x, -18000 + yAhead, alt] as const;
+  return [
+    { id: "dummy-head-60", label: "Head-on, 60 km, 4 km alt (radar В detection range)", signature: ref, positionEnuM: at(0, 60000, 4000), headingRad: 180 * D, speedMps: 220, throttle: 0.85 },
+    { id: "dummy-tail-25", label: "Tail-on, 25 km ahead, slower (mode Д / KOLS tail)", signature: ref, positionEnuM: at(-2500, 25000, 2500), headingRad: 0, speedMps: 160, throttle: 1, afterburner: 0 },
+    { id: "dummy-beam-30", label: "Beam crosser, 30 km (Doppler notch test)", signature: ref, positionEnuM: at(-15000, 30000, 3000), headingRad: 90 * D, speedMps: 230, throttle: 0.85 },
+    { id: "dummy-low-35", label: "Low look-down target, 35 km, 300 m (clutter test)", signature: ref, positionEnuM: at(4000, 35000, 300), headingRad: 180 * D, speedMps: 230, throttle: 0.85 },
+    { id: "dummy-orbit-6", label: "Close orbit, 6 km ahead, afterburner (Б.БОЙ / ББ / laser)", signature: ref, positionEnuM: at(0, 6000, 1900), headingRad: 270 * D, speedMps: 180, throttle: 1, afterburner: 1,
+      script: [{ kind: "turn", rateDegS: 4, durationS: 90 }] },
+    { id: "dummy-jink-15", label: "Jinking, 15 km, 3 km alt (lock retention)", signature: ref, positionEnuM: at(2000, 15000, 3000), headingRad: 180 * D, speedMps: 250, throttle: 0.9,
+      script: [{ kind: "turn", rateDegS: 12, durationS: 4 }, { kind: "turn", rateDegS: -12, durationS: 8 }, { kind: "turn", rateDegS: 12, durationS: 4 }, { kind: "straight", durationS: 6 }] }
+  ];
+}
+
+export function targetsFor(scenario: TargetScenario): readonly AirTargetSpec[] {
+  return scenario === "range" ? createRangeTargets() : scenario === "dummies" ? createDummyTargets() : [];
+}

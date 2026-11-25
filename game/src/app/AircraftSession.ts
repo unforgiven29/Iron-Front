@@ -5,7 +5,7 @@
  */
 import { mountDataPanel } from "./DataPanel.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
-import { createRangeTargets, createTestRange } from "./TestRange.js";
+import { createTestRange, targetsFor, type TargetScenario } from "./TestRange.js";
 import { AirTargetWorld } from "../world/targets/AirTargets.js";
 import { AVIONICS_RATE_HZ } from "../platforms/aircraft/common/Avionics.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
@@ -32,7 +32,7 @@ export interface AircraftSessionHandle {
 
 export type StartMode = "runway" | "air";
 
-export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway"): AircraftSessionHandle {
+export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway", scenario: TargetScenario = "range"): AircraftSessionHandle {
   const { terrain, airfield } = createTestRange();
   const runway = airfield.runways[0];
   const startState = () => {
@@ -51,7 +51,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   }, { ...startState(), positionEnuM: [...startState().positionEnuM] });
 
   // Air targets (world truth) and the aircraft's avionics, stepped at a fixed rate in simulation time.
-  const targets = new AirTargetWorld(createRangeTargets(), { heightAt: (x, y) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; } });
+  const targets = new AirTargetWorld(targetsFor(scenario), { heightAt: (x, y) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; } });
   const avionics = definition.createAvionics?.();
   let simTime = 0, avionicsAcc = 0;
   const stepWorld = (dt: number, head: { az: number; el: number }) => {
