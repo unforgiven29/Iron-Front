@@ -1,0 +1,26 @@
+{
+  "_doc": "MiG-29 main instrument panel geometry shared by the cockpit layout (MiG29Cockpit.ts) and the Blender shell generator (tools/blender/mig29_cockpit.py). Instrument centres/sizes are pixels measured on IrasD 'MiG-29 cockpit 3' (Wikimedia Commons, CC BY-SA 4.0), 870-px crop; scale ADI = 0.10 m (ESTIMATED). Body FRD metres from the design eye point.",
+  "tiltRad": -0.3,
+  "faceX": 0.845,
+  "faceZ": 0.42,
+  "pxToM": 0.0013333,
+  "originPx": [390, 190],
+  "panelPx": { "left": 90, "right": 690, "top": 30, "bottom": 300 },
+  "instruments": [
+    { "id": "ias", "x": 130, "y": 165, "d": 65 },
+    { "id": "alt", "x": 140, "y": 235, "d": 65 },
+    { "id": "adi", "x": 255, "y": 150, "d": 75 },
+    { "id": "hsi", "x": 245, "y": 245, "d": 95 },
+    { "id": "aoa", "x": 340, "y": 140, "d": 55 },
+    { "id": "ralt", "x": 330, "y": 215, "d": 55 },
+    { "id": "vvi", "x": 440, "y": 145, "d": 60 },
+    { "id": "rpm", "x": 515, "y": 140, "d": 60 },
+    { "id": "egt-l", "x": 445, "y": 210, "d": 55 },
+    { "id": "egt-r", "x": 505, "y": 210, "d": 55 },
+    { "id": "fuel", "x": 570, "y": 180, "w": 32, "h": 72 },
+    { "id": "cabin", "x": 435, "y": 255, "w": 55, "h": 42 },
+    { "id": "hydgas", "x": 490, "y": 255, "w": 55, "h": 42 },
+    { "id": "ramps", "x": 555, "y": 255, "w": 55, "h": 42 }
+  ],
+  "hdd": { "x": 600, "y": 95, "w": 110, "h": 100 }
+}

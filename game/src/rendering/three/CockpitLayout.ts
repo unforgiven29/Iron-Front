@@ -5,7 +5,7 @@
  */
 import type { InstrumentFace } from "../instruments/Gauges.js";
 
-export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass" | "instrument";
+export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass" | "instrument" | "node";
 
 export interface CockpitPart {
   readonly id: string;
@@ -21,9 +21,18 @@ export interface CockpitPart {
   readonly binding?:
     | { readonly kind: "stick" }
     | { readonly kind: "throttle" }
-    | { readonly kind: "switch"; readonly switchId: string; readonly positions: readonly string[] };
+    | {
+        readonly kind: "switch"; readonly switchId: string; readonly positions: readonly string[];
+        /** How a "node" part moves per position step (about/along its own origin, body axes). Default: rotate 30° about body y. */
+        readonly motion?: { readonly kind: "rotate" | "translate"; readonly axis: "x" | "y" | "z"; readonly perStep: number };
+      };
   /** Screen content id rendered by the view ("hud", "mfd-left", ...). */
   readonly screen?: string;
+  /**
+   * Kind "node": an object of the shell model, by name (its origin is the pivot). The view animates
+   * it from `binding` and makes it clickable; positionM/sizeM are ignored.
+   */
+  readonly node?: string;
   /** Instrument face (kind "instrument"): drawn from the values the view source reports for this part id. sizeM[0] = diameter (round faces) or [width, height] (tapes). */
   readonly instrument?: InstrumentFace;
 }

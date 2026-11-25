@@ -53,4 +53,17 @@ describe("MiG-29 cockpit", () => {
     expect(Number.isFinite(v("ias")[0]!)).toBe(true);
     expect(Number.isFinite(v("fuel")[0]!)).toBe(true); // DC bus still powered
   });
+
+  it("every animated shell part the layout names exists in the generated model", async () => {
+    const fs = (await import(/* @vite-ignore */ "node:" + "fs")) as { readFileSync(p: string): Uint8Array };
+    const glb = fs.readFileSync("game/src/platforms/aircraft/mig29/cockpit/mig29-cockpit.glb");
+    const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
+    const jsonLength = view.getUint32(12, true);
+    const gltf = JSON.parse(new TextDecoder().decode(glb.subarray(20, 20 + jsonLength))) as { nodes: { name?: string }[] };
+    const names = new Set(gltf.nodes.map((n) => n.name));
+    const nodes = MIG29_COCKPIT_LAYOUT.parts.filter((p) => p.kind === "node");
+    expect(nodes.length).toBeGreaterThan(5);
+    for (const p of nodes) expect(names.has(p.node), p.node).toBe(true);
+    expect(MIG29_COCKPIT_LAYOUT.shellModel).toBeDefined();
+  });
 });

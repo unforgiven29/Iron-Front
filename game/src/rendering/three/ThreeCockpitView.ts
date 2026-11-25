@@ -67,7 +67,7 @@ export class ThreeCockpitView {
   private lookPitch = 0;
   private fov: number;
   private dragging = false;
-  private readonly animated: { part: CockpitPart; mesh: THREE.Mesh; base: THREE.Quaternion; basePos: THREE.Vector3 }[] = [];
+  private readonly animated: { part: CockpitPart; mesh: THREE.Object3D; base: THREE.Quaternion; basePos: THREE.Vector3 }[] = [];
   private readonly screens = new Map<string, { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }>();
   private readonly instruments: { part: CockpitPart; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }[] = [];
   private readonly hudCanvas: HTMLCanvasElement;
@@ -201,6 +201,14 @@ export class ThreeCockpitView {
       const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
       model.position.copy(this.bodyToCamera(shell.centreM).sub(centre));
       model.traverse((o) => { o.userData = { ...o.userData, shell: true }; });
+      // Named nodes bound by the layout become animated, clickable parts (pivot = node origin).
+      for (const part of this.layout.parts) {
+        if (part.kind !== "node" || !part.node) continue;
+        const node = model.getObjectByName(part.node);
+        if (!node) continue;
+        node.traverse((o) => { o.userData = { partId: part.id }; });
+        if (part.binding) this.animated.push({ part, mesh: node, base: node.quaternion.clone(), basePos: node.position.clone() });
+      }
       this.cockpit.add(model);
     }, undefined, () => { /* keep the simple cockpit */ });
   }
@@ -208,6 +216,7 @@ export class ThreeCockpitView {
   private buildCockpit(): void {
     this.loadShell();
     for (const part of this.layout.parts) {
+      if (part.kind === "node") continue; // lives in the shell model
       let geometry: THREE.BufferGeometry;
       let material: THREE.Material;
       const [a, b, c] = part.sizeM;
@@ -260,10 +269,17 @@ export class ThreeCockpitView {
         mesh.quaternion.copy(base).premultiply(tilt);
       } else if (binding.kind === "throttle") {
         mesh.position.copy(basePos).add(new THREE.Vector3(0, 0, -s.throttle * 0.1));
+      } else if (part.kind === "node") {
+        const i = Math.max(0, binding.positions.indexOf(s.switches[binding.switchId] ?? ""));
+        const m = binding.motion ?? { kind: "rotate", axis: "y", perStep: 30 };
+        // Body axes in the camera frame: x → −z, y → x, z → −y.
+        const axis = m.axis === "x" ? new THREE.Vector3(0, 0, -1) : m.axis === "y" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, -1, 0);
+        if (m.kind === "rotate") mesh.quaternion.copy(base).premultiply(new THREE.Quaternion().setFromAxisAngle(axis, (m.perStep * i * Math.PI) / 180));
+        else mesh.position.copy(basePos).add(axis.multiplyScalar(m.perStep * i));
       } else {
         const i = Math.max(0, binding.positions.indexOf(s.switches[binding.switchId] ?? ""));
         mesh.position.copy(basePos).add(new THREE.Vector3(0, 0.012 * i, 0));
-        const mat = mesh.material as THREE.MeshStandardMaterial;
+        const mat = (mesh as THREE.Mesh).material as THREE.MeshStandardMaterial;
         mat.emissive = new THREE.Color(i > 0 ? part.color : "#000000");
         mat.emissiveIntensity = i > 0 ? 0.8 : 0;
       }
@@ -274,7 +290,8 @@ export class ThreeCockpitView {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
-    for (const hit of this.raycaster.intersectObjects(this.cockpit.children.filter((o) => !o.userData["shell"]))) {
+    for (const hit of this.raycaster.intersectObjects(this.cockpit.children, true)) {
+      if (hit.object.userData["shell"]) return; // the shell blocks clicks behind it
       const part = this.layout.parts.find((p) => p.id === hit.object.userData["partId"]);
       if (part?.binding?.kind === "switch") {
         this.source.cycleSwitch(part.binding.switchId);
