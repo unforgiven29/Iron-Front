@@ -54,7 +54,7 @@ test("main game starts the F-16, flies, pauses and resumes without page errors",
   await page.keyboard.down("d");
   await page.waitForTimeout(300);
   await page.keyboard.up("d");
-  await page.keyboard.press("f");
+  await page.keyboard.press("b");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
   await page.getByRole("button", { name: "Resume" }).click();

@@ -214,7 +214,6 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
       let lastElevator = 0;
       const switches: SwitchBinding[] = [
         {
-          key: "f",
           definition: { id: F16_SWITCHES.flcsMode, ownerId: "f16.flcs", label: "FLCS MODE", positions: ["NORM", "DIRECT"], defaultPosition: "NORM", provenance: "Simulation test switch. The real F-16 has no fly-by-wire OFF switch." },
           onChange: (to) => { fcs.setMode(to as "NORM" | "DIRECT", lastElevator); return { accepted: true }; }
         },
@@ -224,7 +223,6 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: (to) => { fcs.setSpeedbrake(to === "EXTEND"); return { accepted: true }; }
         },
         {
-          key: "c",
           definition: { id: F16_SWITCHES.testCg, ownerId: "f16.mass", label: "CG (TEST)", positions: Object.keys(F16_TEST_CG), defaultPosition: "NOMINAL", provenance: "Simulation test setting. Moves the CG used by the aero CG-offset terms; mass and inertia are unchanged." },
           onChange: (to, ctx) => { ctx.setCgFractionMac(F16_TEST_CG[to as keyof typeof F16_TEST_CG]); return { accepted: true }; }
         },
@@ -241,7 +239,6 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; }
         },
         {
-          key: "j",
           definition: { id: F16_SWITCHES.electricalFault, ownerId: "f16.electrical", label: "ELEC FAULT (TEST)", positions: ["NORMAL", "MAIN GEN FAIL", "MAIN+STBY GEN FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven generators. Not a real F-16 control." },
           onChange: (to, ctx) => { ctx.setElectricalSourcesOff(to === "NORMAL" ? [] : to === "MAIN GEN FAIL" ? ["gen.main"] : ["gen.main", "gen.standby"]); return { accepted: true }; }
         },
@@ -250,7 +247,6 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: () => ({ accepted: true })
         },
         {
-          key: "m",
           definition: { id: F16_SWITCHES.engineFault, ownerId: "f16.engine.control", label: "ENG FAULT (TEST)", positions: Object.keys(F110_TEST_FAULTS), defaultPosition: "NONE", provenance: "Simulation test switch: injects engine-control failures. Not a real F-16 control." },
           onChange: () => ({ accepted: true })
         },
@@ -279,7 +275,6 @@ export function createF16Definition(options: { aeroModel?: F16AeroModelId } = {}
           onChange: () => ({ accepted: true })
         },
         {
-          key: "h",
           definition: { id: F16_SWITCHES.hydraulicFault, ownerId: "f16.hydraulics", label: "HYD FAULT (TEST)", positions: Object.keys(F16_TEST_HYDRAULIC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: fails engine-driven hydraulic pumps. Not a real F-16 control." },
           onChange: (to, ctx) => { ctx.setHydraulicFaults(F16_TEST_HYDRAULIC_FAULTS[to as keyof typeof F16_TEST_HYDRAULIC_FAULTS].map((pumpId) => ({ kind: "pump-failed" as const, pumpId }))); return { accepted: true }; }
         }

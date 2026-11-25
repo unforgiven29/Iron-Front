@@ -173,7 +173,7 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
       ]);
       let speedbrakeSwitch = false, emergencyHandle = "STOWED", flapSelection: Mig29FlapSelection = "UP";
       const switches: SwitchBinding[] = [
-        { key: "f", definition: { id: MIG29_SWITCHES.sau, ownerId: "mig29.sau", label: "SAU (TEST)", positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "Simulation test switch for the stability-augmentation dampers" }, onChange: (to) => { fcs.setSau(to as SauMode); return { accepted: true }; } },
+        { definition: { id: MIG29_SWITCHES.sau, ownerId: "mig29.sau", label: "SAU (TEST)", positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "Simulation test switch for the stability-augmentation dampers" }, onChange: (to) => { fcs.setSau(to as SauMode); return { accepted: true }; } },
         { key: "b", definition: { id: MIG29_SWITCHES.speedbrake, ownerId: "mig29.speedbrake", label: "AIRBRAKE", positions: ["RETRACT", "EXTEND"], defaultPosition: "RETRACT", provenance: "Upper/lower airbrakes modelled as one surface" }, onChange: (to) => { speedbrakeSwitch = to === "EXTEND"; return { accepted: true }; } },
         { key: "g", gearHandle: { up: "UP", down: "DN" }, definition: { id: MIG29_SWITCHES.gear, ownerId: "mig29.gear", label: "GEAR", positions: ["UP", "DN"], defaultPosition: "DN", provenance: "Landing-gear handle" }, onChange: (to, ctx) => { ctx.setGearHandle(to === "DN"); return { accepted: true }; } },
         {
@@ -188,17 +188,16 @@ export function createMiG29Definition(options: { readonly engineMode?: Rd33Power
           onChange: (to) => { const ok = to !== "MAIN" || emergencyHandle === "NOSE"; if (ok) emergencyHandle = to; return ok ? { accepted: true } : { accepted: false, reason: "rotate and pull from the NOSE position" }; }
         },
         {
-          key: "k",
           definition: { id: MIG29_SWITCHES.pneumaticFault, ownerId: "mig29.pneumatics", label: "PNEU FAULT (TEST)", positions: Object.keys(PNEU_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: nitrogen leaks and regulator failure" },
           onChange: (to, ctx) => { ctx.setPneumaticFaults(PNEU_FAULTS[to as keyof typeof PNEU_FAULTS] ?? []); return { accepted: true }; }
         },
-        { key: "h", definition: { id: MIG29_SWITCHES.hydraulicFault, ownerId: "mig29.hydraulics", label: "HYD FAULT (TEST)", positions: ["NORMAL", "MAIN PUMP FAIL", "BOOSTER PUMP FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch" }, onChange: (to, ctx) => { ctx.setHydraulicFaults(to === "NORMAL" ? [] : [{ kind: "pump-failed", pumpId: to.startsWith("MAIN") ? "pump.main" : "pump.booster" }]); return { accepted: true }; } },
-        { key: "j", definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: Object.keys(ELEC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: generator, CSD and transformer failures" }, onChange: (to, ctx) => { elec.fault = to; applyElec(ctx); return { accepted: true }; } },
+        { definition: { id: MIG29_SWITCHES.hydraulicFault, ownerId: "mig29.hydraulics", label: "HYD FAULT (TEST)", positions: ["NORMAL", "MAIN PUMP FAIL", "BOOSTER PUMP FAIL"], defaultPosition: "NORMAL", provenance: "Simulation test switch" }, onChange: (to, ctx) => { ctx.setHydraulicFaults(to === "NORMAL" ? [] : [{ kind: "pump-failed", pumpId: to.startsWith("MAIN") ? "pump.main" : "pump.booster" }]); return { accepted: true }; } },
+        { definition: { id: MIG29_SWITCHES.electricalFault, ownerId: "mig29.electrical", label: "ELEC FAULT (TEST)", positions: Object.keys(ELEC_FAULTS), defaultPosition: "NORMAL", provenance: "Simulation test switch: generator, CSD and transformer failures" }, onChange: (to, ctx) => { elec.fault = to; applyElec(ctx); return { accepted: true }; } },
         ...([["batGnd", "BAT-GND SUPPLY"], ["dcGen", "DC GEN"], ["acGen", "AC GEN"], ["pto", "PTO"]] as const).map(([k, label]): SwitchBinding => ({
           definition: { id: MIG29_SWITCHES[k], ownerId: "mig29.electrical", label, positions: ["ON", "OFF"], defaultPosition: "ON", provenance: "GAF T.O. 1F-MIG29-1 fig 1-22, electrical power panel (RH console)" },
           onChange: (to, ctx) => { elec[k] = to === "ON"; applyElec(ctx); return { accepted: true }; }
         })),
-        { key: "l", definition: { id: MIG29_SWITCHES.leftEngine, ownerId: "mig29.engines", label: "L ENGINE (TEST)", positions: ["RUN", "CUT"], defaultPosition: "RUN", provenance: "Simulation test switch: shuts off fuel to the left engine" }, onChange: (to, ctx) => { ctx.setEngineFuelCutoff("left", to === "CUT"); return { accepted: true }; } }
+        { definition: { id: MIG29_SWITCHES.leftEngine, ownerId: "mig29.engines", label: "L ENGINE (TEST)", positions: ["RUN", "CUT"], defaultPosition: "RUN", provenance: "Simulation test switch: shuts off fuel to the left engine" }, onChange: (to, ctx) => { ctx.setEngineFuelCutoff("left", to === "CUT"); return { accepted: true }; } }
       ];
       // Speedbrake logic (GAF T.O.): electrically deactivated (retracted) when main or boost pressure is
       // below 10 MPa, with the gear extended, or without DC power; blow-back above 540 KIAS (estimated

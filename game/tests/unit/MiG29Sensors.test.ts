@@ -171,7 +171,7 @@ describe("MiG-29 weapon-control system", () => {
         const p = w.radar.recentPlots.filter((q) => !q.falseAlarm).at(-1)!;
         w.set("strobeKm", p.rangeM / 1000);
         w.set("strobeAzDeg", p.look.az / DEG);
-        w.key("t", true); w.key("t", false); pressed = true;
+        w.key("enter", true); w.key("enter", false); pressed = true;
       }
     }, 45);
     expect(pressed).toBe(true);
@@ -235,7 +235,7 @@ describe("KOLS IRST against BP-29 (effective D* fitted to the sky figure only)",
 describe("F-16 on the same engine (different package, different controls)", () => {
   it("detects and locks a head-on target with its own TMS/cursor controls", () => {
     const fc = new F16FireControl(3);
-    expect(fc.controls.find((c) => c.key === "t")?.label).toMatch(/TMS/);
+    expect(fc.controls.find((c) => c.key === "enter")?.control).toMatch(/TMS/);
     const world = new AirTargetWorld([{ id: "b", label: "b", signature: SIGNATURES.fighter, positionEnuM: [0, 50000, 6000], headingRad: Math.PI, speedMps: 230, throttle: 0.8 }], flat);
     let y = 0, locked = false;
     for (let t = 0.02; t < 90 && !locked; t += 0.02) {
@@ -244,7 +244,7 @@ describe("F-16 on the same engine (different package, different controls)", () =
       const p = fc.radar.recentPlots.find((q) => !q.falseAlarm);
       if (p && !fc.radar.lock(o) && fc.radar.state === "search") {
         (fc as unknown as { cursor: { x: number; rNm: number } }).cursor = { x: p.look.az / (60 * DEG), rNm: p.rangeM / 1852 };
-        fc.key("t", true); fc.key("t", false);
+        fc.key("enter", true); fc.key("enter", false);
       }
       fc.step({ own: o, snapshot: {} as AircraftSnapshot, scene: world, head: { az: 0, el: 0 } }, 0.02);
       locked = !!fc.radar.lock(o);
