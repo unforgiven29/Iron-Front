@@ -28,6 +28,24 @@ export type InstrumentFace =
       readonly needles?: readonly string[];
       /** Optional digital readout under the hub: format of values[readoutIndex ?? 0]. */
       readonly readout?: { readonly index?: number; readonly divisor?: number; readonly digits?: number; readonly suffix?: string };
+      /** Non-linear scale: (value, fraction of sweep) points, ascending; linear between them. */
+      readonly scale?: readonly (readonly [number, number])[];
+      /** Explicit numbered marks (instead of every majorStep). */
+      readonly marks?: readonly number[];
+    }
+  | {
+      /** Horizontal situation indicator: values [headingDeg]; the compass card turns under a fixed lubber line. */
+      readonly kind: "hsi";
+      readonly label: string;
+    }
+  | {
+      /** Vertical-tape instrument (several tapes side by side): values[i] drives tape i. */
+      readonly kind: "tapes";
+      readonly title: string;
+      readonly footer?: string;
+      readonly tapes: readonly { readonly label: string; readonly min: number; readonly max: number; readonly bands?: readonly DialBand[] }[];
+      /** Scale numbers drawn left of the first tape. */
+      readonly marks?: readonly number[];
     }
   | {
       /** Attitude indicator: values [pitchDeg, rollDeg]. */
@@ -44,7 +62,9 @@ export function drawInstrument(g: CanvasRenderingContext2D, size: number, face: 
   g.clearRect(0, 0, size, size);
   g.fillStyle = "#151719";
   g.fillRect(0, 0, size, size);
+  if (face.kind === "tapes") { drawTapes(g, size, face, values); g.restore(); return; }
   if (face.kind === "attitude") drawAttitude(g, c, r, values);
+  else if (face.kind === "hsi") drawHsi(g, c, r, values);
   else drawDial(g, c, r, face, values);
   // Bezel.
   g.beginPath();
@@ -57,7 +77,7 @@ export function drawInstrument(g: CanvasRenderingContext2D, size: number, face: 
 
 function angleOf(face: Extract<InstrumentFace, { kind: "dial" }>, v: number): number {
   const start = face.startDeg ?? -135, sweep = face.sweepDeg ?? 270;
-  let f = (v - face.min) / (face.max - face.min);
+  let f = face.scale ? lookup(face.scale, v) : (v - face.min) / (face.max - face.min);
   f = face.wrap ? ((f % 1) + 1) % 1 : Math.max(-0.02, Math.min(1.02, f));
   return ((start + sweep * f) * Math.PI) / 180;
 }
@@ -89,7 +109,8 @@ function drawDial(g: CanvasRenderingContext2D, c: number, r: number, face: Extra
   g.font = `bold ${Math.round(r * 0.16)}px ui-monospace, Menlo, monospace`;
   g.textAlign = "center";
   g.textBaseline = "middle";
-  for (let v = face.min; v <= last; v += face.majorStep) {
+  const numbered = face.marks ?? Array.from({ length: Math.floor((last - face.min) / face.majorStep) + 1 }, (_, i) => face.min + i * face.majorStep);
+  for (const v of numbered) {
     const a = angleOf(face, v);
     const [x0, y0] = polar(a, r * 0.95), [x1, y1] = polar(a, r * 0.78);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineWidth = r * 0.035; g.strokeStyle = "#f2f2f2"; g.stroke();
@@ -182,4 +203,70 @@ function offFlag(g: CanvasRenderingContext2D, c: number, r: number): void {
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.fillText("OFF", c, c);
+}
+
+function lookup(t: readonly (readonly [number, number])[], v: number): number {
+  if (v <= t[0]![0]) return t[0]![1];
+  for (let i = 1; i < t.length; i++) {
+    const [x1, y1] = t[i]!, [x0, y0] = t[i - 1]!;
+    if (v <= x1) return y0 + ((y1 - y0) * (v - x0)) / (x1 - x0);
+  }
+  return t[t.length - 1]![1];
+}
+
+function drawHsi(g: CanvasRenderingContext2D, c: number, r: number, values: readonly number[]): void {
+  const hdg = values[0];
+  g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fillStyle = "#0b0c0d"; g.fill();
+  if (hdg === undefined || !Number.isFinite(hdg)) { offFlag(g, c, r); return; }
+  g.save();
+  g.translate(c, c);
+  g.rotate((-hdg * Math.PI) / 180);
+  g.strokeStyle = "#f2f2f2"; g.fillStyle = "#f2f2f2";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  for (let d = 0; d < 360; d += 5) {
+    const a = (d * Math.PI) / 180, long = d % 10 === 0;
+    g.beginPath(); g.moveTo(Math.sin(a) * r * 0.92, -Math.cos(a) * r * 0.92); g.lineTo(Math.sin(a) * r * (long ? 0.8 : 0.86), -Math.cos(a) * r * (long ? 0.8 : 0.86));
+    g.lineWidth = r * (long ? 0.025 : 0.015); g.stroke();
+    if (d % 30 === 0) {
+      g.save(); g.rotate(a); g.font = `bold ${Math.round(r * 0.15)}px ui-monospace, Menlo, monospace`;
+      g.fillText(`${d / 10}`, 0, -r * 0.66); g.restore();
+    }
+  }
+  g.restore();
+  // Fixed aircraft symbol and lubber line.
+  g.strokeStyle = "#ffcc33"; g.lineWidth = r * 0.04;
+  g.beginPath(); g.moveTo(c, c - r * 0.35); g.lineTo(c, c + r * 0.3); g.moveTo(c - r * 0.25, c - r * 0.05); g.lineTo(c + r * 0.25, c - r * 0.05); g.moveTo(c - r * 0.1, c + r * 0.25); g.lineTo(c + r * 0.1, c + r * 0.25); g.stroke();
+  g.fillStyle = "#ffcc33"; g.beginPath(); g.moveTo(c, c - r * 0.95); g.lineTo(c - r * 0.06, c - r * 1.0 + r * 0.17); g.lineTo(c + r * 0.06, c - r * 1.0 + r * 0.17); g.fill();
+}
+
+function drawTapes(g: CanvasRenderingContext2D, size: number, face: Extract<InstrumentFace, { kind: "tapes" }>, values: readonly number[]): void {
+  g.fillStyle = "#0b0c0d";
+  g.fillRect(size * 0.04, size * 0.04, size * 0.92, size * 0.92);
+  g.strokeStyle = "#5a5f66"; g.lineWidth = size * 0.02; g.strokeRect(size * 0.04, size * 0.04, size * 0.92, size * 0.92);
+  g.fillStyle = "#f2f2f2"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `bold ${Math.round(size * 0.075)}px ui-monospace, Menlo, monospace`;
+  g.fillText(face.title, size / 2, size * 0.11);
+  if (face.footer) { g.font = `${Math.round(size * 0.06)}px ui-monospace, Menlo, monospace`; g.fillText(face.footer, size / 2, size * 0.91); }
+  const n = face.tapes.length, left = size * 0.2, right = size * 0.92, top = size * 0.2, bottom = size * 0.74;
+  const slot = (right - left) / n, w = slot * 0.42;
+  face.tapes.forEach((t, i) => {
+    const x = left + slot * i + (slot - w) / 2;
+    g.fillStyle = "#26292c"; g.fillRect(x, top, w, bottom - top);
+    for (const b of t.bands ?? []) {
+      const y0 = bottom - ((Math.min(b.to, t.max) - t.min) / (t.max - t.min)) * (bottom - top), y1 = bottom - ((Math.max(b.from, t.min) - t.min) / (t.max - t.min)) * (bottom - top);
+      g.fillStyle = b.color; g.fillRect(x - w * 0.25, y0, w * 0.18, y1 - y0);
+    }
+    const v = values[i];
+    if (v !== undefined && Number.isFinite(v)) {
+      const f = Math.max(0, Math.min(1, (v - t.min) / (t.max - t.min)));
+      g.fillStyle = "#f2f2f2"; g.fillRect(x, bottom - f * (bottom - top), w, f * (bottom - top));
+    }
+    g.fillStyle = "#cfd3d8"; g.font = `bold ${Math.round(size * 0.06)}px ui-monospace, Menlo, monospace`;
+    g.fillText(t.label, x + w / 2, size * 0.82);
+  });
+  if (face.marks && face.tapes[0]) {
+    const t = face.tapes[0];
+    g.font = `${Math.round(size * 0.055)}px ui-monospace, Menlo, monospace`; g.fillStyle = "#cfd3d8"; g.textAlign = "right";
+    for (const m of face.marks) g.fillText(`${m}`, left - size * 0.02, bottom - ((m - t.min) / (t.max - t.min)) * (bottom - top));
+  }
 }

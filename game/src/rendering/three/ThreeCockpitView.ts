@@ -221,7 +221,7 @@ export class ThreeCockpitView {
         geometry = new THREE.PlaneGeometry(a, b);
         material = new THREE.MeshBasicMaterial({ color: part.color, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false });
       } else if (part.kind === "instrument" && part.instrument) {
-        geometry = new THREE.CircleGeometry(a / 2, 48);
+        geometry = part.instrument.kind === "tapes" ? new THREE.PlaneGeometry(a, b) : new THREE.CircleGeometry(a / 2, 48);
         const canvas = document.createElement("canvas");
         canvas.width = 256;
         canvas.height = 256;

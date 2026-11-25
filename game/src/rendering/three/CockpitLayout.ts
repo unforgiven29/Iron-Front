@@ -24,7 +24,7 @@ export interface CockpitPart {
     | { readonly kind: "switch"; readonly switchId: string; readonly positions: readonly string[] };
   /** Screen content id rendered by the view ("hud", "mfd-left", ...). */
   readonly screen?: string;
-  /** Instrument face (kind "instrument"): drawn from the values the view source reports for this part id. sizeM[0] = diameter. */
+  /** Instrument face (kind "instrument"): drawn from the values the view source reports for this part id. sizeM[0] = diameter (round faces) or [width, height] (tapes). */
   readonly instrument?: InstrumentFace;
 }
 

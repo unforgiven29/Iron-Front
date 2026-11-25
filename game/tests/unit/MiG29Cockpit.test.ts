@@ -33,8 +33,11 @@ describe("MiG-29 cockpit", () => {
     expect(v("alt")[0]).toBeCloseTo(s.altitudeMslM, 6);
     expect(v("fuel")[0]).toBeCloseTo(s.fuelKg, 6);
     expect(v("rpm")).toHaveLength(2);
-    for (const x of [...v("rpm"), ...v("egt"), ...v("hyd"), ...v("n2"), ...v("adi")]) expect(Number.isFinite(x)).toBe(true);
-    expect(v("hyd")[0]).toBeCloseTo(s.hydraulics!.circuits.find((c) => c.id === "main")!.pressurePa / 1e6, 6);
+    for (const x of [...v("rpm"), ...v("egt-l"), ...v("egt-r"), ...v("hydgas"), ...v("adi"), ...v("hsi"), ...v("ramps"), ...v("aoa"), ...v("ralt")]) expect(Number.isFinite(x)).toBe(true);
+    expect(v("hydgas")[0]).toBeCloseTo(s.hydraulics!.circuits.find((c) => c.id === "main")!.pressurePa / 98066.5, 6);
+    expect(v("hydgas")[3]).toBeCloseTo(s.pneumatics!.systems.find((c) => c.id === "emergency")!.pressurePa / 98066.5, 6);
+    expect(v("ralt")[0]).toBeCloseTo(s.ground.kind === "airborne" ? s.ground.aglM : 0, 6);
+    expect(v("cabin").every((x) => Number.isNaN(x))).toBe(true); // not simulated: drawn empty, never faked
   });
 
   it("powered instruments show no reading (OFF) when their bus is unpowered; pitot-static ones keep working", () => {
@@ -45,7 +48,8 @@ describe("MiG-29 cockpit", () => {
     expect(s.electrical!.buses.find((b) => b.id === "ac36")!.powered).toBe(false);
     const v = (id: string) => MIG29_COCKPIT_INSTRUMENTS[id]!(s);
     expect(v("adi").every((x) => Number.isNaN(x))).toBe(true);
-    expect(v("hyd").every((x) => Number.isNaN(x))).toBe(true);
+    expect(v("hydgas").every((x) => Number.isNaN(x))).toBe(true);
+    expect(v("hsi").every((x) => Number.isNaN(x))).toBe(true);
     expect(Number.isFinite(v("ias")[0]!)).toBe(true);
     expect(Number.isFinite(v("fuel")[0]!)).toBe(true); // DC bus still powered
   });
