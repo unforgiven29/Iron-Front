@@ -90,6 +90,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     rect("ramps", 555, 255, 55, 42, { kind: "tapes", title: "КЛИН", footer: "%", tapes: [{ label: "Л", min: 0, max: 100 }, { label: "П", min: 0, max: 100 }], marks: [0, 50, 100] }),
     // Radar head-down display: repeats the radar/KOLS picture (drawn from the weapon-control system).
     { id: "hdd", kind: "screen", positionM: onPanel(...at(600, 95)), sizeM: [0.15, 0.13, 0], rotationRad: [0, TILT, 0], color: "#101214", screen: "radar" },
+    // СПО-15 indicator (right side of the panel; position approximate).
+    { id: "spo15", kind: "screen", positionM: onPanel(...at(650, 215)), sizeM: [0.1, 0.1, 0], rotationRad: [0, TILT, 0], color: "#101214", screen: "rwr" },
     // Levers and switches (clickable; positions approximate, not from the photographs).
     lever("gear-lever", SW.gear, ["UP", "DN"], [0.62, -0.46, 0.36], [0.04, 0.03, 0.08], "#c33"),
     lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.7, -0.33, 0.64], [0.03, 0.06, 0.03], YELLOW),

@@ -8,6 +8,7 @@
  */
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import type { IrFieldQuery, IrPoint } from "../infrared/InfraredPhysics.js";
+import type { RfIntercept, RfReceiverQuery } from "../radar/RfEmission.js";
 import type { BistaticClutterQuery, ClutterPatch, ClutterQuery, RadarBeamQuery, RadarEcho } from "../radar/RadarPhysics.js";
 
 export interface SensorScene {
@@ -19,6 +20,8 @@ export interface SensorScene {
   bistaticClutter?(query: Omit<BistaticClutterQuery, "groundHeightM" | "gammaDb">): readonly ClutterPatch[];
   /** Point sources inside one tick of detector-field motion. */
   infrared(query: IrFieldQuery): readonly IrPoint[];
+  /** Direct-path RF arriving at a passive receiver this tick (optional; absent = RF-silent world). */
+  rf?(query: RfReceiverQuery): readonly RfIntercept[];
   /** Unit vector toward the sun (ENU). */
   readonly sunDirectionEnu: Vector3;
 }

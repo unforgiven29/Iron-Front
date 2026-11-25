@@ -4,6 +4,7 @@
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
 import { mountDataPanel } from "./DataPanel.js";
+import { WarningTones } from "./WarningTones.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
 import { createTestRange, hostileSpecs, targetsFor, type TargetScenario } from "./TestRange.js";
 import { HostileFighter, type HostileEnvironment } from "../world/combat/HostileFighters.js";
@@ -97,6 +98,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     return hostiles;
   });
   const missiles = new MissileWorld(targets, groundAt);
+  // Active missile seekers radiate into the same RF world as the aircraft radars.
+  targets.extraEmitters = () => notional.emitters();
   const notional = new NotionalMissileWorld(
     () => [...playerTarget(), ...targets.states().map((t) => ({ id: t.id, side: "red" as const, positionEnuM: t.positionEnuM, velocityEnuMps: t.velocityEnuMps }))],
     (id, m) => { if (id === "player") shotDown = `${m.spec.display}`; else targets.destroy(id); },
@@ -146,7 +149,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     hud: () => {
       const s = jet.snapshot();
       const base = hud(s, jet.definition.annunciate);
-      return { ...base, warnings: [...combatWarnings(s), ...base.warnings] };
+      return { ...base, warnings: [...combatWarnings(), ...base.warnings] };
     },
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     instrument: (id) => definition.cockpitInstruments?.[id]?.(jet.snapshot()) ?? [Number.NaN],
@@ -155,6 +158,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     hudOverlay: () => avionics?.hud() ?? [],
     hudOwnedByPackage: () => avionics?.ownsHud === true,
     helmetOverlay: () => avionics?.helmet?.() ?? [],
+    inset: () => (avionics?.insetScreen ? avionics.screen(avionics.insetScreen) : undefined),
     worldObjects: () => [
       ...targets.states().map((t) => ({ id: t.id, kind: "aircraft" as const, ...(hostileModel.has(t.id) ? { modelId: hostileModel.get(t.id)! } : {}), positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu })),
       ...notional.states().map((m) => ({ id: m.id, kind: "missile" as const, ...orient(m.velocityEnuMps), positionEnuM: m.positionEnuM, missile: { geometry: m.spec.geometry, burning: m.burning } })),
@@ -168,23 +172,11 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       })
     ]
   };
-  // Low-fidelity missile warning (placeholder for an RWR/MAWS model): any hostile missile inside 60 km.
-  const combatWarnings = (s: AircraftSnapshot): { text: string; level: "caution" | "warning" }[] => {
-    if (shotDown) return [{ text: `SHOT DOWN — ${shotDown}`, level: "warning" }];
-    const out: { text: string; level: "caution" | "warning" }[] = [];
-    for (const m of notional.states()) {
-      if (m.side === "blue") continue;
-      const r = [m.positionEnuM[0] - s.positionEnuM[0], m.positionEnuM[1] - s.positionEnuM[1], m.positionEnuM[2] - s.positionEnuM[2]] as const;
-      const d = Math.hypot(...r);
-      if (d > 60000) continue;
-      const clock = ((Math.round(((Math.atan2(r[0], r[1]) - s.headingRad) * 6) / Math.PI) % 12) + 12) % 12 || 12;
-      out.push({ text: `MISSILE ${m.spec.display} ${clock} O'CLOCK ${(d / 1852).toFixed(1)} NM`, level: "warning" });
-      break;
-    }
-    return out;
-  };
+  // Loss is shown on the HUD; threat warnings come from the aircraft's own RWR (inset + tones).
+  const combatWarnings = (): { text: string; level: "caution" | "warning" }[] => (shotDown ? [{ text: `SHOT DOWN — ${shotDown}`, level: "warning" }] : []);
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield], definition.exteriorModelId);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
+  const tones = new WarningTones();
   let paused = false;
   const restart = () => {
     const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); avionics?.reset();
@@ -239,6 +231,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     }
     view.render();
     panel.update();
+    if (!paused && avionics?.audioCues) tones.update(avionics.audioCues()); else tones.update(null);
     if (raf !== -1) raf = requestAnimationFrame(loop);
   };
   let raf = requestAnimationFrame(loop);
@@ -247,7 +240,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     get paused() { return paused; },
     setPaused(p: boolean) { paused = p; held.clear(); if (!p) { last = null; frame.focus(); } },
     restart,
-    dispose() { cancelAnimationFrame(raf); raf = -1; view.dispose(); }
+    dispose() { cancelAnimationFrame(raf); raf = -1; tones.dispose(); view.dispose(); }
   };
 }
 

@@ -66,8 +66,15 @@ export interface AvionicsSuite {
   /** Short status lines for data panels and tests. */
   status(): Readonly<Record<string, string | number>>;
   reset(): void;
+  /** Screen id the session may also show as a small inset over the view (e.g. the RWR indicator). */
+  readonly insetScreen?: string;
+  /** Warning tones the package's equipment is requesting now (the session plays them). */
+  audioCues?(): AudioCues;
   /** Optional presentation settings from the game menu (e.g. hudLanguage = ru | en). */
   setOption?(key: string, value: string): void;
 }
+
+/** Warning-tone requests: `newContacts` counts emitters newly displayed since the last call. */
+export interface AudioCues { readonly newContacts: number; readonly steadyIllumination: boolean; readonly missile: boolean }
 
 export const AVIONICS_RATE_HZ = 50;

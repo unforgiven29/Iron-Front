@@ -16,6 +16,7 @@ import { createScopedRandom, type SeededRandom } from "../../core/random/SeededR
 import { cross, unit } from "../../physics/sensing/SweepGeometry.js";
 import type { NotionalMissileSpec } from "../../weapons/catalog/NotionalAirToAir.js";
 import type { AirTargetBody, AirTargetState, TargetSignature } from "../targets/AirTargets.js";
+import type { RfAntennaPattern, RfEmitter } from "../../physics/radar/RfEmission.js";
 import type { CombatTarget, LauncherCue, Side } from "../weapons/NotionalMissiles.js";
 
 const G = 9.80665;
@@ -38,7 +39,30 @@ export interface HostileFighterSpec {
   readonly cruiseMps?: number;
   /** 0..1: reaction time and shot discipline. */
   readonly skill?: number;
+  /** Fire-control radar (RF emitter). Absent = no radar emissions. */
+  readonly radar?: FighterRadarSpec;
 }
+
+/**
+ * Fire-control radar transmitter of a hostile fighter, as an RF emitter (search scan / single-target
+ * track). ESTIMATED class values for an X-band planar-array fighter radar (0.62 m aperture at
+ * ~9.7 GHz → ≈33 dBi, ≈3.5° beam); powers from average power ÷ duty. Not data for any real radar.
+ */
+export interface FighterRadarSpec {
+  readonly carrierBandHz: readonly [number, number];
+  readonly pattern: RfAntennaPattern;
+  readonly search: { readonly prfHz: number; readonly pulseWidthS: number; readonly peakPowerW: number; readonly halfWidthRad: number; readonly rateRadS: number; readonly barsRad: readonly number[] };
+  readonly track: { readonly prfHz: number; readonly pulseWidthS: number; readonly peakPowerW: number };
+  readonly provenance: string;
+}
+
+export const NOTIONAL_FIGHTER_RADAR: FighterRadarSpec = {
+  carrierBandHz: [9.6e9, 10.0e9],
+  pattern: { peakGainDbi: 33, beamwidthRad: 3.5 * D, sidelobeDb: -30 },
+  search: { prfHz: 12e3, pulseWidthS: 1.1e-6, peakPowerW: 19e3, halfWidthRad: 60 * D, rateRadS: 60 * D, barsRad: [1 * D, -2.5 * D] },
+  track: { prfHz: 160e3, pulseWidthS: 1.3e-6, peakPowerW: 4.5e3 },
+  provenance: "ESTIMATED class values (X-band planar array fighter radar); not measured data of any radar"
+};
 
 export interface HostileEnvironment {
   /** Opposing aircraft and missiles in the world; the fighter applies its own perception gates. */
@@ -83,6 +107,12 @@ export class HostileFighter implements AirTargetBody {
   private crankSign = 1;
   private contact: { id: string; positionEnuM: Vector3; velocityEnuMps: Vector3; seenAtS: number } | null = null;
   public mode: HostileMode = "patrol";
+  private radarStart: Vector3 = [0, 1, 0];
+  private radarEnd: Vector3 = [0, 1, 0];
+  private scanPhase = 0;
+  private carrierHz = 9.8e9;
+  /** True while the radar holds a single-target track (beam on the contact). */
+  public radarTracking = false;
   private readonly rng: SeededRandom;
 
   public constructor(spec: HostileFighterSpec, private readonly env: HostileEnvironment) {
@@ -92,6 +122,44 @@ export class HostileFighter implements AirTargetBody {
     this.speed = spec.speedMps;
     this.stores = [...spec.loadout];
     this.rng = createScopedRandom(4242, `hostile/${spec.id}`);
+    if (spec.radar) {
+      const [a, b] = spec.radar.carrierBandHz;
+      this.carrierHz = a + (b - a) * this.rng.nextFloat();
+      this.scanPhase = this.rng.nextFloat() * 4;
+    }
+  }
+
+  /** Radar pointing for this tick: STT on a fresh contact, otherwise a bar scan about the nose. */
+  private pointRadar(dt: number): void {
+    const r = this.spec.radar;
+    if (!r) return;
+    this.radarStart = this.radarEnd;
+    const c = this.contact;
+    // Search until the contact is near shooting range or a radar missile needs support, then hold the beam (STT).
+    const range = c ? len([c.positionEnuM[0] - this.pos[0], c.positionEnuM[1] - this.pos[1], c.positionEnuM[2] - this.pos[2]]) : Infinity;
+    const supporting = this.spec.loadout.some((m) => m.guidance === "radar" && this.env.missileInFlight(this.spec.id, m.id));
+    this.radarTracking = !!c && this.time - c.seenAtS < 1 && (range < 38000 || supporting);
+    if (this.radarTracking && c) {
+      const d: Vector3 = [c.positionEnuM[0] - this.pos[0], c.positionEnuM[1] - this.pos[1], c.positionEnuM[2] - this.pos[2]];
+      this.radarEnd = unit(d);
+      return;
+    }
+    // Triangle scan ±halfWidth, one bar per sweep.
+    this.scanPhase += dt;
+    const sweep = (2 * r.search.halfWidthRad) / r.search.rateRadS;
+    const k = Math.floor(this.scanPhase / sweep);
+    const f = (this.scanPhase % sweep) / sweep;
+    const az = this.heading + (k % 2 === 0 ? -1 + 2 * f : 1 - 2 * f) * r.search.halfWidthRad;
+    const el = r.search.barsRad[k % r.search.barsRad.length]!;
+    this.radarEnd = [Math.sin(az) * Math.cos(el), Math.cos(az) * Math.cos(el), Math.sin(el)];
+  }
+
+  public emitters(): readonly RfEmitter[] {
+    const r = this.spec.radar;
+    if (!r) return [];
+    const w = this.radarTracking ? r.track : r.search;
+    return [{ positionEnuM: [...this.pos], boresightStartEnu: this.radarStart, boresightEndEnu: this.radarEnd, pattern: r.pattern, carrierHz: this.carrierHz,
+      peakPowerW: w.peakPowerW, cw: false, prfHz: w.prfHz, pulseWidthS: w.pulseWidthS, radiating: true }];
   }
 
   public get remainingStores(): readonly NotionalMissileSpec[] { return this.stores; }
@@ -217,6 +285,7 @@ export class HostileFighter implements AirTargetBody {
     this.bank = Math.atan((this.speed * this.turnRate) / G);
     const v = this.velocityEnuMps;
     this.pos = [this.pos[0] + v[0] * dt, this.pos[1] + v[1] * dt, this.pos[2] + v[2] * dt];
+    this.pointRadar(dt);
   }
 
   public state(): AirTargetState {

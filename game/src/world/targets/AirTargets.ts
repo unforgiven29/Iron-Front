@@ -11,6 +11,7 @@ import { infraredPoints, type IrEmitterState, type IrFieldQuery, type IrPoint, t
 import { bistaticClutterPatches, groundClutterPatches, radarEchoes, type BistaticClutterQuery, type ClutterPatch, type ClutterQuery, type RadarBeamQuery, type RadarEcho, type RadarScatterer, type RadarTerrain, type RcsModel } from "../../physics/radar/RadarPhysics.js";
 import type { SensorScene } from "../../physics/sensing/SensorScene.js";
 import { cross, dot, unit } from "../../physics/sensing/SweepGeometry.js";
+import { rfInterceptsAt, type RfEmitter, type RfIntercept, type RfReceiverQuery } from "../../physics/radar/RfEmission.js";
 import { standardAtmosphere } from "../../physics/environment/Atmosphere.js";
 
 export type ManeuverStep =
@@ -69,6 +70,8 @@ export interface AirTargetBody {
   readonly spec: { readonly id: string; readonly label: string; readonly signature: TargetSignature };
   update(dt: number): void;
   state(): AirTargetState;
+  /** What this body radiates this tick (radar transmitters); absent = RF-silent. */
+  emitters?(): readonly RfEmitter[];
 }
 
 class AirTarget implements AirTargetBody {
@@ -159,6 +162,14 @@ export class AirTargetWorld implements SensorScene {
 
   /** Truth for rendering and tests only. Sensors receive a SensorScene, never this list. */
   public states(): readonly AirTargetState[] { return this.targets.map((t) => t.state()); }
+
+  /** Extra emitters not carried by air targets (e.g. active missile seekers), set by the world. */
+  public extraEmitters: () => readonly RfEmitter[] = () => [];
+
+  public rf(query: RfReceiverQuery): readonly RfIntercept[] {
+    const emitters = [...this.targets.flatMap((t) => t.emitters?.() ?? []), ...this.extraEmitters()];
+    return rfInterceptsAt(query, emitters, this.terrain);
+  }
 
   public radar(query: RadarBeamQuery): readonly RadarEcho[] {
     const scatterers: RadarScatterer[] = this.targets.map((t) => { const s = t.state(); return { positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, toBody: toBodyOf(s), rcs: t.spec.signature.rcs }; });

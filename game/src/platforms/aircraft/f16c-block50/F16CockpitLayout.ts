@@ -25,6 +25,8 @@ export const F16_COCKPIT_LAYOUT: CockpitLayout = {
     { id: "glareshield", kind: "box", positionM: [0.78, 0, 0.28], sizeM: [0.2, 0.5, 0.04], color: DARK },
     { id: "mfd-left", kind: "screen", positionM: [0.825, -0.19, 0.44], sizeM: [0.13, 0.13, 0], rotationRad: [0, -0.35, 0], color: "#0d1a12", screen: "mfd-left" },
     { id: "mfd-right", kind: "screen", positionM: [0.825, 0.19, 0.44], sizeM: [0.13, 0.13, 0], rotationRad: [0, -0.35, 0], color: "#0d1a12", screen: "mfd-right" },
+    // RWR azimuth indicator (upper left of the panel; position approximate).
+    { id: "rwr", kind: "screen", positionM: [0.79, -0.15, 0.33], sizeM: [0.075, 0.075, 0], rotationRad: [0, -0.35, 0], color: "#06100a", screen: "rwr" },
     { id: "icp", kind: "box", positionM: [0.8, 0, 0.36], sizeM: [0.05, 0.16, 0.08], rotationRad: [0, -0.35, 0], color: DARK },
     // HUD combiner glass and frame.
     { id: "hud-glass", kind: "glass", positionM: [0.66, 0, 0.07], sizeM: [0.15, 0.16, 0], rotationRad: [0, -0.2, 0], color: "#7fe0a0" },

@@ -11,7 +11,9 @@
 import type { DisplayList, DisplayPrimitive } from "../../../../rendering/instruments/DisplayList.js";
 import { DEG, type RasterPattern } from "../../../../sensors/common/ScanGeometry.js";
 import { PulseDopplerRadar, type RadarProfile, type WaveformSpec } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import type { AudioCues, AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import { RadarWarningReceiver } from "../../../../sensors/rwr/RadarWarningReceiver.js";
+import { ALR56M_PROFILE, alr56mDisplay } from "./ALR56M.js";
 import { NOTIONAL_AAM, type NotionalMissileSpec } from "../../../../weapons/catalog/NotionalAirToAir.js";
 
 const E = (source: string) => ({ source: `ESTIMATED: ${source}`, status: "estimated" as const });
@@ -84,6 +86,11 @@ const BY_NAME: Record<string, NotionalMissileSpec> = { "AIM-9X": NOTIONAL_AAM.AI
 const storesFor = (id: string): (NotionalMissileSpec | null)[] => (F16_LOADOUTS.find((l) => l.id === id) ?? F16_LOADOUTS[0]!).stations.map((n) => BY_NAME[n] ?? null);
 
 export class F16FireControl implements AvionicsSuite {
+  /** Radar warning receiver (passive; independent of the radar). */
+  public readonly rwr = new RadarWarningReceiver(ALR56M_PROFILE);
+  public readonly insetScreen = "rwr";
+  private rwrSeen = new Set<number>();
+  private rwrTime = 0;
   public readonly controls = F16_AVIONICS_CONTROLS;
   public readonly radar: PulseDopplerRadar;
   private mode: Mode = "CRM";
@@ -104,7 +111,8 @@ export class F16FireControl implements AvionicsSuite {
 
   public constructor(seed = 16) { this.radar = new PulseDopplerRadar(APG68_PROFILE, seed); }
 
-  public reset(): void { this.radar.breakLock("reset"); this.mode = "CRM"; this.stores = storesFor(this.loadoutId); this.selectFirst(); }
+  public reset(): void {
+    this.rwr.reset(); this.rwrSeen.clear(); this.radar.breakLock("reset"); this.mode = "CRM"; this.stores = storesFor(this.loadoutId); this.selectFirst(); }
 
   public setOption(key: string, value: string): void {
     if (key === "loadout" && F16_LOADOUTS.some((l) => l.id === value)) { this.loadoutId = value; this.stores = storesFor(value); this.selectFirst(); }
@@ -169,6 +177,10 @@ export class F16FireControl implements AvionicsSuite {
   }
 
   public step(ctx: AvionicsContext, dt: number): void {
+    this.rwrTime = ctx.own.timeS;
+    // Power: any live bus (the exact RWR bus assignment is not sourced).
+    this.rwr.setPower(!ctx.snapshot.electrical || ctx.snapshot.electrical.buses.some((b) => b.powered));
+    this.rwr.step({ timeS: ctx.own.timeS, positionEnuM: ctx.own.positionEnuM, bodyToWorld: ctx.own.bodyToWorld, headingRad: ctx.own.headingRad }, ctx.scene, dt);
     this.ctx = ctx;
     const sc = SCALES[this.scale] as number;
     if (this.held.has("arrowup")) this.cursor.rNm = Math.min(sc, this.cursor.rNm + sc * 0.3 * dt);
@@ -231,7 +243,16 @@ export class F16FireControl implements AvionicsSuite {
     return [{ kind: "line", frame: "angle", points: [[az - d, el - d], [az + d, el - d], [az + d, el + d], [az - d, el + d]], closed: true }];
   }
 
-  public screen(id: string): DisplayList | undefined { return id === "mfd-left" ? this.bscope() : undefined; }
+  public audioCues(): AudioCues {
+    const cs = this.rwr.contacts();
+    let fresh = 0;
+    for (const c of cs) if (!this.rwrSeen.has(c.id)) { this.rwrSeen.add(c.id); fresh++; }
+    return { newContacts: fresh, steadyIllumination: cs.some((c) => c.steadyIllumination), missile: cs.some((c) => c.match?.entry.category === "missile-seeker") };
+  }
+
+  public screen(id: string): DisplayList | undefined {
+    if (id === "rwr") return alr56mDisplay(this.rwr.contacts(), this.rwr.isPowered, Math.floor(this.rwrTime * 4) % 2 === 0);
+    return id === "mfd-left" ? this.bscope() : undefined; }
 
   public status(): Readonly<Record<string, string | number>> { return { mode: this.mode, radar: this.radar.state, plots: this.radar.recentPlots.length }; }
 }

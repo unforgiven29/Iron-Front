@@ -6,7 +6,7 @@ import { createTestTerrain } from "../debug/DebugFlyer.js";
 import { flattenTileForAirfield, type AirfieldSpec } from "../world/infrastructure/Airfield.js";
 import { generateSyntheticTile, TerrainSurface } from "../world/terrain/Terrain.js";
 import { SIGNATURES, type AirTargetSpec } from "../world/targets/AirTargets.js";
-import type { HostileFighterSpec } from "../world/combat/HostileFighters.js";
+import { NOTIONAL_FIGHTER_RADAR, type HostileFighterSpec } from "../world/combat/HostileFighters.js";
 import { NOTIONAL_AAM } from "../weapons/catalog/NotionalAirToAir.js";
 
 export interface TestRange {
@@ -78,7 +78,8 @@ export function hostileSpecs(scenario: TargetScenario): readonly HostileFighterS
     id: `hostile-${i + 1}`, label: `${names[i]} (F-16C, hostile, low fidelity)`, modelId: "f16c-aggressor", signature: SIGNATURES.fighter, side: "red" as const,
     positionEnuM: [x, 40000 + y, z] as const, headingRad: 180 * D, speedMps: 250,
     loadout: [NOTIONAL_AAM.AIM120, NOTIONAL_AAM.AIM120, NOTIONAL_AAM.AIM9X, NOTIONAL_AAM.AIM9X],
-    skill: 0.45 + 0.1 * i
+    skill: 0.45 + 0.1 * i,
+    radar: NOTIONAL_FIGHTER_RADAR
   }));
 }
 

@@ -32,6 +32,8 @@ export interface NotionalMissileSpec {
   readonly fuzeRadiusM: number;
   readonly lethalRadiusM: number;
   readonly geometry: MissileShape;
+  /** Active radar seeker transmitter (radar guidance only): what an RWR can intercept in the terminal phase. */
+  readonly activeSeeker?: { readonly carrierHz: number; readonly prfHz: number; readonly pulseWidthS: number; readonly peakPowerW: number; readonly peakGainDbi: number; readonly beamwidthRad: number; readonly sidelobeDb: number };
   readonly provenance: string;
 }
 
@@ -50,6 +52,7 @@ export const NOTIONAL_AAM = {
     id: "aim120", display: "AIM-120", guidance: "radar", boostDeltaVMps: 900, burnS: 6, dragK: 0.00004, maxG: 35, navConstant: 4,
     lifetimeS: 80, seekerRangeM: 15000, seekerHalfAngleRad: 30 * D, maxLaunchRangeM: 45000, minLaunchRangeM: 1500, maxOffBoresightRad: 30 * D,
     fuzeRadiusM: 12, lethalRadiusM: 10,
+    activeSeeker: { carrierHz: 15.5e9, prfHz: 120e3, pulseWidthS: 0.6e-6, peakPowerW: 500, peakGainDbi: 24, beamwidthRad: 9 * D, sidelobeDb: -20 },
     geometry: { lengthM: 3.65, diameterM: 0.178, noseLengthM: 0.45, surfaces: [{ spanM: 0.53, rootChordM: 0.4, tipChordM: 0.25, leadingEdgeM: 1.4 }, { spanM: 0.45, rootChordM: 0.3, tipChordM: 0.15, leadingEdgeM: 3.3 }] },
     provenance: NOTE
   }

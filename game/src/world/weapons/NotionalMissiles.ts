@@ -11,6 +11,7 @@ import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { createScopedRandom } from "../../core/random/SeededRandom.js";
 import { standardAtmosphere } from "../../physics/environment/Atmosphere.js";
 import type { NotionalMissileSpec } from "../../weapons/catalog/NotionalAirToAir.js";
+import type { RfEmitter } from "../../physics/radar/RfEmission.js";
 
 export type Side = "blue" | "red";
 
@@ -62,6 +63,10 @@ class NotionalMissile {
   public seekerId: string | null = null;
   public prevRel = new Map<string, Vector3>();
   public lastCue: { positionEnuM: Vector3; velocityEnuMps: Vector3 } | null = null;
+  /** Active seeker transmitting (terminal phase of a radar missile). */
+  public active = false;
+  public seekerStart: Vector3 = [0, 1, 0];
+  public seekerEnd: Vector3 = [0, 1, 0];
 
   public constructor(public readonly id: string, public readonly spec: NotionalMissileSpec, public readonly side: Side, public readonly shooterId: string,
     position: Vector3, velocity: Vector3, public readonly cue: LauncherCue, public readonly intendedId: string | null) {
@@ -128,6 +133,11 @@ export class NotionalMissileWorld {
       const aimP = target?.positionEnuM ?? m.lastCue?.positionEnuM ?? null;
       const aimV = target?.velocityEnuMps ?? m.lastCue?.velocityEnuMps ?? [0, 0, 0];
       const spd = Math.max(1, len(m.vel));
+      // The active seeker radiates once inside its acquisition range of the cued point (or while homing).
+      m.active = !!m.spec.activeSeeker && (!!target || (!!aimP && len(sub(aimP, m.pos)) <= m.spec.seekerRangeM));
+      m.seekerStart = m.seekerEnd;
+      if (aimP) { const d = sub(aimP, m.pos), n = len(d) || 1; m.seekerEnd = [d[0] / n, d[1] / n, d[2] / n]; }
+      else m.seekerEnd = scale(m.vel, 1 / spd);
       // Speed: motor then drag (ρ from ISA).
       const rho = standardAtmosphere(Math.max(0, Math.min(30000, m.pos[2]))).densityKgM3 / 1.225;
       const thrustA = m.t <= m.spec.burnS ? m.spec.boostDeltaVMps / m.spec.burnS : 0;
@@ -179,6 +189,15 @@ export class NotionalMissileWorld {
 
   private stateOf(m: NotionalMissile): NotionalMissileState {
     return { id: m.id, spec: m.spec, side: m.side, shooterId: m.shooterId, positionEnuM: [...m.pos], velocityEnuMps: [...m.vel], timeS: m.t, burning: m.t <= m.spec.burnS, seekerTargetId: m.seekerId };
+  }
+
+  /** Active seekers as RF emitters (only what is transmitting now). */
+  public emitters(): readonly RfEmitter[] {
+    return this.missiles.filter((m) => m.alive && m.active && m.spec.activeSeeker).map((m) => {
+      const a = m.spec.activeSeeker!;
+      return { positionEnuM: [...m.pos], boresightStartEnu: m.seekerStart, boresightEndEnu: m.seekerEnd, pattern: { peakGainDbi: a.peakGainDbi, beamwidthRad: a.beamwidthRad, sidelobeDb: a.sidelobeDb },
+        carrierHz: a.carrierHz, peakPowerW: a.peakPowerW, cw: false, prfHz: a.prfHz, pulseWidthS: a.pulseWidthS, radiating: true };
+    });
   }
 
   public states(): readonly NotionalMissileState[] { return this.missiles.map((m) => this.stateOf(m)); }

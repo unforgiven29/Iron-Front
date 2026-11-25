@@ -18,7 +18,9 @@ import { norm, sub, unit } from "../../../../physics/sensing/SweepGeometry.js";
 import { bodyAngles, DEG, type LookAngles, type RasterPattern, type SensorOwnship } from "../../../../sensors/common/ScanGeometry.js";
 import { ScanningIrst } from "../../../../sensors/irst/ScanningIrst.js";
 import { PulseDopplerRadar, type RadarTrackReport } from "../../../../sensors/radar/PulseDopplerRadar.js";
-import type { AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import type { AudioCues, AvionicsContext, AvionicsControl, AvionicsSuite, LoadoutOption } from "../../common/Avionics.js";
+import { RadarWarningReceiver } from "../../../../sensors/rwr/RadarWarningReceiver.js";
+import { SPO15_PROFILE, spo15Display } from "./Spo15.js";
 import { KOLS_PROFILE } from "./KolsProfile.js";
 import { SOVIET_AAM } from "../../../../weapons/catalog/SovietAirToAir.js";
 import { launchZone, type LauncherLink, type MissileSpec } from "../../../../weapons/missiles/Missile.js";
@@ -107,6 +109,11 @@ const MIG_STORE: Record<string, MissileSpec> = { "R-73": SOVIET_AAM.R73A, "R-60M
 const migStores = (id: string): (MissileSpec | null)[] => (MIG29_LOADOUTS.find((l) => l.id === id) ?? MIG29_LOADOUTS[0]!).stations.map((n) => MIG_STORE[n] ?? null);
 
 export class MiG29WeaponControl implements AvionicsSuite {
+  /** Radar warning receiver (passive; independent of the radar). */
+  public readonly rwr = new RadarWarningReceiver(SPO15_PROFILE);
+  public readonly insetScreen = "rwr";
+  private rwrSeen = new Set<number>();
+  private rwrTime = 0;
   public readonly controls = MIG29_AVIONICS_CONTROLS;
   public readonly ownsHud = true;
   public readonly radar: PulseDopplerRadar;
@@ -263,7 +270,8 @@ export class MiG29WeaponControl implements AvionicsSuite {
     this.dlz = { maxM: this.dlz && k < 1 ? this.dlz.maxM + k * (z.maxM - this.dlz.maxM) : z.maxM, minM: this.dlz && k < 1 ? this.dlz.minM + k * (z.minM - this.dlz.minM) : z.minM, t: own.timeS, specId: w.id };
   }
 
-  public reset(): void { this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); this.stores = migStores(this.loadoutId); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
+  public reset(): void {
+    this.rwr.reset(); this.rwrSeen.clear(); this.s = MiG29WeaponControl.initial(); this.radar.breakLock("reset"); this.kols.breakLock("reset"); this.stores = migStores(this.loadoutId); this.selected = Math.max(0, this.stores.findIndex((x) => x)); }
 
   public get state(): Readonly<Mig29WcsStatus> { return this.s; }
 
@@ -358,6 +366,10 @@ export class MiG29WeaponControl implements AvionicsSuite {
   }
 
   public step(ctx: AvionicsContext, dt: number): void {
+    this.rwrTime = ctx.own.timeS;
+    // Power: any live bus (the exact RWR bus assignment is not sourced).
+    this.rwr.setPower(!ctx.snapshot.electrical || ctx.snapshot.electrical.buses.some((b) => b.powered));
+    this.rwr.step({ timeS: ctx.own.timeS, positionEnuM: ctx.own.positionEnuM, bodyToWorld: ctx.own.bodyToWorld, headingRad: ctx.own.headingRad }, ctx.scene, dt);
     this.ctx = ctx;
     const s = this.s;
     const scale = SCALE_KM[s.radarMode];
@@ -761,7 +773,16 @@ export class MiG29WeaponControl implements AvionicsSuite {
 
   public hud(): DisplayList { return this.localize(this.picture(true)); }
 
-  public screen(id: string): DisplayList | undefined { return id === "radar" ? this.localize(this.picture(false)) : undefined; }
+  public audioCues(): AudioCues {
+    const cs = this.rwr.contacts();
+    let fresh = 0;
+    for (const c of cs) if (!this.rwrSeen.has(c.id)) { this.rwrSeen.add(c.id); fresh++; }
+    return { newContacts: fresh, steadyIllumination: cs.some((c) => c.steadyIllumination), missile: cs.some((c) => c.match?.entry.category === "missile-seeker") };
+  }
+
+  public screen(id: string): DisplayList | undefined {
+    if (id === "rwr") return spo15Display(this.rwr.contacts(), this.rwr.isPowered, Math.floor(this.rwrTime * 4) % 2 === 0);
+    return id === "radar" ? this.localize(this.picture(false)) : undefined; }
 
   public status(): Readonly<Record<string, string | number>> {
     const own = this.ctx?.own;
