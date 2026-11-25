@@ -1,6 +1,6 @@
 # Radar source structure
 
-**Status: documentation and folder scaffold only for the radar work requested here. No radar runtime code was added by this task.**
+**Status: first executable slice exists under `game/src/sensors/` and `game/src/physics/` (PROJECT_STATE item 16u). This folder remains the architecture guide; capabilities not listed there are not implemented.**
 
 This is the equipment-side organization guide. It defines future code/data ownership for radar sets and their processing chain. The [radar documentation](../../docs/radar/README.md) is the requirements authority; [shared radar physics](../../physics/radar/README.md) owns reusable propagation, geometry, scattering and clutter requirements.
 

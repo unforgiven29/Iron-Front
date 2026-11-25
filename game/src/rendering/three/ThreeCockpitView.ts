@@ -16,6 +16,7 @@ import { rotateVector } from "../../physics/rigidbody/RigidBody.js";
 import type { AirfieldSpec } from "../../world/infrastructure/Airfield.js";
 import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import { drawInstrument } from "../instruments/Gauges.js";
+import { drawDisplayList, type DisplayList } from "../instruments/DisplayList.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
@@ -51,6 +52,12 @@ export interface CockpitViewSource {
   instrument(partId: string): readonly number[];
   /** Request the next position of a switch (cockpit click). */
   cycleSwitch(switchId: string): void;
+  /** Package-drawn content for a cockpit screen (display list); falls back to the text MFD page. */
+  display?(screen: string): DisplayList | undefined;
+  /** Package HUD symbology drawn over the shared HUD (screen frame = HUD field box, angle frame = conformal). */
+  hudOverlay?(): DisplayList;
+  /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
+  worldObjects?(): readonly { readonly id: string; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
@@ -72,6 +79,7 @@ export class ThreeCockpitView {
   private readonly instruments: { part: CockpitPart; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }[] = [];
   private readonly hudCanvas: HTMLCanvasElement;
   private readonly raycaster = new THREE.Raycaster();
+  private readonly others = new Map<string, THREE.Group>();
   private frame = 0;
 
   public constructor(
@@ -150,6 +158,7 @@ export class ThreeCockpitView {
     this.animateParts(s);
     if (this.frame++ % 6 === 0) this.drawScreens();
     if (this.frame % 2 === 0) this.drawInstruments();
+    this.drawOthers();
     this.renderer.render(this.scene, this.camera);
     this.drawHud(s);
   }
@@ -296,6 +305,14 @@ export class ThreeCockpitView {
     for (const [id, { canvas, texture }] of this.screens) {
       const g = canvas.getContext("2d");
       if (!g) continue;
+      const list = this.source.display?.(id);
+      if (list) {
+        g.fillStyle = "#04100a";
+        g.fillRect(0, 0, 256, 256);
+        drawDisplayList(g, list, { screen: (x, y) => [128 + x * 120, 128 - y * 120], unitPx: 120 }, "#8ff0a8");
+        texture.needsUpdate = true;
+        continue;
+      }
       const page = this.source.mfd(id);
       g.fillStyle = "#06120a";
       g.fillRect(0, 0, 256, 256);
@@ -308,6 +325,35 @@ export class ThreeCockpitView {
       page.lines.slice(0, 10).forEach((line, i) => g.fillText(line, 14, 66 + i * 19));
       texture.needsUpdate = true;
     }
+  }
+
+  /** Simple meshes for other aircraft. */
+  private drawOthers(): void {
+    const list = this.source.worldObjects?.() ?? [];
+    const seen = new Set<string>();
+    for (const o of list) {
+      seen.add(o.id);
+      let m = this.others.get(o.id);
+      if (!m) {
+        m = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: "#6d747c", roughness: 0.6 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 17), mat); // z = along fuselage (built aft = +z)
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.25, 4), mat);
+        wing.position.set(0, 0, 1);
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3, 2.5), mat);
+        fin.position.set(0, 1.8, 6.5);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 2.2), mat);
+        tail.position.set(0, 0, 7);
+        m.add(body, wing, fin, tail);
+        this.world.add(m);
+        this.others.set(o.id, m);
+      }
+      // Children of the world group use absolute ENU; the group carries the floating origin.
+      m.position.copy(enuToThree(o.positionEnuM));
+      const right = enuToThree(o.rightEnu), up = enuToThree([-o.downEnu[0], -o.downEnu[1], -o.downEnu[2]]), back = enuToThree([-o.forwardEnu[0], -o.forwardEnu[1], -o.forwardEnu[2]]);
+      m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, back));
+    }
+    for (const [id, m] of this.others) if (!seen.has(id)) { this.world.remove(m); this.others.delete(id); }
   }
 
   // ---------------- HUD (collimated overlay) ----------------
@@ -417,6 +463,15 @@ export class ThreeCockpitView {
     g.fillText(`${d.nzG.toFixed(1)}G`, cx - 20 * u, cy + 8 * u);
     g.fillText(`M ${d.mach.toFixed(2)}`, cx - 20 * u, cy + 11 * u);
     g.fillText(`α ${d.alphaDeg.toFixed(1)}`, cx - 20 * u, cy + 14 * u);
+    const overlay = this.source.hudOverlay?.();
+    if (overlay) {
+      const half = 20 * u;
+      drawDisplayList(g, overlay, {
+        unitPx: half,
+        screen: (x, y) => [cx + x * half, cy - 4 * u - y * half],
+        angle: (az, el) => this.project(rotateVector(s.bodyToWorld, [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), -Math.sin(el)]))
+      }, color);
+    }
     g.restore();
 
   }

@@ -5,7 +5,9 @@
  */
 import { mountDataPanel } from "./DataPanel.js";
 import { runwayLineUp } from "../world/infrastructure/Airfield.js";
-import { createTestRange } from "./TestRange.js";
+import { createRangeTargets, createTestRange } from "./TestRange.js";
+import { AirTargetWorld } from "../world/targets/AirTargets.js";
+import { AVIONICS_RATE_HZ } from "../platforms/aircraft/common/Avionics.js";
 import { layeredWind } from "../physics/environment/Atmosphere.js";
 import type { AircraftDefinition } from "../platforms/aircraft/common/AircraftDefinition.js";
 import { FixedWingAircraft, type AircraftSnapshot } from "../platforms/aircraft/common/FixedWingAircraft.js";
@@ -48,17 +50,38 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     wind: layeredWind("cockpit.wind", [{ heightM: 0, velocityEnuMps: [2, 1, 0] }, { heightM: 3000, velocityEnuMps: [12, -4, 0] }])
   }, { ...startState(), positionEnuM: [...startState().positionEnuM] });
 
+  // Air targets (world truth) and the aircraft's avionics, stepped at a fixed rate in simulation time.
+  const targets = new AirTargetWorld(createRangeTargets(), { heightAt: (x, y) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; } });
+  const avionics = definition.createAvionics?.();
+  let simTime = 0, avionicsAcc = 0;
+  const stepWorld = (dt: number, head: { az: number; el: number }) => {
+    avionicsAcc += dt;
+    const h = 1 / AVIONICS_RATE_HZ;
+    while (avionicsAcc >= h) {
+      avionicsAcc -= h;
+      simTime += h;
+      targets.step(h);
+      if (avionics) {
+        const s = jet.snapshot();
+        avionics.step({ own: { timeS: simTime, positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps, bodyToWorld: s.bodyToWorld, headingRad: s.headingRad, pitchRad: s.pitchRad, rollRad: s.rollRad }, snapshot: s, scene: targets, head }, h);
+      }
+    }
+  };
+
   const source: CockpitViewSource = {
     snapshot: () => jet.renderSnapshot(),
     hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
     instrument: (id) => definition.cockpitInstruments?.[id]?.(jet.snapshot()) ?? [Number.NaN],
-    cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); }
+    cycleSwitch: (id) => { jet.controls.cycle(id, "cockpit-click"); },
+    display: (id) => avionics?.screen(id),
+    hudOverlay: () => avionics?.hud() ?? [],
+    worldObjects: () => targets.states().map((t) => ({ id: t.id, positionEnuM: t.positionEnuM, forwardEnu: t.forwardEnu, rightEnu: t.rightEnu, downEnu: t.downEnu }))
   };
   const view = new View(frame, definition.cockpit, terrain, { minM: [-20000, -20000], maxM: [20000, 20000], stepM: 200 }, source, [airfield]);
   const panel = mountDataPanel(frame, definition, () => jet.snapshot());
   let paused = false;
-  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
+  const restart = () => { const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); avionics?.reset(); simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 }; };
 
   const held = new Set<string>();
   let stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
@@ -71,13 +94,14 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (paused) return;
     if (k === "r") { restart(); return; }
     if (panel.onKey(k)) return;
+    if (avionics?.key(k, true)) { e.preventDefault(); return; }
     const bound = jet.switchKeys.find((b) => b.key === k);
     if (bound) { jet.controls.cycle(bound.switchId, "keyboard"); return; }
     if (k === "v") { view.resetLook(); return; }
     held.add(k);
   });
-  frame.addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
-  frame.addEventListener("blur", () => held.clear());
+  frame.addEventListener("keyup", (e) => { held.delete(e.key.toLowerCase()); avionics?.key(e.key.toLowerCase(), false); });
+  frame.addEventListener("blur", () => { held.clear(); for (const c of avionics?.controls ?? []) avionics?.key(c.key, false); });
   frame.addEventListener("pointerdown", () => frame.focus());
 
   let last: number | null = null;
@@ -97,7 +121,11 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (has("control")) throttle = Math.max(0, throttle - 0.4 * dt);
     jet.setPilotInputs(stick);
     jet.setThrottle(throttle);
-    if (!paused) jet.advanceFrame(dt);
+    if (!paused) {
+      jet.advanceFrame(dt);
+      // Helmet sight = the pilot's view direction (view yaw is positive to the left).
+      stepWorld(dt, { az: -view.look.yaw, el: view.look.pitch });
+    }
     view.render();
     panel.update();
     requestAnimationFrame(loop);

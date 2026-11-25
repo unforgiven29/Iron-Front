@@ -88,8 +88,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
       { label: "БУСТ", min: 0, max: 250, bands: [{ from: 0, to: H.lowPressurePa.value / KGF, color: RED }] },
       { label: "ОСН", min: 0, max: 200 }, { label: "АВАР", min: 0, max: 200 }] }),
     rect("ramps", 555, 255, 55, 42, { kind: "tapes", title: "КЛИН", footer: "%", tapes: [{ label: "Л", min: 0, max: 100 }, { label: "П", min: 0, max: 100 }], marks: [0, 50, 100] }),
-    // Radar head-down display (radar not simulated: dark).
-    { id: "hdd", kind: "box", positionM: onPanel(...at(600, 95)), sizeM: [0.02, 0.15, 0.13], rotationRad: [0, TILT, 0], color: "#101214" },
+    // Radar head-down display: repeats the radar/KOLS picture (drawn from the weapon-control system).
+    { id: "hdd", kind: "screen", positionM: onPanel(...at(600, 95)), sizeM: [0.15, 0.13, 0], rotationRad: [0, TILT, 0], color: "#101214", screen: "radar" },
     // Levers and switches (clickable; positions approximate, not from the photographs).
     lever("gear-lever", SW.gear, ["UP", "DN"], [0.62, -0.46, 0.36], [0.04, 0.03, 0.08], "#c33"),
     lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.7, -0.33, 0.64], [0.03, 0.06, 0.03], YELLOW),

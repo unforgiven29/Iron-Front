@@ -1,6 +1,6 @@
 # Radar simulation source area
 
-**Status: folder scaffold and README only for this task. No radar runtime code was added or retained from this task.**
+**Status: first vertical slice implemented** — `PulseDopplerRadar.ts` (mechanically scanned coherent pulse-Doppler radar driven entirely by an equipment profile; see `docs/claude/PROJECT_STATE.md` item 16u). The rest of this page is the intended full architecture; items below not named there are still unimplemented.
 
 This directory is reserved for the future executable radar equipment and processing implementation. The requirements and architecture authority is [docs/radar](../../../../docs/radar/README.md); the top-level equipment ownership map is [sensors/Radar](../../../../sensors/Radar/README.md); shared world/physics requirements are [physics/radar](../../../../physics/radar/README.md).
 

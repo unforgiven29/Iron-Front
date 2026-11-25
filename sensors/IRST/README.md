@@ -1,6 +1,6 @@
 # IRST Source Structure
 
-**Status: documentation and planned folder structure only. No IRST detection or tracking algorithms are implemented yet.**
+**Status: first executable slice exists under `game/src/sensors/` and `game/src/physics/` (PROJECT_STATE item 16u). This folder remains the architecture guide; capabilities not listed there are not implemented.**
 
 IRST is a passive infrared search-and-track sensor. It must detect targets from modeled thermal radiance/contrast, atmospheric transmission, background, optics, detector behavior, scan geometry and processing. It must not use a fixed detection radius, visible-mesh test or hidden world truth.
 

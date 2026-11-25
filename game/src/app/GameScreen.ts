@@ -45,9 +45,11 @@ export function mountGameScreen(root: HTMLElement): void {
   const renderControls = () => {
     controls.replaceChildren();
     const switchRows = definition.createSystems().switches.filter((s) => s.key).map((s) => [s.key!.toUpperCase(), s.definition.label] as const);
+    const avionicsRows = (definition.createAvionics?.().controls ?? []).map((c) => [c.key.length === 1 ? c.key.toUpperCase() : c.key.replace(/^./, (x) => x.toUpperCase()), c.label] as const);
     for (const [k, v] of [
       ["W / S", "Pitch"], ["A / D", "Roll"], ["Q / E", "Yaw / nose-wheel steering"], ["Shift / Ctrl", "Throttle"], ["Space", "Wheel brakes"],
       ...switchRows,
+      ...avionicsRows,
       ["I  (then 1 / 2 / 3)", "Data panel: surfaces / engines / systems"], ["Right-drag / wheel", "Look around / zoom"], ["V", "Centre view"], ["R", "Reset"], ["Esc / P", "Pause"]
     ] as const) {
       const row = el("div", "game-control-row");

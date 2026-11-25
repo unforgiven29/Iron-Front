@@ -357,6 +357,8 @@ export interface AircraftDefinition {
   /** Pilot-facing MFD pages built from the snapshot (package decides what to show). */
   readonly mfdPages?: Readonly<Record<string, (snapshot: import("./FixedWingAircraft.js").AircraftSnapshot) => { title: string; lines: string[] }>>;
   createSystems(): AircraftSystems;
+  /** Optional avionics / weapon-control suite (sensors, modes, controls, symbology). Fresh instance per flight. */
+  createAvionics?(): import("./Avionics.js").AvionicsSuite;
 }
 
 export type { Ambient };

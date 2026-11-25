@@ -10,3 +10,6 @@ Do not transfer MiG-29S 9.13S N019M/TWS2/R-77 or later MiG-29M/SMT capabilities 
 
 ## Integration and tests
 Commands from avionics; uncertain reports to cockpit/fusion; actual resource grants; shared physical RF chain. Test configuration, stabilization, power/cooling, mode/control mapping, startup, aperture/antenna damage and no hidden-world target input.
+
+## Implemented installation (first slice)
+`game/src/platforms/aircraft/mig29/avionics/N019Profile.ts` (radar), `KolsProfile.ts` (IRST/LRF), `MiG29WeaponControl.ts` (СУВ modes, controls, symbology). Source: «Боевое применение самолёта МиГ-29» (cited BP-29, export RLPK-29E/OEPrNK-29E fit — confirm applicability to product 9.13). Every hardware value carries published/derived/estimated/fitted status; one fitted value per sensor.
