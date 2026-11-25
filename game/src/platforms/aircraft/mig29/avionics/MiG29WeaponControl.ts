@@ -34,6 +34,13 @@ export type Snp = "ОТКЛ" | "ППС" | "ЗПС";
 const MASTERS: readonly Master[] = ["НВГ", "РЛС", "ТП", "ББ", "ШЛЕМ", "ОПТ", "БРСТ"];
 /** English names shown on the ИЛС and in the controls list. */
 export const MASTER_EN: Record<Master, string> = { "НВГ": "NAV", "РЛС": "RDR", "ТП": "IRST", "ББ": "CC", "ШЛЕМ": "HMS", "ОПТ": "OPT", "БРСТ": "BRST" };
+/** English equivalents of the Cyrillic ИЛС legends (menu option). */
+const EN: Record<string, string> = {
+  "РЛ": "RL", "ТП": "IR", "А": "A", "ПР": "LA", "ППС": "HEAD", "ЗПС": "TAIL", "ЗАХВ": "ACQ", "СРЫВ": "BREAK", "Б.Б": "CC", "ШЛЕМ": "HMS", "ОПТ": "OPT", "ВИЗ": "BRST", "НВГ": "NAV",
+  "УСИЛ": "GAIN", "ΔН": "dH", "Д": "R", "Ṽ": "Vc", "ПОРАЖ": "KILL", "ПРОМАХ": "MISS", "НЕТ": "NONE", "27Р": "R27R", "27ЭР": "R27ER", "27Т": "R27T", "27ЭТ": "R27ET", "60М": "R60M", "73": "R73",
+  "ИЗЛ": "TX", "ЭКВ": "STBY", "ОТКЛ": "OFF", "ТОРМ": "COOP", "СНП": "TWS", "БЕЗ": "NO", "КОМП": "GUARD", "РЛС": "RDR", "КОЛС": "IRST",
+  "ОБЗОР": "SEARCH", "СОПР": "TRACK", "ПАМЯТЬ": "MEMORY", "ПРОГРЕВ": "WARMUP", "ЦУ": "SLAVED", "В": "HEAD-ON", "АВТ": "AUTO", "БЛ.БОЙ": "DOGFIGHT"
+};
 /** ИЛС legends are Cyrillic, as on the aircraft. */
 const STATE_RU: Record<string, string> = { off: "ОТКЛ", warmup: "ПРОГРЕВ", standby: "ЭКВ", search: "ОБЗОР", acquire: "ЗАХВ", track: "СОПР", memory: "ПАМЯТЬ", slaved: "ЦУ" };
 const MISSILE_RU: Record<string, string> = { r27r: "27Р", r27er: "27ЭР", r27t: "27Т", r27et: "27ЭТ", r60m: "60М", r73a: "73" };
@@ -475,6 +482,12 @@ export class MiG29WeaponControl implements AvionicsSuite {
       L([[-0.74, 0.8], [-0.5, 0.8]]);
       L([[-0.66, 0.74], [-0.62, 0.79], [-0.58, 0.74]], { closed: true });
       T(0.62, 0.86, `${Math.round(alt / 10) * 10}`, "center", 0.1);
+      // Attacked target's speed and altitude, smaller, above our own (BP-29 fig.43).
+      const est = this.targetEstimate(own);
+      if (est) {
+        T(-0.62, 0.97, `${Math.round((norm(est.velocityEnuMps) * 3.6) / 10) * 10}`, "center", 0.065);
+        T(0.62, 0.97, `${Math.round(est.positionEnuM[2] / 100) * 100}`, "center", 0.065);
+      }
       const hdg = ((own.headingRad / DEG) % 360 + 360) % 360;
       const px = 0.02;
       L([[-0.26, 0.8], [0.26, 0.8]]);
@@ -578,7 +591,7 @@ export class MiG29WeaponControl implements AvionicsSuite {
       const pat = this.searchPattern();
       const bx = (deg: number) => (deg / 65) * 0.75;
       L([[bx(pat.center.az / DEG - pat.widthRad / DEG / 2), -0.75], [bx(pat.center.az / DEG + pat.widthRad / DEG / 2), -0.75]], { width: 2.5 });
-      T(0.95, 0.66, `ΔН ${s.dhKm > 0 ? "+" : ""}${s.dhKm}`, "right", 0.06);
+      if (!hud) T(0.95, 0.66, `ΔН ${s.dhKm > 0 ? "+" : ""}${s.dhKm}`, "right", 0.06);
       if (this.radar.acquisitionPhase) T(0, -0.62, "ЗАХВ", "center", 0.07);
     } else if (s.master === "РЛС" || (s.master === "ББ" && !this.oepsLeads())) {
       // ---------- radar close combat (BP-29 figs 12–13): two vertical lines bounding the zone ----------
@@ -643,12 +656,12 @@ export class MiG29WeaponControl implements AvionicsSuite {
     T(-0.95, -0.82, w ? `${MISSILE_RU[w.id] ?? w.display} ${this.remaining}` : "НЕТ", "left", 0.065);
     if (w && hud && this.ctx && w.seeker.value.kind === "ir") {
       const los = this.irSeekerLos(this.ctx, w);
-      if (los) { const b = bodyAngles(own, los); out.push({ kind: "circle", frame: "angle", at: [b.az, b.el], radius: 0.05 }); T(-0.95, -0.72, "ЗАХВ ТГС", "left", 0.05); }
+      if (los) { const b = bodyAngles(own, los); out.push({ kind: "circle", frame: "angle", at: [b.az, b.el], radius: 0.05 }); }
     }
     if (this.killCue && own.timeS - this.killCue.t < 2.5) T(0, 0.55, this.killCue.text, "center", 0.1);
     const em = s.emission;
     const tags = [s.emission !== "ИЗЛ" ? em : "", s.interaction ? "ТОРМ" : "", s.snp !== "ОТКЛ" ? `СНП ${s.snp}` : "", s.compensation ? "" : "БЕЗ КОМП"].filter(Boolean);
-    if (!hud || tags.length) T(0.95, -0.95, tags.join(" "), "right");
+    if (!hud) T(0.95, -0.95, tags.join(" "), "right");
     if (!hud) T(-0.95, -0.95, `РЛС ${STATE_RU[this.radar.state] ?? this.radar.state} ${s.radarMode}  КОЛС ${STATE_RU[this.kols.state] ?? this.kols.state}`, "left");
     const loss = this.radar.lossEvent ?? this.kols.lossEvent;
     if (loss && own.timeS - loss.timeS < 2.5 && !["mode change", "pilot", "rescan", "reset"].includes(loss.reason)) T(0, 0.68, "СРЫВ", "center", 0.08);
@@ -711,9 +724,18 @@ export class MiG29WeaponControl implements AvionicsSuite {
     }
   }
 
-  public hud(): DisplayList { return this.picture(true); }
+  /** HUD/HDD legend language: "ru" as on the aircraft, or "en". */
+  private lang: "ru" | "en" = "ru";
+  public setOption(key: string, value: string): void { if (key === "hudLanguage" && (value === "ru" || value === "en")) this.lang = value; }
 
-  public screen(id: string): DisplayList | undefined { return id === "radar" ? this.picture(false) : undefined; }
+  private localize(list: DisplayPrimitive[]): DisplayList {
+    if (this.lang === "ru") return list;
+    return list.map((p) => (p.kind === "text" ? { ...p, text: p.text.split(" ").map((w) => EN[w] ?? w).join(" ") } : p));
+  }
+
+  public hud(): DisplayList { return this.localize(this.picture(true)); }
+
+  public screen(id: string): DisplayList | undefined { return id === "radar" ? this.localize(this.picture(false)) : undefined; }
 
   public status(): Readonly<Record<string, string | number>> {
     const own = this.ctx?.own;

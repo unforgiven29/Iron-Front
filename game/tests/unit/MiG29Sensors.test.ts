@@ -404,3 +404,16 @@ describe("cannon sight and IRST gain", () => {
     expect(run(0)).toBe(0);
   });
 });
+
+describe("HUD language option", () => {
+  it("Russian by default, English on request; scan elevation and TWS state are off the HUD", () => {
+    const w = new MiG29WeaponControl();
+    w.step({ own: own(1, 0, 6000, 230), snapshot: {} as AircraftSnapshot, scene: EMPTY_SENSOR_SCENE, head: { az: 0, el: 0 } }, 0.02);
+    const texts = () => w.hud().filter((p) => p.kind === "text").map((p) => (p as { text: string }).text);
+    expect(texts()).toContain("РЛ");
+    expect(texts().some((t) => t.startsWith("ΔН"))).toBe(false);
+    w.setOption("hudLanguage", "en");
+    expect(texts()).toContain("RL");
+    expect(texts()).not.toContain("РЛ");
+  });
+});

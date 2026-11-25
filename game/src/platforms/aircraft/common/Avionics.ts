@@ -51,6 +51,8 @@ export interface AvionicsSuite {
   /** Short status lines for data panels and tests. */
   status(): Readonly<Record<string, string | number>>;
   reset(): void;
+  /** Optional presentation settings from the game menu (e.g. hudLanguage = ru | en). */
+  setOption?(key: string, value: string): void;
 }
 
 export const AVIONICS_RATE_HZ = 50;

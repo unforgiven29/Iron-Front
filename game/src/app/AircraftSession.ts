@@ -33,7 +33,7 @@ export interface AircraftSessionHandle {
 
 export type StartMode = "runway" | "air";
 
-export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway", scenario: TargetScenario = "range"): AircraftSessionHandle {
+export function startAircraftSession(View: typeof import("../rendering/three/ThreeCockpitView.js").ThreeCockpitView, frame: HTMLElement, definition: AircraftDefinition, mode: StartMode = "runway", scenario: TargetScenario = "range", options: Readonly<Record<string, string>> = {}): AircraftSessionHandle {
   const { terrain, airfield } = createTestRange();
   const runway = airfield.runways[0];
   const startState = () => {
@@ -56,6 +56,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   const groundAt = (x: number, y: number) => { const t = terrain.sample(x, y); return t.status === "valid" ? t.heightM : Number.NaN; };
   const missiles = new MissileWorld(targets, groundAt);
   const avionics = definition.createAvionics?.();
+  for (const [k, v] of Object.entries(options)) avionics?.setOption?.(k, v);
   let simTime = 0, avionicsAcc = 0;
   const stepWorld = (dt: number, head: { az: number; el: number }) => {
     avionicsAcc += dt;
