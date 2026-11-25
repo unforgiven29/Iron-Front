@@ -18,14 +18,19 @@ const STYLE: Readonly<Record<ExplosionKind, { fire: number; smoke: number; debri
   ground: { fire: 90, smoke: 70, debris: 14, radius: 14, light: 500 }
 };
 
+const MAX_PARTICLES = 20000;
+/** Write rows into the fixed-size buffers (allocated once) and upload only the used range. */
 function upload(pts: THREE.Points, rows: readonly number[][]): void {
-  const n = rows.length, pos = new Float32Array(n * 3), size = new Float32Array(n), fire = new Float32Array(n), fade = new Float32Array(n);
-  rows.forEach((r, i) => { pos[i * 3] = r[0]!; pos[i * 3 + 1] = r[1]!; pos[i * 3 + 2] = r[2]!; size[i] = r[3]!; fire[i] = r[4]!; fade[i] = r[5]!; });
   const geo = pts.geometry;
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute("size", new THREE.BufferAttribute(size, 1));
-  geo.setAttribute("fire", new THREE.BufferAttribute(fire, 1));
-  geo.setAttribute("fade", new THREE.BufferAttribute(fade, 1));
+  if (!geo.getAttribute("position")) {
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    for (const k of ["size", "fire", "fade"]) geo.setAttribute(k, new THREE.BufferAttribute(new Float32Array(MAX_PARTICLES), 1).setUsage(THREE.DynamicDrawUsage));
+  }
+  const n = Math.min(rows.length, MAX_PARTICLES);
+  const attrs = ["position", "size", "fire", "fade"].map((k) => geo.getAttribute(k) as THREE.BufferAttribute);
+  const [pos, size, fire, fade] = attrs.map((a) => a.array as Float32Array) as [Float32Array, Float32Array, Float32Array, Float32Array];
+  for (let i = 0; i < n; i++) { const r = rows[i]!; pos[i * 3] = r[0]!; pos[i * 3 + 1] = r[1]!; pos[i * 3 + 2] = r[2]!; size[i] = r[3]!; fire[i] = r[4]!; fade[i] = r[5]!; }
+  attrs.forEach((a, j) => { a.addUpdateRange(0, j === 0 ? n * 3 : n); a.needsUpdate = true; });
   geo.setDrawRange(0, n);
 }
 
@@ -79,7 +84,7 @@ export class Explosions {
     light.position.copy(c);
     this.parent.add(light);
     this.flashes.push({ light, born: now, peak: req.kind === "warhead" ? 40 : 90 });
-    while (this.particles.length > 20000) this.particles.shift();
+    if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);
   }
 
   /** Advance and upload the particles (call once per rendered frame). */

@@ -68,6 +68,10 @@ export interface CockpitViewSource {
   worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly modelId?: string; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
+/** Device-pixel-ratio cap: above 1.5 the antialiased scene costs far more fill rate for little gain. */
+const MAX_DPR = 1.5;
+/** Smoke puffs kept (fixed GPU buffer size). */
+const SMOKE_MAX = 12000;
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
 
 export class ThreeCockpitView {
@@ -106,7 +110,7 @@ export class ThreeCockpitView {
     ownModelId?: string
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
     this.renderer.domElement.className = "cockpit-gl";
     this.hudCanvas = document.createElement("canvas");
     this.hudCanvas.className = "cockpit-hud";
@@ -207,7 +211,7 @@ export class ThreeCockpitView {
 
     this.animateParts(s);
     if (this.frame++ % 6 === 0) this.drawScreens();
-    if (this.frame % 2 === 0) this.drawInstruments();
+    this.drawInstruments(this.frame % 4);
     this.drawOthers();
     this.drawSmoke();
     this.explosionFx ??= new Explosions(this.world);
@@ -247,7 +251,7 @@ export class ThreeCockpitView {
   private drawExternalHud(): void {
     const g = this.hudCanvas.getContext("2d");
     if (!g) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1), w = this.hudCanvas.width / dpr, h = this.hudCanvas.height / dpr;
+    const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1), w = this.hudCanvas.width / dpr, h = this.hudCanvas.height / dpr;
     g.save();
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
@@ -333,6 +337,8 @@ export class ThreeCockpitView {
         canvas.height = 256;
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
         this.instruments.push({ part, canvas, texture });
         material = new THREE.MeshBasicMaterial({ map: texture });
       } else {
@@ -342,6 +348,8 @@ export class ThreeCockpitView {
         canvas.height = 256;
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
         this.screens.set(part.screen ?? part.id, { canvas, texture });
         material = new THREE.MeshBasicMaterial({ map: texture });
       }
@@ -389,8 +397,10 @@ export class ThreeCockpitView {
     }
   }
 
-  private drawInstruments(): void {
-    for (const { part, canvas, texture } of this.instruments) {
+  /** Redraw a quarter of the instruments per frame (each one updates every 4th frame). */
+  private drawInstruments(slot: number): void {
+    for (let i = slot; i < this.instruments.length; i += 4) {
+      const { part, canvas, texture } = this.instruments[i]!;
       const g = canvas.getContext("2d");
       if (!g || !part.instrument) continue;
       drawInstrument(g, canvas.width, part.instrument, this.source.instrument(part.id));
@@ -463,7 +473,7 @@ export class ThreeCockpitView {
       this.smoke.push({ p: [prev[0] + (tail[0] - prev[0]) * t, prev[1] + (tail[1] - prev[1]) * t, prev[2] + (tail[2] - prev[2]) * t], born: now, drift: [j(), j(), 0.3 + Math.random() * 0.3] });
     }
     this.lastPuff.set(id, tail);
-    while (this.smoke.length > 12000) this.smoke.shift();
+    while (this.smoke.length > SMOKE_MAX) this.smoke.shift();
   }
 
   /** Draw the smoke trail: puffs grow and fade over ~20 s, drifting slightly; they outlive the missile. */
@@ -483,7 +493,13 @@ export class ThreeCockpitView {
       this.world.add(this.smokePoints);
     }
     const n = this.smoke.length;
-    const pos = new Float32Array(n * 3), age = new Float32Array(n);
+    const geo = this.smokePoints.geometry;
+    if (!geo.getAttribute("position")) {
+      geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SMOKE_MAX * 3), 3).setUsage(THREE.DynamicDrawUsage));
+      geo.setAttribute("age", new THREE.BufferAttribute(new Float32Array(SMOKE_MAX), 1).setUsage(THREE.DynamicDrawUsage));
+    }
+    const posAttr = geo.getAttribute("position") as THREE.BufferAttribute, ageAttr = geo.getAttribute("age") as THREE.BufferAttribute;
+    const pos = posAttr.array as Float32Array, age = ageAttr.array as Float32Array;
     for (let i = 0; i < n; i++) {
       const s = this.smoke[i] as { p: Vector3; born: number; drift: Vector3 };
       const a = now - s.born;
@@ -491,9 +507,10 @@ export class ThreeCockpitView {
       pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z;
       age[i] = a;
     }
-    const geo = this.smokePoints.geometry;
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute("age", new THREE.BufferAttribute(age, 1));
+    posAttr.addUpdateRange(0, n * 3);
+    ageAttr.addUpdateRange(0, n);
+    posAttr.needsUpdate = true;
+    ageAttr.needsUpdate = true;
     geo.setDrawRange(0, n);
   }
 
@@ -546,7 +563,7 @@ export class ThreeCockpitView {
 
   private resize(): void {
     const w = this.container.clientWidth, h = this.container.clientHeight;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
     const size = this.renderer.getSize(new THREE.Vector2());
     if (size.x !== w || size.y !== h) {
       this.renderer.setSize(w, h, false);
