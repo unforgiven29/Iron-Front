@@ -53,6 +53,12 @@ export interface FadecOverrides {
 export interface FadecSchedule {
   /** Throttle position (0..1) of the dry-power / afterburner detent. */
   readonly afterburnerDetentThrottle: number;
+  /**
+   * Afterburner fraction at the detent (minimum afterburner). Past the detent the throttle maps
+   * linearly from this to 1. Absent = 0. Lit afterburners carry pressure losses, so a fraction near
+   * zero can give less thrust than dry MIL; real controls start at a minimum flame above MIL.
+   */
+  readonly minAfterburnerFraction?: number;
   /** Physical spool speed (fraction of design) at idle, sea level. */
   readonly idleSpeed: number;
   /**
@@ -185,7 +191,8 @@ export function scheduleSteadyState(design: TurbofanDesign, s: FadecSchedule, mo
   const correctedCap = (s.maxCorrectedSpeedByTheta ? Math.min(s.maxCorrectedSpeed, lookup1D(s.maxCorrectedSpeedByTheta, theta).value) : s.maxCorrectedSpeed) * Math.sqrt(theta);
   if (speed > correctedCap) { speed = correctedCap; limits.push("corrected-speed"); }
 
-  let abRequest = t > s.afterburnerDetentThrottle ? (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
+  const minAb = Math.max(0, Math.min(1, s.minAfterburnerFraction ?? 0));
+  let abRequest = t > s.afterburnerDetentThrottle ? minAb + (1 - minAb) * (t - s.afterburnerDetentThrottle) / (1 - s.afterburnerDetentThrottle) : 0;
   if (abRequest > 0 && ((mode === "backup" && s.backup.afterburnerInhibited) || o.afterburnerInhibited)) { abRequest = 0; limits.push("afterburner-inhibited"); }
 
   const dryFraction = Math.min(1, Math.max(0, t / s.afterburnerDetentThrottle));

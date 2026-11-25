@@ -72,7 +72,7 @@ export const RD33_LPM_DESIGN: TurbofanDesign = sizeNozzle(E.limitedPowerMilitary
 export type Rd33PowerMode = "NPM" | "LPM";
 
 export const RD33_CONTROL: FadecSchedule = {
-  afterburnerDetentThrottle: E.afterburnerDetentThrottle.value, idleSpeed: E.idleSpeed.value, maxPhysicalSpeed: 1, maxCorrectedSpeed: 1.04,
+  afterburnerDetentThrottle: E.afterburnerDetentThrottle.value, minAfterburnerFraction: E.minAfterburnerFraction.value, idleSpeed: E.idleSpeed.value, maxPhysicalSpeed: 1, maxCorrectedSpeed: 1.04,
   accelRatePerS: E.accelRatePerS.value, decelRatePerS: E.decelRatePerS.value,
   afterburnerMinSpeedFraction: E.afterburnerMinSpeedFraction.value, afterburnerLightDelayS: E.afterburnerLightDelayS.value, afterburnerLightDuringAcceleration: true,
   // GAF T.O.: AB ignition may not be available in bursts above 43,000 ft close to minimum speed (envelope ESTIMATED as burner pressure).

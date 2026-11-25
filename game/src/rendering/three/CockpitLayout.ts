@@ -3,7 +3,9 @@
  * (FRD, metres) relative to the pilot's design eye point. Aircraft packages supply a layout;
  * the shared Three.js view renders any layout without aircraft-specific code.
  */
-export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass";
+import type { InstrumentFace } from "../instruments/Gauges.js";
+
+export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass" | "instrument";
 
 export interface CockpitPart {
   readonly id: string;
@@ -22,6 +24,8 @@ export interface CockpitPart {
     | { readonly kind: "switch"; readonly switchId: string; readonly positions: readonly string[] };
   /** Screen content id rendered by the view ("hud", "mfd-left", ...). */
   readonly screen?: string;
+  /** Instrument face (kind "instrument"): drawn from the values the view source reports for this part id. sizeM[0] = diameter (round faces) or [width, height] (tapes). */
+  readonly instrument?: InstrumentFace;
 }
 
 export interface CockpitLayout {

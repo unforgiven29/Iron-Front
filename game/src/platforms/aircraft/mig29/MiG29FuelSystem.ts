@@ -14,8 +14,9 @@
  *    (inertia switch) and above 30,000 ft "may or may not transfer" (modelled as not).
  *  - Fuel is burned only from tank 2 (both engines).
  * ESTIMATED: tank centroids (scaled from the perspective drawing fig. 1-18 on a 17.32 m airframe),
- * pump capacities, distribution of trapped fuel (pro rata to capacity). The fuel accumulator for
- * near-zero-g flight is not modelled.
+ * pump capacities, distribution of trapped fuel (pro rata to capacity).
+ * The near-zero-g fuel accumulator is a TANK ("accumulator", inside tank 3): its fuel counts in
+ * mass, CG and inertia, and refilling it from tank 2 is a transfer, not a loss.
  */
 import type { Vector3 } from "../../../core/coordinates/CoordinateFrames.js";
 import { TankSet, type FuelStepInput, type FuelSystemModel, type TankSpec } from "../../../systems/fuel/FuelTanks.js";
@@ -29,12 +30,14 @@ const trapped = (litres: number) => L(100 * (litres / INTERNAL_L));
 const POS: Record<string, Vector3> = {
   tank1: [3.0, 0, -0.2], tank2: [1.6, 0, -0.3], tank3: [0.2, 0, -0.3],
   tank3A1: [-3.4, -1.2, -0.1], tank3A2: [-3.4, 1.2, -0.1],
-  wingL: [-0.6, -2.2, 0.1], wingR: [-0.6, 2.2, 0.1], centerline: [-0.3, 0, 1.0]
+  wingL: [-0.6, -2.2, 0.1], wingR: [-0.6, 2.2, 0.1], centerline: [-0.3, 0, 1.0],
+  accumulator: [0.2, 0, -0.3] // membrane accumulator inside tank 3 (GAF T.O.)
 };
 
 export function mig29TankSpecs(withCenterline: boolean): TankSpec[] {
   const t = (id: string, litres: number, trappedKg = trapped(litres)): TankSpec => ({ id, capacityKg: L(litres), unusableKg: trappedKg, positionBodyM: POS[id]! });
-  return [t("tank1", 650), t("tank2", 900), t("tank3", 1800), t("tank3A1", 150), t("tank3A2", 150), t("wingL", 325), t("wingR", 325),
+  return [t("tank1", 650), t("tank2", 900), t("tank3", 1800 - ACCUMULATOR_KG / F34_KG_PER_L) /* accumulator sits inside tank 3 */, t("tank3A1", 150), t("tank3A2", 150), t("wingL", 325), t("wingR", 325),
+    { id: "accumulator", capacityKg: ACCUMULATOR_KG, unusableKg: 0, positionBodyM: POS["accumulator"]! },
     ...(withCenterline ? [t("centerline", 1500, L(25))] : [])];
 }
 
@@ -58,7 +61,7 @@ const NEAR_ZERO_G = 0.25;
 export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } = {}): FuelSystemModel {
   const withCl = options.centerlineTank ?? false;
   const tanks = new TankSet(mig29TankSpecs(withCl));
-  let fromTank1 = 0, fromTank3 = 0, pausePhaseKg = 0, accumulator = ACCUMULATOR_KG;
+  let fromTank1 = 0, fromTank3 = 0, pausePhaseKg = 0;
   let phase: "tank1" | "tank3" | "pause" | "tank3-final" = "tank1";
   let feedOk = true;
   let flows: { from: string; to: string; kgS: number }[] = [];
@@ -70,10 +73,10 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
     tanks,
     reset: () => {
       for (const s of mig29TankSpecs(withCl)) tanks.set(s.id, s.capacityKg);
-      fromTank1 = 0; fromTank3 = 0; pausePhaseKg = 0; phase = "tank1"; feedOk = true; accumulator = ACCUMULATOR_KG; flows = []; pumps = []; valves = [];
+      fromTank1 = 0; fromTank3 = 0; pausePhaseKg = 0; phase = "tank1"; feedOk = true; flows = []; pumps = []; valves = [];
     },
     engineFuelAvailable: () => feedOk,
-    components: () => ({ pumps, valves, flows, accumulatorKg: accumulator, accumulatorCapacityKg: ACCUMULATOR_KG }),
+    components: () => ({ pumps, valves, flows, accumulatorKg: tanks.kg("accumulator"), accumulatorCapacityKg: ACCUMULATOR_KG }),
     annunciations: () => [
       ...(tanks.kg("tank2") < 550 ? ["550 KG REMAIN"] : []),
       ...(withCl && tanks.isEmpty("centerline") ? ["CL TANK EMPTY"] : []),
@@ -128,20 +131,17 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
       const nearZeroG = Math.abs(input.nzG) < NEAR_ZERO_G;
       const fromAccumulator = nearZeroG || !boost;
       let got: number;
-      if (fromAccumulator && accumulator > 0) {
-        got = Math.min(demand, accumulator);
-        accumulator -= got;
+      if (fromAccumulator && tanks.kg("accumulator") > 0) {
+        got = tanks.draw("accumulator", demand);
         // Without boost but in positive g, the engine pumps can still suck from tank 2 (ESTIMATED).
         if (got < demand && !nearZeroG && input.nzG > 0) got += tanks.draw("tank2", demand - got);
       } else if (fromAccumulator) {
         got = !nearZeroG && input.nzG > 0 ? tanks.draw("tank2", demand) : 0;
       } else {
         got = tanks.draw("tank2", demand);
-        const refill = tanks.draw("tank2", Math.min(ACCUMULATOR_KG - accumulator, ACCUMULATOR_REFILL_KGS * dt));
-        accumulator += refill;
-        if (refill > 0) flows.push({ from: "tank2", to: "accumulator", kgS: refill / dt });
+        move("tank2", "accumulator", ACCUMULATOR_REFILL_KGS);
       }
-      for (const [eng, v] of Object.entries(input.engineFlowKgS)) if (v > 0) flows.push({ from: fromAccumulator && got > 0 && accumulator >= 0 && nearZeroG ? "accumulator" : "tank2", to: eng, kgS: v });
+      for (const [eng, v] of Object.entries(input.engineFlowKgS)) if (v > 0) flows.push({ from: fromAccumulator && got > 0 && nearZeroG ? "accumulator" : "tank2", to: eng, kgS: v });
       feedOk = got >= demand - 1e-9;
       pumps = [
         { id: "activeFuel", running: active, flowKgS: 0 },
@@ -155,7 +155,7 @@ export function mig29FuelSystem(options: { readonly centerlineTank?: boolean } =
         { id: "clTransfer", open: clValve },
         { id: "tank1Level", open: t1Turbo },
         { id: "tank3Level", open: t3Turbo || jetT3 },
-        { id: "accumulatorFeed", open: fromAccumulator && accumulator > 0 }
+        { id: "accumulatorFeed", open: fromAccumulator && tanks.kg("accumulator") > 0 }
       ];
     }
   };

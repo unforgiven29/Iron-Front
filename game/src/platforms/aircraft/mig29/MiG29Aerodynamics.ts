@@ -18,7 +18,7 @@
 import { groundEffect, groundEffectPitchIncrement, type WingPlanform } from "../../../physics/aerodynamics/GroundEffect.js";
 import { buffetIntensity, LaggedFlowState } from "../../../physics/aerodynamics/UnsteadyFlow.js";
 import type { AeroModel, AeroOutput } from "../common/AircraftDefinition.js";
-import { MIG29_AERO as A, MIG29_GEOMETRY as G, MIG29_MASS as MM, MIG29_LIFT_SLOPE_MACH_FACTOR as LF } from "./MiG29Data.js";
+import { MIG29_AERO as A, MIG29_CONTROLS as KC, MIG29_GEOMETRY as G, MIG29_MASS as MM, MIG29_LIFT_SLOPE_MACH_FACTOR as LF } from "./MiG29Data.js";
 
 const DEG = Math.PI / 180;
 const S = G.wingAreaM2.value, B = G.spanM.value, C = G.meanChordM.value;
@@ -39,6 +39,8 @@ function machFactor(mach: number): number {
 }
 
 /** Lift-curve slope, per rad: analytic theory × fitted Mach correction. */
+const K_FLAP_FULL = KC.flapLandingDeg.value;
+
 export function liftSlope(mach: number): number {
   return analyticLiftSlope(mach) * machFactor(mach);
 }
@@ -80,11 +82,13 @@ export function mig29Aerodynamics(): AeroModel {
       // Lift and drag in stability axes.
       const sa = Math.sin(a), ca = Math.cos(a);
       const lef = Math.max(0, s["lef"] ?? 0);
+      // Trailing-edge flaps (ESTIMATED increments, fraction of the landing setting).
+      const flap = Math.max(0, Math.min(1.2, (s["flap"] ?? 0) / K_FLAP_FULL));
       const ae = a - A.zeroLiftAlphaDeg.value * DEG, sae = Math.sin(ae), cae = Math.cos(ae);
       // LERX vortex: intact fraction lags its static breakdown curve.
       const vIntact = vortex.step(Math.abs(a), (x) => 1 - smooth((x / DEG - A.vortexBurstOnsetDeg.value) / A.vortexBurstWidthDeg.value), C, V, input.stepSeconds);
-      const attachedCl = cla * sae * cae + vIntact * G.lerxVortexLiftFactor.value * Math.abs(sae) * sae * cae + A.lefLiftPerDeg.value * lef * smooth((Math.abs(a) / DEG - 8) / 10);
-      const stall = A.stallAlphaDeg.value + 0.2 * lef;
+      const attachedCl = cla * sae * cae + vIntact * G.lerxVortexLiftFactor.value * Math.abs(sae) * sae * cae + A.lefLiftPerDeg.value * lef * smooth((Math.abs(a) / DEG - 8) / 10) + A.flapLiftAtFull.value * flap;
+      const stall = A.stallAlphaDeg.value + 0.2 * lef - A.flapStallAlphaReductionDeg.value * flap;
       // Separation lags the static curve (Goman–Khrabrov): overshoot in a fast pull, delayed reattachment.
       const sep = 1 - attachment.step(Math.abs(a), (x) => 1 - smooth((x / DEG - stall) / 6), C, V, input.stepSeconds);
       const flatCn = 1.2 * sa;
@@ -94,13 +98,13 @@ export function mig29Aerodynamics(): AeroModel {
       const brake = Math.max(0, Math.min(1, (s["speedbrake"] ?? 0) / 60));
       const overBreak = Math.max(0, Math.abs(attachedCl) - A.highLiftDragBreakCl.value);
       const cd = zeroLiftDrag(M) + (K * ge.inducedDragFactor * attachedCl * attachedCl + A.highLiftDragFactor.value * overBreak * overBreak) * (1 - sep) + flatCn * sa * sep
-        + A.speedbrakeDrag.value * brake + A.gearDrag.value * gear;
+        + A.speedbrakeDrag.value * brake + A.gearDrag.value * gear + A.flapDragAtFull.value * flap ** 1.5;
 
       // Moments.
       const elev = (s["elevator"] ?? 0) * DEG, ail = s["aileron"] ?? 0, rud = s["rudder"] ?? 0;
       const c2v = C / (2 * V), b2v = B / (2 * V);
       // Static margin is defined at the reference CG; an aft CG reduces it one-for-one (MAC fractions).
-      const cm = groundEffectPitchIncrement(ge, cl, A.groundEffectTailSensitivity.value) - (staticMargin(M) - (input.cgFractionMac - MM.aeroReferenceCgFractionMac.value)) * cl + A.stabilatorPowerPerRad.value * elev * eta + A.pitchDampingPerRad.value * q * c2v - 0.05 * sep;
+      const cm = groundEffectPitchIncrement(ge, cl, A.groundEffectTailSensitivity.value) - (staticMargin(M) - (input.cgFractionMac - MM.aeroReferenceCgFractionMac.value)) * cl + A.stabilatorPowerPerRad.value * elev * eta + A.pitchDampingPerRad.value * q * c2v - 0.05 * sep + A.flapPitchAtFull.value * flap * (1 - sep);
       const cnb = A.yawStabilityPerRad.value * (1 - 0.8 * smooth((Math.abs(a) / DEG - 20) / 15));
       const cy = A.sideForcePerRad.value * b + 0.003 * -rud * eta;
       const cRoll = A.dihedralEffectPerRad.value * b + A.rollDampingPerRad.value * p * b2v + 0.1 * r * b2v + (A.rollPowerPerDeg.value * ail + A.differentialStabilatorRollPerDeg.value * (s["differentialStabilator"] ?? 0)) * eta * (1 - 0.5 * smooth((Math.abs(a) / DEG - 15) / 15));

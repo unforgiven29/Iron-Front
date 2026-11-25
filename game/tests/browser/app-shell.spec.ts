@@ -91,3 +91,17 @@ test("data panel toggles with I and shows surfaces, engines and systems pages", 
   await expect(page.locator(".data-panel")).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test("MiG-29 cockpit with live instruments loads and flies without page errors", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("combobox", { name: "Aircraft" }).selectOption({ label: "MiG-29 (provisional)" });
+  await page.getByRole("button", { name: "Fly" }).click();
+  await expect(page.getByRole("dialog", { name: "Game menu" })).toBeHidden({ timeout: 20_000 });
+  const frame = page.getByLabel(/cockpit view/);
+  await frame.click();
+  await page.keyboard.press("x"); // flap lever
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});

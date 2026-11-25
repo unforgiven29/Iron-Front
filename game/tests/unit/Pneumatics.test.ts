@@ -188,3 +188,15 @@ describe("MiG-29 pneumatic installation (GAF T.O. 1F-MIG29-1)", () => {
     expect(logic.step(ctx(0, -1), 0.01).hydraulicPumpInlet!["main"]).toBe(0);
   });
 });
+
+describe("MiG-29 EFB pneumatics page", () => {
+  it("draws the bottles and consumers from the live pneumatic snapshot", () => {
+    const a = airStart();
+    a.controls.request(MIG29_SWITCHES.pneumaticFault, "MAIN LEAK", "test");
+    const s = fly(a, 2);
+    const html = a.definition.efb!.pages.find((p) => p.id === "pneumatics")!.render(s, undefined);
+    const main = s.pneumatics!.systems.find((x) => x.id === "main")!.pressurePa;
+    expect(html).toContain(`${(main / 1e6).toFixed(1)} MPa`);
+    for (const t of ["EMERGENCY", "CHUTE", "BRAKE REG", "EMERG GEAR", "LEAK main"]) expect(html).toContain(t);
+  });
+});

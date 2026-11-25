@@ -15,6 +15,7 @@ import type { Quaternion, Vector3 } from "../../core/coordinates/CoordinateFrame
 import { rotateVector } from "../../physics/rigidbody/RigidBody.js";
 import type { AirfieldSpec } from "../../world/infrastructure/Airfield.js";
 import type { TerrainSurface } from "../../world/terrain/Terrain.js";
+import { drawInstrument } from "../instruments/Gauges.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
@@ -46,6 +47,8 @@ export interface CockpitViewSource {
   snapshot(): CockpitViewSnapshot;
   hud(): HudData;
   mfd(screen: string): MfdPage;
+  /** Values for an instrument part (non-finite = no valid signal). */
+  instrument(partId: string): readonly number[];
   /** Request the next position of a switch (cockpit click). */
   cycleSwitch(switchId: string): void;
 }
@@ -66,6 +69,7 @@ export class ThreeCockpitView {
   private dragging = false;
   private readonly animated: { part: CockpitPart; mesh: THREE.Mesh; base: THREE.Quaternion; basePos: THREE.Vector3 }[] = [];
   private readonly screens = new Map<string, { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }>();
+  private readonly instruments: { part: CockpitPart; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture }[] = [];
   private readonly hudCanvas: HTMLCanvasElement;
   private readonly raycaster = new THREE.Raycaster();
   private frame = 0;
@@ -145,6 +149,7 @@ export class ThreeCockpitView {
 
     this.animateParts(s);
     if (this.frame++ % 6 === 0) this.drawScreens();
+    if (this.frame % 2 === 0) this.drawInstruments();
     this.renderer.render(this.scene, this.camera);
     this.drawHud(s);
   }
@@ -215,6 +220,15 @@ export class ThreeCockpitView {
       } else if (part.kind === "glass") {
         geometry = new THREE.PlaneGeometry(a, b);
         material = new THREE.MeshBasicMaterial({ color: part.color, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false });
+      } else if (part.kind === "instrument" && part.instrument) {
+        geometry = part.instrument.kind === "tapes" ? new THREE.PlaneGeometry(a, b) : new THREE.CircleGeometry(a / 2, 48);
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.instruments.push({ part, canvas, texture });
+        material = new THREE.MeshBasicMaterial({ map: texture });
       } else {
         geometry = new THREE.PlaneGeometry(a, b);
         const canvas = document.createElement("canvas");
@@ -266,6 +280,15 @@ export class ThreeCockpitView {
         this.source.cycleSwitch(part.binding.switchId);
         return;
       }
+    }
+  }
+
+  private drawInstruments(): void {
+    for (const { part, canvas, texture } of this.instruments) {
+      const g = canvas.getContext("2d");
+      if (!g || !part.instrument) continue;
+      drawInstrument(g, canvas.width, part.instrument, this.source.instrument(part.id));
+      texture.needsUpdate = true;
     }
   }
 
