@@ -356,3 +356,33 @@ describe("N019 behaviours from the N-019EB description (N019-WEB)", { timeout: 1
     expect(lost).toMatch(/lost|notch|gate|clutter/);
   });
 });
+
+describe("N019 antenna N019-01: twist-Cassegrain geometry (RLPK slide 23)", () => {
+  const hw = deriveHardware(N019_PROFILE);
+  const a = hw.antenna;
+  it("the flat mirror steers the beam at twice its own angle", () => {
+    expect(a.mirrorAngle(65 * DEG)).toBeCloseTo(32.5 * DEG, 10);
+  });
+  it("steering off the axis loses gain and widens the beam (mirror projected area ∝ cos(beam/2))", () => {
+    const on = a.gain2(0, 0, { azRad: 0, elRad: 0 });
+    const off = a.gain2(0, 0, { azRad: 65 * DEG, elRad: 0 });
+    expect(off / on).toBeCloseTo(Math.cos(32.5 * DEG), 6); // −0.74 dB at the ±65° limit
+    // Half-power offset grows by 1/cos(32.5°) in the steered plane.
+    const halfOn = hw.antenna.halfPowerBeamwidthRad / 2;
+    expect(a.gain2(halfOn / Math.cos(32.5 * DEG), 0, { azRad: 65 * DEG, elRad: 0 }) / off).toBeCloseTo(0.5, 1);
+  });
+  it("using only the lower part of the paraboloid makes the elevation beam wider than the azimuth beam", () => {
+    expect(a.halfPowerBeamwidthElRad).toBeGreaterThan(a.halfPowerBeamwidthRad * 1.05);
+  });
+  it("blockage raises the near sidelobes above the clean taper's −30.6 dB", () => {
+    const clean = antennaPattern({ diameterM: 0.72, taperExponent: 2, farSidelobeFloorDb: 38 }, 0.03);
+    expect(a.firstSidelobeDb).toBeGreaterThan(clean.firstSidelobeDb);
+  });
+  it("horizontal polarisation lowers low-grazing ground clutter compared with vertical", async () => {
+    const { groundClutterPatches } = await import("../../src/physics/radar/RadarPhysics.js");
+    const look = { antenna: a, averagePowerW: 1200, systemNoiseTempK: 1000, lossesDb: 6 };
+    const q = { originEnuM: [0, 0, 1000] as Vector3, ownVelocityEnuMps: [0, 230, 0] as Vector3, beamDirection: [0, Math.cos(0.05), -Math.sin(0.05)] as Vector3, integrationTimeS: 4.48e-3, groundHeightM: 0, gammaDb: -15, maxRangeM: 40000 };
+    const sum = (pol: "horizontal" | "vertical") => groundClutterPatches({ ...q, look: { ...look, antenna: { ...a, polarization: pol } } }).reduce((t, p) => t + p.cnr, 0);
+    expect(sum("horizontal")).toBeLessThan(sum("vertical"));
+  });
+});

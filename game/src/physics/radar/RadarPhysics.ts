@@ -11,7 +11,7 @@
  */
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { angleBetween, dot, norm, scale, sub, sweepRelation, unit } from "../sensing/SweepGeometry.js";
-import type { AntennaPattern } from "./Aperture.js";
+import type { AntennaPattern, Steering } from "./Aperture.js";
 
 /**
  * Radar cross-section by aspect, m². Aspect angle 0 = seen from the nose, 180° = from the tail,
@@ -66,6 +66,8 @@ export interface RadarLook {
   readonly systemNoiseTempK: number;
   /** Total RF/processing losses (radome, plumbing, filter mismatch, straddle, CFAR...), dB, positive. */
   readonly lossesDb: number;
+  /** Beam steering relative to the antenna boresight (flat-mirror antennas lose gain and widen off-axis). */
+  readonly steering?: Steering;
 }
 
 /** What a radar asks of the world for one tick of beam motion. */
@@ -94,8 +96,8 @@ const BOLTZMANN = 1.380649e-23;
  * Gt, Gr: transmit/receive gains; g(θ): one-way relative pattern at the target's offset; Tcoh: the
  * coherent integration time (its reciprocal is the Doppler filter's noise bandwidth).
  */
-export function radarEquationSnr(look: RadarLook, integrationTimeS: number, rcsM2: number, rangeM: number, offBeamRad: number): number {
-  const g = look.antenna.gain(offBeamRad);
+export function radarEquationSnr(look: RadarLook, integrationTimeS: number, rcsM2: number, rangeM: number, offRightRad: number, offUpRad = 0): number {
+  const g = look.antenna.gain2(offRightRad, offUpRad, look.steering);
   const lambda = look.antenna.wavelengthM;
   const L = 10 ** (look.lossesDb / 10);
   return (look.averagePowerW * look.antenna.transmitGain * look.antenna.receiveGain * g * g * lambda * lambda * rcsM2 * integrationTimeS) / ((4 * Math.PI) ** 3 * rangeM ** 4 * BOLTZMANN * look.systemNoiseTempK * L);
@@ -127,6 +129,19 @@ export interface RadarTerrain {
 }
 
 /** Straight-line terrain masking between two points (samples every ~250 m). */
+const crossV = (a: Vector3, b: Vector3): Vector3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const add3 = (a: Vector3, b: Vector3): Vector3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+
+/** Angular offset of a direction from a beam centre along the beam's horizontal (right) and vertical (up) axes, rad. */
+export function beamOffsets(beam: Vector3, dir: Vector3): { readonly right: number; readonly up: number } {
+  let right = crossV(beam, [0, 0, 1]);
+  if (norm(right) < 1e-6) right = [1, 0, 0];
+  right = unit(right);
+  const up = crossV(right, beam);
+  const clamp = (x: number) => Math.max(-1, Math.min(1, x));
+  return { right: Math.asin(clamp(dot(dir, right))), up: Math.asin(clamp(dot(dir, up))) };
+}
+
 export function lineOfSightClear(terrain: RadarTerrain | undefined, a: Vector3, b: Vector3): boolean {
   if (!terrain) return true;
   const d = sub(b, a);
@@ -164,7 +179,16 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
     const rel = sweepRelation(los, query.beamFrom, query.beamTo);
     if (!rel.crossed) continue;
     const sigma = aspectRcsM2(s.rcs, unit(s.toBody(los)));
-    const meanSnr = radarEquationSnr(query.look, query.integrationTimeS, sigma, range, rel.offsetRad) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
+    // Offset from the beam at closest approach, split into the beam's right/up axes (non-round apertures).
+    const along = sub(query.beamTo, query.beamFrom);
+    let centre: Vector3 = unit(query.beamFrom);
+    if (norm(along) > 1e-9) {
+      // Sweep: the beam passes closest where only the across-scan component of the offset remains.
+      const across = unit(crossV(unit(add3(query.beamFrom, query.beamTo)), unit(along)));
+      centre = unit(sub(los, scale(across, dot(los, across))));
+    }
+    const off = beamOffsets(centre, los);
+    const meanSnr = radarEquationSnr(query.look, query.integrationTimeS, sigma, range, off.right, off.up) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
     if (meanSnr < query.reportFloorSnr) continue;
     if (!lineOfSightClear(terrain, query.originEnuM, s.positionEnuM)) continue;
     const closure = -dot(sub(s.velocityEnuMps, query.ownVelocityEnuMps), los);
@@ -239,8 +263,12 @@ export function groundClutterPatches(q: ClutterQuery): ClutterPatch[] {
     for (let j = 0; j < nAz; j++) {
       const az = ((j + 0.5) / nAz) * 2 * Math.PI;
       const d: Vector3 = [(Math.sin(az) * gm) / slant, (Math.cos(az) * gm) / slant, -h / slant];
-      const off = angleBetween(d, q.beamDirection);
-      const cnr = radarEquationSnr(q.look, q.integrationTimeS, sigma0 * (ringArea / nAz), slant, off);
+      if (angleBetween(d, q.beamDirection) >= Math.PI / 2) continue;
+      const o = beamOffsets(q.beamDirection, d);
+      // Horizontal polarisation: land backscatter is weaker than vertical at low grazing (≈ −5 dB at
+      // grazing → 0, vanishing by 10°; Long, "Radar Reflectivity of Land and Sea", ch. 6 — ESTIMATED).
+      const polDb = q.look.antenna.polarization === "horizontal" ? -5 * Math.max(0, 1 - graze / (10 * Math.PI / 180)) : 0;
+      const cnr = radarEquationSnr(q.look, q.integrationTimeS, sigma0 * 10 ** (polDb / 10) * (ringArea / nAz), slant, o.right, o.up);
       if (cnr < 1e-3) continue;
       out.push({ relDopplerHz: (2 * dot(q.ownVelocityEnuMps, d)) / lambda - beamDoppler, rangeM: slant, cnr });
     }

@@ -97,6 +97,8 @@ export interface RadarProfile {
   readonly scanRateRadS: Sourced<number>;
   readonly barTurnaroundS: Sourced<number>;
   readonly slewRateRadS: Sourced<number>;
+  /** Flat-mirror antennas: the mirror's maximum angular rate; the beam slews at twice this. */
+  readonly mirrorRateRadS?: Sourced<number>;
   readonly searchGimbal: Sourced<GimbalLimits>;
   readonly trackGimbal: Sourced<GimbalLimits>;
   readonly stabilization: Sourced<{ readonly rollMaxRad: number; readonly pitchUpRad: number; readonly pitchDownRad: number }>;
@@ -325,6 +327,12 @@ export class PulseDopplerRadar {
     this.stepSearch(own, scene, dt);
   }
 
+  /** Beam slew rate: for a flat-mirror antenna the beam moves twice as fast as the mirror. */
+  private beamSlewRate(): number {
+    const m = this.profile.mirrorRateRadS?.value;
+    return m !== undefined && this.profile.aperture.value.steering === "flat-mirror" ? 2 * m : this.profile.slewRateRadS.value;
+  }
+
   private stabilized(own: SensorOwnship): boolean {
     const s = this.profile.stabilization.value;
     return Math.abs(own.rollRad) <= s.rollMaxRad && own.pitchRad <= s.pitchUpRad && own.pitchRad >= -s.pitchDownRad;
@@ -337,8 +345,10 @@ export class PulseDopplerRadar {
     return worldDirection("body", own, clipToGimbal(gimbal, body));
   }
 
-  private lookFor(wf: WaveformSpec): RadarLook {
-    return { antenna: this.hw.antenna, averagePowerW: wf.averagePowerW.value, systemNoiseTempK: this.hw.systemNoiseTempK, lossesDb: this.hw.totalLossesDb };
+  /** Transmit/receive state for a look; `beam` (world) sets the steering for flat-mirror scan loss. */
+  private lookFor(wf: WaveformSpec, own?: SensorOwnship, beam?: Vector3): RadarLook {
+    const st = own && beam ? bodyAngles(own, beam) : undefined;
+    return { antenna: this.hw.antenna, averagePowerW: wf.averagePowerW.value, systemNoiseTempK: this.hw.systemNoiseTempK, lossesDb: this.hw.totalLossesDb, ...(st ? { steering: { azRad: st.az, elRad: st.el } } : {}) };
   }
 
   private clutter(own: SensorOwnship, scene: SensorScene, beam: Vector3, look: RadarLook, tcoh: number, key: string): readonly ClutterPatch[] {
@@ -455,7 +465,7 @@ export class PulseDopplerRadar {
     const T = this.profile.timing.value;
     const rate = pat.rateRadS ?? this.profile.scanRateRadS.value;
     const tacts = Math.max(1, Math.round(this.hw.antenna.halfPowerBeamwidthRad / rate / T.searchTactS));
-    const look = this.lookFor(wf);
+    const look = this.lookFor(wf, own, to);
     const echoes = scene.radar({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamFrom: from, beamTo: to, look, integrationTimeS: T.searchCoherentS, reportFloorSnr: 0.05, maxRangeM: Math.min(cmd.rangeScaleM, this.profile.instrumentedRangeM.value) });
     const clutter = echoes.length || this.profile.clutterThresholdSuppressionDb ? this.clutter(own, scene, to, look, T.searchCoherentS, wf.id) : [];
     const found: RadarPlot[] = [];
@@ -572,14 +582,14 @@ export class PulseDopplerRadar {
       // Fastest path to the point 4° left / 2° above the designation (start of the box), N019 practice.
       const start = a.req.box ? { az: boxCentre.az - a.req.box.widthRad / 2, el: boxCentre.el + (a.req.box.spacingRad * (a.req.box.bars - 1)) / 2 } : { az: boxCentre.az + A.offsetAzRad, el: boxCentre.el + A.offsetElRad };
       const cur = anglesIn(a.req.frame, own, this.pointing(own, this.lookFrame, this.look, this.profile.trackGimbal.value));
-      const next = slew(cur, start, this.profile.slewRateRadS.value, dt);
+      const next = slew(cur, start, this.beamSlewRate(), dt);
       this.lookFrame = a.req.frame;
       this.look = next;
       if (Math.hypot(next.az - start.az, next.el - start.el) < 1e-4) { a.phase = "box"; a.scan.reset(); }
       return;
     }
     const wf = this.trackWaveform(own, worldDirection(a.req.frame, own, designated));
-    const look = this.lookFor(wf);
+    const look = this.lookFor(wf, own, worldDirection(a.req.frame, own, designated));
     if (a.phase === "box") {
       const bx = a.req.box;
       const pat: RasterPattern = { frame: a.req.frame, center: boxCentre, widthRad: bx?.widthRad ?? A.boxWidthRad, bars: bx?.bars ?? 2, barSpacingRad: bx?.spacingRad ?? A.boxSpacingRad, orientation: "horizontal", rateRadS: bx ? this.profile.scanRateRadS.value : A.boxRateRadS, turnaroundS: 0.05 };
@@ -666,7 +676,7 @@ export class PulseDopplerRadar {
     s.lastLos = los;
     this.look = anglesIn(this.lookFrame, own, los);
     const wf = this.trackWaveform(own, los);
-    const look = this.lookFor(wf);
+    const look = this.lookFor(wf, own, los);
     const echoes = scene.radar({ originEnuM: own.positionEnuM, ownVelocityEnuMps: own.velocityEnuMps, beamFrom: los, beamTo: los, look, integrationTimeS: T.trackCoherentS, reportFloorSnr: 0.01, maxRangeM: this.profile.instrumentedRangeM.value });
     const gate = 150 + 60 * (own.timeS - s.lastDetectS) + 0.005 * range;
     const cand = echoes.filter((e) => Math.abs(e.rangeM - range) < gate).sort((a, b) => Math.abs(a.rangeM - range) - Math.abs(b.rangeM - range))[0];

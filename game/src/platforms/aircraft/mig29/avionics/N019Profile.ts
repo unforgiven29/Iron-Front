@@ -70,9 +70,10 @@ export const N019_PROFILE: RadarProfile = {
   designation: "N019 (RLPK-29)",
   frequencyHz: { value: 299792458 / 0.03, source: `${R} slide 7: wave range 3 cm`, status: "published" },
   aperture: {
-    value: { diameterM: 0.72, taperExponent: 2, farSidelobeFloorDb: 38, directivity: { transmit: 2000, receive: 1350 } },
-    source: `${R} slide 8: beamwidth 3.5°, directivity (КНД) 2000 transmit / 1350 receive; two-mirror twist-Cassegrain (slide 14). Diameter DERIVED from 3.5° with taper p=2 (ESTIMATED)`, status: "published"
+    value: { diameterM: 0.72, heightM: 0.64, taperExponent: 2, farSidelobeFloorDb: 38, blockageDiameterM: 0.06, polarization: "horizontal", steering: "flat-mirror", directivity: { transmit: 2000, receive: 1350 } },
+    source: `${R} slide 8: beamwidth 3.5°, directivity (КНД) 2000 transmit / 1350 receive. Slide 23 (antenna N019-01): two-mirror twist-Cassegrain — vertically polarised feed, parabolic polarisation-filter mirror, flat twist mirror that turns the wave horizontal and STEERS the beam (beam angle = 2 × mirror angle); only the lower part of the paraboloid is used, to avoid shading by the flat mirror. Width DERIVED from 3.5° with taper p=2; height (lower-part aperture), blockage and taper ESTIMATED`, status: "published"
   },
+
   noiseFigureDb: { value: 5.4, source: `${R} slide 30: front-end noise figure 5.4 dB (channels 1, 2)`, status: "published" },
   antennaTemperatureK: { value: 150, source: "ESTIMATED", status: "estimated" },
   lossesDb: { value: { radome: 1.0, plumbing: 1.5, beamShapeScan: 1.3, filterMismatch: 1.0, cfar: 1.0, straddle: 1.0 }, source: "ESTIMATED itemised loss budget (Skolnik ch.2 typical values)", status: "estimated" },
@@ -85,6 +86,7 @@ export const N019_PROFILE: RadarProfile = {
   scanRateRadS: { value: 57 * DEG, source: `${R} slide 8: search speed 57°/s; time on target ≈60 ms (slide 41)`, status: "published" },
   barTurnaroundS: { value: 0.32, source: `DERIVED: ${R} slide 39 frame 3.6 s for 50° × 3 bars at 57°/s`, status: "derived" },
   slewRateRadS: { value: 120 * DEG, source: "ESTIMATED ('maximum speed', slide 44)", status: "estimated" },
+  mirrorRateRadS: { value: 60 * DEG, source: "ESTIMATED flat-mirror servo rate; the beam moves at twice this (slide 23). Search scan 57°/s beam = 28.5°/s mirror", status: "estimated" },
   searchGimbal: { value: { azMaxRad: 70 * DEG, elMinRad: -45 * DEG, elMaxRad: 60 * DEG }, source: `${R} slide 8: view zone ±70° az, −45/+60° el`, status: "published" },
   trackGimbal: { value: { azMaxRad: 65 * DEG, elMinRad: -36 * DEG, elMaxRad: 56 * DEG }, source: `${BP} p.11 fig.7: autotrack zone ±65° az, +56/−36° el`, status: "published" },
   stabilization: { value: { rollMaxRad: 120 * DEG, pitchUpRad: 40 * DEG, pitchDownRad: 30 * DEG }, source: `N019-WEB: beam stabilised up to 120° roll, +40°/−30° pitch (BP-29 p.11 gives ±30°)`, status: "published" },
