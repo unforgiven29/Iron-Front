@@ -39,6 +39,13 @@ export function mountGameScreen(root: HTMLElement): void {
     opt.value = v;
     targetPicker.append(opt);
   }
+  const langPicker = el("select", "game-select");
+  langPicker.setAttribute("aria-label", "HUD language");
+  for (const [v, label] of [["ru", "HUD: Russian (as on the aircraft)"], ["en", "HUD: English"]] as const) {
+    const opt = el("option", undefined, label);
+    opt.value = v;
+    langPicker.append(opt);
+  }
   const status = el("p", "game-status", "");
   const fly = el("button", "game-button primary", "Fly");
   fly.type = "button";
@@ -73,7 +80,7 @@ export function mountGameScreen(root: HTMLElement): void {
   picker.addEventListener("change", () => { definition = catalog.definition(picker.value); renderControls(); });
   const debug = el("a", "game-link", "Developer tools →");
   debug.href = "#debug";
-  card.append(title, subtitle, picker, targetPicker, status, fly, airStart, restart, controls, note, debug);
+  card.append(title, subtitle, picker, targetPicker, langPicker, status, fly, airStart, restart, controls, note, debug);
   menu.append(card);
   screen.append(frame, menu);
   root.append(screen);
@@ -85,6 +92,7 @@ export function mountGameScreen(root: HTMLElement): void {
     airStart.hidden = paused;
     picker.hidden = paused;
     targetPicker.hidden = paused;
+    langPicker.hidden = paused;
     restart.hidden = !paused;
     status.textContent = paused ? "Paused" : "";
     fly.focus();
@@ -101,7 +109,7 @@ export function mountGameScreen(root: HTMLElement): void {
     status.textContent = "Loading…";
     try {
       const { ThreeCockpitView } = await import("../rendering/three/ThreeCockpitView.js");
-      session = startAircraftSession(ThreeCockpitView, frame, definition, mode, targetPicker.value as TargetScenario);
+      session = startAircraftSession(ThreeCockpitView, frame, definition, mode, targetPicker.value as TargetScenario, { hudLanguage: langPicker.value });
       status.textContent = "";
       hideMenu();
     } catch (e) {

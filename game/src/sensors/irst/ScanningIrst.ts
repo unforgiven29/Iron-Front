@@ -42,7 +42,7 @@ export interface IrstProfile {
   readonly laser: Sourced<{ readonly minRangeM: number; readonly maxRangeM: number; readonly sigmaM: number }>;
 }
 
-export interface IrstPlot { readonly timeS: number; readonly look: LookAngles; readonly losEnu: Vector3; readonly snr: number }
+export interface IrstPlot { readonly timeS: number; readonly look: LookAngles; readonly losEnu: Vector3; readonly snr: number; readonly noise?: boolean }
 
 export interface IrstLock {
   readonly losEnu: Vector3;
@@ -84,6 +84,7 @@ export class ScanningIrst {
   private lastLoss: { reason: string; timeS: number } | null = null;
   private time = 0;
   private readonly threshold: number;
+  private gain = 0.5;
 
   public constructor(public readonly profile: IrstProfile, seed: number) {
     this.rng = createScopedRandom(seed, "irst", profile.id);
@@ -104,6 +105,15 @@ export class ScanningIrst {
     this.acq = { look, frame, windowAz, windowEl, t: 0, hits: 0 };
   }
   public setLaser(on: boolean): void { this.lasing = on; }
+  /** Move an acquisition in progress to a new direction (e.g. the helmet sight following the pilot's head). */
+  public steerAcquisition(look: LookAngles): void { if (this.acq && !this.acq.los) this.acq.look = look; }
+  /**
+   * Gain knob 0..1 (KOLS УСИЛ.ТП). It sets the detection threshold relative to noise: 0.5 = the design
+   * false-alarm rate; turned up, weak targets appear sooner but noise crosses the threshold and the
+   * picture fills with false marks. Threshold law ESTIMATED: T = T0 · (1.5 − gain) (gain 0.5 = design Pfa).
+   */
+  public setGain(g: number): void { this.gain = Math.max(0, Math.min(1, g)); }
+  private get thresholdNow(): number { return this.threshold * (1.5 - this.gain); }
   public breakLock(reason = "pilot"): void { if (this.trk || this.acq) this.lastLoss = { reason, timeS: this.time }; this.trk = null; this.acq = null; }
 
   public get state(): IrstStatus { return this.status; }
@@ -136,7 +146,7 @@ export class ScanningIrst {
     return Math.abs(pt.irradianceWm2) / this.nei(dwellS, pt.backgroundWm2sr);
   }
 
-  private detect(snr: number): boolean { return this.rng.nextFloat() < qfunc(this.threshold - snr); }
+  private detect(snr: number): boolean { return this.rng.nextFloat() < qfunc(this.thresholdNow - snr); }
 
   private noisy(own: SensorOwnship, los: Vector3, snr: number): Vector3 {
     const g = () => Math.sqrt(-2 * Math.log(1 - this.rng.nextFloat() + 1e-12)) * Math.cos(2 * Math.PI * this.rng.nextFloat());
@@ -148,7 +158,7 @@ export class ScanningIrst {
   public step(own: SensorOwnship, scene: SensorScene, dt: number): void {
     this.time = own.timeS;
     if (!this.on) { this.status = "off"; return; }
-    this.plots = this.plots.filter((p) => own.timeS - p.timeS < 3);
+    this.plots = this.plots.filter((p) => own.timeS - p.timeS < (p.noise ? 0.6 : 3));
     if (this.trk) return this.stepTrack(own, scene, dt);
     if (this.acq) return this.stepAcquire(own, scene, dt);
     if (this.slave) {
@@ -167,6 +177,16 @@ export class ScanningIrst {
     if (this.scan.turning) return;
     const to = worldDirection(p.frame, own, this.look);
     const dwell = this.profile.pixelIfovRad.value / this.profile.scanRateRadS.value;
+    // Noise crossings: pixels swept this tick × per-pixel false-alarm probability at the current threshold.
+    const ifov = this.profile.pixelIfovRad.value;
+    const pixels = (this.profile.swathRad.value / ifov) * ((this.profile.scanRateRadS.value * dt) / ifov);
+    let n = pixels * qfunc(this.thresholdNow);
+    for (let i = 0; i < 40 && this.rng.nextFloat() < n; i++, n -= 1) {
+      const t = this.rng.nextFloat(), across = (this.rng.nextFloat() - 0.5) * this.profile.swathRad.value;
+      const a0 = anglesIn(p.frame, own, from), a1 = this.look;
+      const look = p.orientation === "horizontal" ? { az: a0.az + (a1.az - a0.az) * t, el: a1.el + across } : { az: a1.az + across, el: a0.el + (a1.el - a0.el) * t };
+      this.plots.push({ timeS: own.timeS, look, losEnu: worldDirection(p.frame, own, look), snr: this.thresholdNow, noise: true });
+    }
     for (const pt of scene.infrared({ originEnuM: own.positionEnuM, fieldFrom: from, fieldTo: to, fieldHalfRad: this.profile.swathRad.value / 2, maxRangeM: 60000 })) {
       if (pt.sunAngleRad < this.profile.sunExclusionRad.value) continue;
       const snr = this.snrOf(pt, dwell, own.positionEnuM[2]);

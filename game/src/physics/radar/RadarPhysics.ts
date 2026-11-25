@@ -86,6 +86,12 @@ export interface RadarBeamQuery {
   /** Echoes weaker than this (linear SNR) are not reported. */
   readonly reportFloorSnr: number;
   readonly maxRangeM: number;
+  /**
+   * Bistatic reception (e.g. a semi-active missile seeker): the target is lit by this separate
+   * illuminator; the receiver is at `originEnuM`. SNR = ERP·σ_b·Gr·λ² / ((4π)³·Rt²·Rr²·k·Ts·L) · T,
+   * with σ_b the RCS seen along the bistatic bisector.
+   */
+  readonly illuminator?: { readonly positionEnuM: Vector3; readonly erpW: number; readonly velocityEnuMps?: Vector3 };
 }
 
 const BOLTZMANN = 1.380649e-23;
@@ -121,6 +127,11 @@ export interface RadarEcho {
   readonly lookDown: boolean;
   /** Radar height above the ground, m (clutter strength). */
   readonly radarAglM: number;
+  /**
+   * Bistatic only: Doppler of the echo relative to the direct (reference) signal from the illuminator,
+   * Hz: −(d(Rt + Rr)/dt − d(Rd)/dt)/λ, with Rt illuminator→target, Rr target→receiver, Rd illuminator→receiver.
+   */
+  readonly bistaticDopplerHz?: number;
 }
 
 export interface RadarTerrain {
@@ -178,7 +189,11 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
     const los = scale(r, 1 / range);
     const rel = sweepRelation(los, query.beamFrom, query.beamTo);
     if (!rel.crossed) continue;
-    const sigma = aspectRcsM2(s.rcs, unit(s.toBody(los)));
+    const bistatic = query.illuminator;
+    const toIllum = bistatic ? unit(sub(bistatic.positionEnuM, s.positionEnuM)) : null;
+    // Bistatic RCS approximated by the monostatic RCS along the bisector of the two directions.
+    const aspectDir = toIllum ? unit(scale(add3(scale(los, -1), toIllum), -1)) : los;
+    const sigma = aspectRcsM2(s.rcs, unit(s.toBody(aspectDir)));
     // Offset from the beam at closest approach, split into the beam's right/up axes (non-round apertures).
     const along = sub(query.beamTo, query.beamFrom);
     let centre: Vector3 = unit(query.beamFrom);
@@ -188,7 +203,10 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
       centre = unit(sub(los, scale(across, dot(los, across))));
     }
     const off = beamOffsets(centre, los);
-    const meanSnr = radarEquationSnr(query.look, query.integrationTimeS, sigma, range, off.right, off.up) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
+    const meanSnr = bistatic
+      ? (bistatic.erpW * sigma * query.look.antenna.receiveGain * query.look.antenna.gain2(off.right, off.up) * query.look.antenna.wavelengthM ** 2 * query.integrationTimeS) /
+        ((4 * Math.PI) ** 3 * norm(sub(s.positionEnuM, bistatic.positionEnuM)) ** 2 * range ** 2 * 1.380649e-23 * query.look.systemNoiseTempK * 10 ** (query.look.lossesDb / 10))
+      : radarEquationSnr(query.look, query.integrationTimeS, sigma, range, off.right, off.up) * twoWayAtmosphericLoss(query.look.antenna.wavelengthM, range, query.originEnuM[2], s.positionEnuM[2]);
     if (meanSnr < query.reportFloorSnr) continue;
     if (!lineOfSightClear(terrain, query.originEnuM, s.positionEnuM)) continue;
     const closure = -dot(sub(s.velocityEnuMps, query.ownVelocityEnuMps), los);
@@ -198,7 +216,8 @@ export function radarEchoes(query: RadarBeamQuery, scatterers: readonly RadarSca
     out.push({
       meanSnr, swerling: s.rcs.swerling, rangeM: range, losEnu: los, closureMps: closure,
       targetRadialSpeedMps: -dot(s.velocityEnuMps, los), offBeamRad: rel.offsetRad,
-      lookDown: groundRange < range * 1.2, radarAglM
+      lookDown: groundRange < range * 1.2, radarAglM,
+      ...(bistatic ? { bistaticDopplerHz: bistaticDoppler(bistatic.positionEnuM, bistatic.velocityEnuMps ?? [0, 0, 0], query.originEnuM, query.ownVelocityEnuMps, s.positionEnuM, s.velocityEnuMps, query.look.antenna.wavelengthM) } : {})
     });
   }
   return out;
@@ -299,4 +318,75 @@ export function clutterInCell(patches: readonly ClutterPatch[], targetRelDoppler
     c += p.cnr;
   }
   return c;
+}
+
+/** Doppler of a scatterer's bistatic return relative to the direct illuminator→receiver signal, Hz. */
+export function bistaticDoppler(pIll: Vector3, vIll: Vector3, pRx: Vector3, vRx: Vector3, pS: Vector3, vS: Vector3, wavelengthM: number): number {
+  const rate = (a: Vector3, va: Vector3, b: Vector3, vb: Vector3) => { const d = sub(b, a); const n = norm(d); return n > 0 ? dot(sub(vb, va), d) / n : 0; };
+  const dRt = rate(pIll, vIll, pS, vS);
+  const dRr = rate(pS, vS, pRx, vRx);
+  const dRd = rate(pIll, vIll, pRx, vRx);
+  return -(dRt + dRr - dRd) / wavelengthM;
+}
+
+export interface BistaticClutterQuery {
+  readonly receiverEnuM: Vector3;
+  readonly receiverVelocityEnuMps: Vector3;
+  readonly receiverBeam: Vector3;
+  readonly receiverAntenna: AntennaPattern;
+  readonly receiverNoiseTempK: number;
+  readonly receiverLossesDb: number;
+  readonly illuminatorEnuM: Vector3;
+  readonly illuminatorVelocityEnuMps: Vector3;
+  /** Illuminator ERP on its boresight, W, and its relative pattern toward a direction. */
+  readonly illuminatorErpW: number;
+  readonly illuminatorBoresight: Vector3;
+  readonly illuminatorPattern: AntennaPattern;
+  readonly integrationTimeS: number;
+  readonly groundHeightM: number;
+  readonly gammaDb: number;
+  readonly maxRangeM: number;
+}
+
+/**
+ * Bistatic ground clutter for a semi-active receiver: ground patches lit by the illuminator (through its
+ * own pattern: main lobe and sidelobes) and received through the receiver's pattern. Reflectivity uses
+ * the bistatic constant-γ form σ0 = γ·√(sin ψi · sin ψs) (Willis, "Bistatic Radar", ch. 9 — ESTIMATED γ).
+ * Each patch carries its Doppler relative to the direct signal and its CNR at the receiver.
+ */
+export function bistaticClutterPatches(q: BistaticClutterQuery): ClutterPatch[] {
+  const h = q.receiverEnuM[2] - q.groundHeightM;
+  if (!(h > 1)) return [];
+  const lambda = q.receiverAntenna.wavelengthM;
+  const gamma = 10 ** (q.gammaDb / 10);
+  const nAz = 48, nR = 36;
+  const maxGround = Math.sqrt(Math.max(0, q.maxRangeM ** 2 - h * h));
+  const r0 = Math.max(20, h * 0.05);
+  const out: ClutterPatch[] = [];
+  const k = 1.380649e-23;
+  const L = 10 ** (q.receiverLossesDb / 10);
+  for (let i = 0; i < nR; i++) {
+    const g0 = i === 0 ? 0 : r0 * (maxGround / r0) ** ((i - 1) / (nR - 1));
+    const g1 = r0 * (maxGround / r0) ** (i / (nR - 1));
+    if (g1 <= g0) continue;
+    const gm = (g0 + g1) / 2;
+    const area = (Math.PI * (g1 * g1 - g0 * g0)) / nAz;
+    for (let j = 0; j < nAz; j++) {
+      const az = ((j + 0.5) / nAz) * 2 * Math.PI;
+      const pG: Vector3 = [q.receiverEnuM[0] + Math.sin(az) * gm, q.receiverEnuM[1] + Math.cos(az) * gm, q.groundHeightM];
+      const toRx = sub(q.receiverEnuM, pG), toIll = sub(q.illuminatorEnuM, pG);
+      const rr = norm(toRx), rt = norm(toIll);
+      const dRx = scale(toRx, -1 / rr), dIll = scale(toIll, -1 / rt);
+      const sinS = Math.max(1e-3, toRx[2] / rr), sinI = Math.max(1e-3, toIll[2] / rt);
+      const sigma0 = gamma * Math.sqrt(sinS * sinI);
+      if (angleBetween(dRx, q.receiverBeam) >= Math.PI / 2) continue;
+      const oR = beamOffsets(q.receiverBeam, dRx);
+      const oI = beamOffsets(q.illuminatorBoresight, dIll);
+      const p = (q.illuminatorErpW * q.illuminatorPattern.gain2(oI.right, oI.up) * sigma0 * area * q.receiverAntenna.receiveGain * q.receiverAntenna.gain2(oR.right, oR.up) * lambda * lambda * q.integrationTimeS) /
+        ((4 * Math.PI) ** 3 * rt * rt * rr * rr * k * q.receiverNoiseTempK * L);
+      if (p < 1e-3) continue;
+      out.push({ relDopplerHz: bistaticDoppler(q.illuminatorEnuM, q.illuminatorVelocityEnuMps, q.receiverEnuM, q.receiverVelocityEnuMps, pG, [0, 0, 0], lambda), rangeM: rr, cnr: p });
+    }
+  }
+  return out;
 }

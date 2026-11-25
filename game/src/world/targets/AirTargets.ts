@@ -8,7 +8,7 @@
  */
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 import { infraredPoints, type IrEmitterState, type IrFieldQuery, type IrPoint, type IrSignatureModel, type IrSource } from "../../physics/infrared/InfraredPhysics.js";
-import { groundClutterPatches, radarEchoes, type ClutterPatch, type ClutterQuery, type RadarBeamQuery, type RadarEcho, type RadarScatterer, type RadarTerrain, type RcsModel } from "../../physics/radar/RadarPhysics.js";
+import { bistaticClutterPatches, groundClutterPatches, radarEchoes, type BistaticClutterQuery, type ClutterPatch, type ClutterQuery, type RadarBeamQuery, type RadarEcho, type RadarScatterer, type RadarTerrain, type RcsModel } from "../../physics/radar/RadarPhysics.js";
 import type { SensorScene } from "../../physics/sensing/SensorScene.js";
 import { cross, dot, unit } from "../../physics/sensing/SweepGeometry.js";
 import { standardAtmosphere } from "../../physics/environment/Atmosphere.js";
@@ -134,13 +134,18 @@ const toBodyOf = (s: AirTargetState) => (v: Vector3): Vector3 => [dot(v, s.forwa
 /** The world's air targets plus the SensorScene built on them. */
 export class AirTargetWorld implements SensorScene {
   private targets: AirTarget[];
+  private destroyed = new Set<string>();
   public readonly sunDirectionEnu: Vector3 = unit([0.4, -0.3, 1]);
 
   public constructor(private readonly specs: readonly AirTargetSpec[], private readonly terrain?: RadarTerrain) {
     this.targets = specs.map((s) => new AirTarget(s));
   }
 
-  public reset(): void { this.targets = this.specs.map((s) => new AirTarget(s)); }
+  public reset(): void { this.targets = this.specs.map((s) => new AirTarget(s)); this.destroyed.clear(); }
+
+  /** Destroy a target (warhead effect). It stops existing for sensors and rendering. */
+  public destroy(id: string): void { this.destroyed.add(id); this.targets = this.targets.filter((t) => t.spec.id !== id); }
+  public isDestroyed(id: string): boolean { return this.destroyed.has(id); }
 
   public step(dt: number): void { for (const t of this.targets) t.update(dt); }
 
@@ -158,6 +163,11 @@ export class AirTargetWorld implements SensorScene {
   public radarClutter(query: Omit<ClutterQuery, "groundHeightM" | "gammaDb">): readonly ClutterPatch[] {
     const h = this.terrain?.heightAt(query.originEnuM[0], query.originEnuM[1]);
     return groundClutterPatches({ ...query, groundHeightM: Number.isFinite(h) ? (h as number) : 0, gammaDb: this.clutterGammaDb });
+  }
+
+  public bistaticClutter(query: Omit<BistaticClutterQuery, "groundHeightM" | "gammaDb">): readonly ClutterPatch[] {
+    const h = this.terrain?.heightAt(query.receiverEnuM[0], query.receiverEnuM[1]);
+    return bistaticClutterPatches({ ...query, groundHeightM: Number.isFinite(h) ? (h as number) : 0, gammaDb: this.clutterGammaDb });
   }
 
   public infrared(query: IrFieldQuery): readonly IrPoint[] {

@@ -58,8 +58,10 @@ export interface CockpitViewSource {
   hudOverlay?(): DisplayList;
   /** True when the package draws the complete HUD itself (the shared flight symbology is then omitted; warnings stay). */
   hudOwnedByPackage?(): boolean;
+  /** Helmet-mounted sight symbology (angle frame; circle radii in degrees), drawn unclipped in yellow. */
+  helmetOverlay?(): DisplayList;
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
-  worldObjects?(): readonly { readonly id: string; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
+  worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
 const enuToThree = (v: Vector3): THREE.Vector3 => new THREE.Vector3(v[0], v[2], -v[1]);
@@ -340,6 +342,16 @@ export class ThreeCockpitView {
     }, color);
   }
 
+  private drawHelmet(g: CanvasRenderingContext2D, s: CockpitViewSnapshot, w: number, h: number): void {
+    const list = this.source.helmetOverlay?.();
+    if (!list || list.length === 0) return;
+    drawDisplayList(g, list, {
+      unitPx: h / this.fov, // pixels per degree: circle radii are given in degrees
+      screen: (x, y) => [w / 2 + (x * h) / 2, h / 2 - (y * h) / 2],
+      angle: (az, el) => this.project(rotateVector(s.bodyToWorld, [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), -Math.sin(el)]))
+    }, "#ffd84a");
+  }
+
   /** Simple meshes for other aircraft. */
   private drawOthers(): void {
     const list = this.source.worldObjects?.() ?? [];
@@ -347,6 +359,18 @@ export class ThreeCockpitView {
     for (const o of list) {
       seen.add(o.id);
       let m = this.others.get(o.id);
+      if (!m && o.kind === "missile") {
+        m = new THREE.Group();
+        {
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4, 8), new THREE.MeshStandardMaterial({ color: "#d9d9d0" }));
+          body.rotation.x = Math.PI / 2;
+          const flame = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffb347" }));
+          flame.position.set(0, 0, 2.3);
+          m.add(body, flame);
+          this.world.add(m);
+          this.others.set(o.id, m);
+        }
+      }
       if (!m) {
         m = new THREE.Group();
         const mat = new THREE.MeshStandardMaterial({ color: "#6d747c", roughness: 0.6 });
@@ -413,6 +437,7 @@ export class ThreeCockpitView {
     g.font = `600 ${Math.round(u * 2.2)}px ui-monospace, Menlo, monospace`;
     g.fillStyle = color;
 
+    this.drawHelmet(g, s, w, h);
     // Symbology is clipped to the HUD's field of view around boresight.
     const bore = this.project(rotateVector(s.bodyToWorld, [1, 0, 0]));
     if (!bore) return;
