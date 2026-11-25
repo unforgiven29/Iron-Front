@@ -13,7 +13,7 @@ camera frame with no extra rotation.
 
 References (arrangement only; nothing is copied into the repository): IrasD, "MiG-29 cockpit 1..4",
 c. 1995, Wikimedia Commons, CC BY-SA 4.0 — a Soviet-standard 9.12 cockpit (the 9.13 cockpit is the
-same, per the project owner). The tub sides are curved lofted surfaces tiled with sub-panels. Panel geometry and
+same, per the project owner). The tub sides are flat facets at angles, tiled with sub-panels. Panel geometry and
 instrument positions come from panel.json (shared with the TypeScript layout so bezels and live
 gauges coincide). Dimensions not measurable from the photographs are ESTIMATED.
 
@@ -362,19 +362,36 @@ def canopy_frame_and_tub():
 CONSOLE_TOP = 0.57  # reference height for parts that still sit on a flat datum (ESTIMATED)
 
 
+# Faceted side panels (flat planes meeting at creases, as on the aircraft). Profile corner points
+# (y outboard, z down) from the canopy sill to the foot-well edge: aft section and forward section.
+SIDE_AFT = [(0.485, 0.30), (0.48, 0.47), (0.34, 0.62), (0.24, 0.78)]
+SIDE_FWD = [(0.485, 0.30), (0.47, 0.40), (0.38, 0.49), (0.33, 0.63)]
+A_CREASE = 0.6          # crease where the forward section angles inboard toward the panel
+B_CREASES = (0.0, 1 / 3, 2 / 3, 1.0)
+
+
 def side_profile(side, a, b):
-    """Curved side panel ("downlook panel") of the cockpit tub, FRD. a: aft (0) → front (1);
-    b: canopy sill (0) → inboard edge at the foot well (1). Quadratic profile from the sill,
-    straight down, then curving inboard; toward the front it sweeps up and outboard into the
-    angled main-panel sections (shape from the reference photographs; dimensions ESTIMATED)."""
+    """Side panel point, FRD. a: aft (0) → front (1), flat facets with one crease at A_CREASE;
+    b: sill (0) → foot-well edge (1), three flat facets. Dimensions ESTIMATED from the photographs."""
     x = -0.45 + 1.31 * a
-    k = max(0.0, min(1.0, (a - 0.55) / 0.45)) ** 2
-    p0 = (0.485, 0.30)
-    p1 = (0.485, 0.62 - 0.17 * k)
-    p2 = (0.23 + 0.13 * k, 0.77 - 0.16 * k)
-    y = (1 - b) ** 2 * p0[0] + 2 * (1 - b) * b * p1[0] + b * b * p2[0]
-    z = (1 - b) ** 2 * p0[1] + 2 * (1 - b) * b * p1[1] + b * b * p2[1]
+    k = 0.0 if a <= A_CREASE else (a - A_CREASE) / (1 - A_CREASE)
+    pts = [(pa[0] + (pf[0] - pa[0]) * k, pa[1] + (pf[1] - pa[1]) * k) for pa, pf in zip(SIDE_AFT, SIDE_FWD)]
+    seg = min(2, int(b * 3))
+    t = b * 3 - seg
+    y = pts[seg][0] + (pts[seg + 1][0] - pts[seg][0]) * t
+    z = pts[seg][1] + (pts[seg + 1][1] - pts[seg][1]) * t
     return (x, side * y, z)
+
+
+def facet_loft(name, f, a_list, b_list, material):
+    """Flat-faceted surface: one quad per (a, b) cell between the given parameter breakpoints."""
+    bm = bmesh.new()
+    g = [[bm.verts.new(B(f(a, b))) for b in b_list] for a in a_list]
+    for i in range(len(a_list) - 1):
+        for j in range(len(b_list) - 1):
+            bm.faces.new([g[i][j], g[i + 1][j], g[i + 1][j + 1], g[i][j + 1]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return obj_from_bm(name, bm, material)
 
 
 def loft(name, f, nu, nv, material, thickness=0.012, parent=None):
@@ -443,21 +460,20 @@ RESERVED = {-1: [(0.34, 0.58, 0.50, 0.75), (0.80, 0.94, 0.30, 0.54), (0.30, 0.37
 
 
 def side_tiles(side, rnd):
-    """Tile the side surface with sub-panels of varying size (as on the photographs), leaving the
+    """Sub-panels of varying size inside single facets (never across a crease), leaving the
     reserved areas (throttle, gear, flap, airbrake, electrical plate) clear."""
     tiles = []
-    a = 0.02
-    while a < 0.97:
-        w = min(0.97 - a, rnd.uniform(0.06, 0.13))
-        b = 0.16
-        while b < 0.99:
-            h = min(0.99 - b, rnd.uniform(0.18, 0.4))
-            t = (a, a + w, b, b + h)
-            clash = any(not (t[1] <= r[0] or t[0] >= r[1] or t[3] <= r[2] or t[2] >= r[3]) for r in RESERVED[side])
-            if not clash:
-                tiles.append(t)
-            b += h
-        a += w
+    for (fa0, fa1) in ((0.02, A_CREASE), (A_CREASE, 0.98)):
+        for (fb0, fb1) in ((B_CREASES[1], B_CREASES[2]), (B_CREASES[2], B_CREASES[3]), (0.16, B_CREASES[1])):
+            a = fa0
+            while a < fa1 - 0.02:
+                w = min(fa1 - a, rnd.uniform(0.06, 0.13))
+                bands = 2 if fb1 - fb0 > 0.25 else 1
+                for q in range(bands):
+                    t = (a, a + w, fb0 + (fb1 - fb0) * q / bands, fb0 + (fb1 - fb0) * (q + 1) / bands)
+                    if not any(not (t[1] <= r[0] or t[0] >= r[1] or t[3] <= r[2] or t[2] >= r[3]) for r in RESERVED[side]):
+                        tiles.append(t)
+                a += w
     return tiles
 
 
@@ -465,7 +481,7 @@ def consoles():
     rnd = random.Random(1995)
     for side, name in ((-1, "l"), (1, "r")):
         f = side_f(side)
-        loft(f"side_{name}", f, 28, 14, PAINT, thickness=0)
+        facet_loft(f"side_{name}", f, (0.0, A_CREASE, 1.0), B_CREASES, PAINT)
         for k, (a0, a1, b0, b1) in enumerate(side_tiles(side, rnd)):
             on_surface_plate(f"sp_{name}_{k}", f, side, a0 + 0.004, a1 - 0.004, b0 + 0.008, b1 - 0.008, BLACK if rnd.random() < 0.35 else PAINT_DK)
             na = max(1, int((a1 - a0) / 0.04)); nb = max(1, int((b1 - b0) / 0.12))
