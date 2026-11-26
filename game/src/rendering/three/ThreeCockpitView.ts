@@ -18,7 +18,7 @@ import type { TerrainSurface } from "../../world/terrain/Terrain.js";
 import { drawInstrument } from "../instruments/Gauges.js";
 import { drawDisplayList, type DisplayList } from "../instruments/DisplayList.js";
 import type { CockpitLayout, CockpitPart } from "./CockpitLayout.js";
-import { Explosions, type ExplosionRequest } from "./Explosions.js";
+import { Explosions, type DecoyVisual, type ExplosionRequest } from "./Explosions.js";
 import { buildAircraftModel } from "./models/AircraftModels.js";
 
 /** What the view needs from an aircraft snapshot (structural, platform-neutral). */
@@ -65,6 +65,8 @@ export interface CockpitViewSource {
   /** Other aircraft to draw (world truth is fine for rendering; sensors never use this). */
   /** Explosions that started since the last call (visual effects only). */
   explosions?(): readonly ExplosionRequest[];
+  /** Flares and chaff in the air (visual only). */
+  decoys?(): readonly (DecoyVisual & { readonly id: string; readonly velocityEnuMps: Vector3 })[];
   worldObjects?(): readonly { readonly id: string; readonly kind?: "aircraft" | "missile"; readonly modelId?: string; readonly missile?: { readonly geometry: MissileShape; readonly burning: boolean }; readonly positionEnuM: Vector3; readonly forwardEnu: Vector3; readonly rightEnu: Vector3; readonly downEnu: Vector3 }[];
 }
 
@@ -217,7 +219,9 @@ export class ThreeCockpitView {
     this.explosionFx ??= new Explosions(this.world);
     for (const e of this.source.explosions?.() ?? []) this.explosionFx.spawn(e);
     const nowS = performance.now() / 1000;
-    this.explosionFx.update(this.lastFrameS === null ? 0 : Math.min(0.1, nowS - this.lastFrameS));
+    const decoyList = this.source.decoys?.() ?? [];
+    for (const d of decoyList) if (d.kind === "flare") this.addSmoke(d.id, d.positionEnuM, d.velocityEnuMps, 0);
+    this.explosionFx.update(this.lastFrameS === null ? 0 : Math.min(0.1, nowS - this.lastFrameS), decoyList);
     this.lastFrameS = nowS;
     if (ext || !this.ownModel) this.renderer.render(this.scene, this.camera);
     else {

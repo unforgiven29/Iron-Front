@@ -70,6 +70,8 @@ export interface HostileEnvironment {
   threats(): readonly { readonly positionEnuM: Vector3; readonly velocityEnuMps: Vector3; readonly side: Side }[];
   groundHeightAt(x: number, y: number): number;
   fire(spec: NotionalMissileSpec, shooter: HostileFighter, targetId: string, cue: LauncherCue): void;
+  /** Eject a flare or chaff cartridge (optional; worlds without countermeasures omit it). */
+  dispense?(kind: "flare" | "chaff", shooter: HostileFighter, dispenserSide: -1 | 1): void;
   /** True while a missile this fighter fired is still flying. */
   missileInFlight(shooterId: string, specId: string): boolean;
 }
@@ -101,6 +103,8 @@ export class HostileFighter implements AirTargetBody {
   private throttle = 0.8;
   private ab = 0;
   private time = 0;
+  private nextDispenseS = 0;
+  private expendables = { flare: 30, chaff: 30 };
   private stores: NotionalMissileSpec[];
   private lastShotS = -999;
   private modeStartS = 0;
@@ -234,6 +238,15 @@ export class HostileFighter implements AirTargetBody {
         desiredAlt = this.pos[2] - 1500;
         desiredSpeed = 330;
         this.ab = 1;
+        // Flare + chaff pair every ~1.5 s while defending (ESTIMATED tactic and load).
+        if (this.env.dispense && this.time >= this.nextDispenseS) {
+          this.nextDispenseS = this.time + 1.2 + this.rng.nextFloat() * 0.6;
+          for (const kind of ["flare", "chaff"] as const) {
+            if (this.expendables[kind] <= 0) continue;
+            this.expendables[kind]--;
+            this.env.dispense(kind, this, this.rng.nextFloat() < 0.5 ? -1 : 1);
+          }
+        }
       }
     } else if (c) {
       const r: Vector3 = [c.positionEnuM[0] - this.pos[0], c.positionEnuM[1] - this.pos[1], c.positionEnuM[2] - this.pos[2]];
