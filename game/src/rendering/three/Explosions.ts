@@ -8,6 +8,7 @@ import * as THREE from "three";
 import type { Vector3 } from "../../core/coordinates/CoordinateFrames.js";
 
 export type ExplosionKind = "warhead" | "aircraft" | "ground";
+export interface DecoyVisual { readonly positionEnuM: Vector3; readonly kind: "flare" | "chaff"; readonly ageS: number; readonly lifeS: number }
 export interface ExplosionRequest { readonly positionEnuM: Vector3; readonly kind: ExplosionKind }
 
 interface Particle { p: THREE.Vector3; v: THREE.Vector3; born: number; life: number; size: number; fire: number; drag: number; fall: number }
@@ -58,7 +59,7 @@ export class Explosions {
       parent.add(pts);
       return pts;
     };
-    this.smokePts = make("varying float vFire; varying float vFade; void main(){ vec2 c = gl_PointCoord - 0.5; float r = length(c); if (r > 0.5) discard; float soft = 1.0 - smoothstep(0.1, 0.5, r); gl_FragColor = vec4(vec3(0.18,0.17,0.16), soft * vFade * 0.5); }", THREE.NormalBlending, 2);
+    this.smokePts = make("varying float vFire; varying float vFade; void main(){ vec2 c = gl_PointCoord - 0.5; float r = length(c); if (r > 0.5) discard; float soft = 1.0 - smoothstep(0.1, 0.5, r); gl_FragColor = vec4(mix(vec3(0.18,0.17,0.16), vec3(0.78,0.8,0.82), vFire), soft * vFade * 0.5); }", THREE.NormalBlending, 2);
     // Fire: white-yellow core cooling to orange and deep red.
     this.firePts = make("varying float vFire; varying float vFade; void main(){ vec2 c = gl_PointCoord - 0.5; float r = length(c); if (r > 0.5) discard; float soft = 1.0 - smoothstep(0.0, 0.5, r); vec3 hot = mix(vec3(0.85,0.18,0.03), vec3(1.0,0.92,0.6), clamp(vFire*1.5-0.3,0.0,1.0)); gl_FragColor = vec4(hot * soft * soft * vFade * 0.28, 1.0); }", THREE.AdditiveBlending, 3);
   }
@@ -87,8 +88,8 @@ export class Explosions {
     if (this.particles.length > MAX_PARTICLES) this.particles.splice(0, this.particles.length - MAX_PARTICLES);
   }
 
-  /** Advance and upload the particles (call once per rendered frame). */
-  public update(dt: number): void {
+  /** Advance and upload the particles (call once per rendered frame); decoys are drawn this frame only. */
+  public update(dt: number, decoys: readonly DecoyVisual[] = []): void {
     const now = performance.now() / 1000;
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i]!, a = now - f.born;
@@ -113,6 +114,15 @@ export class Explosions {
       } else {
         smokeRows.push([p.p.x, p.p.y, p.p.z, p.size * (0.6 + 1.4 * Math.sqrt(t)), 0, Math.min(1, age * 1.5) * (1 - t)]);
       }
+    }
+    for (const d of decoys) {
+      const p = enuToThree(d.positionEnuM), t = d.ageS / Math.max(0.1, d.lifeS);
+      // Flare: small white-hot point with a flicker; chaff: thin grey cloud that blooms and fades.
+      if (d.kind === "flare") {
+        // Two stacked points: a wide glow and a hot core, so the flare reads at a distance.
+        const f = Math.max(0.3, 1 - t * t) * (0.85 + Math.random() * 0.3);
+        fireRows.push([p.x, p.y, p.z, 14, 0.6, f], [p.x, p.y, p.z, 5, 1, f * 3]);
+      } else smokeRows.push([p.x, p.y, p.z, 4 + 18 * Math.sqrt(t), 1, 0.5 * (1 - t)]);
     }
     upload(this.firePts, fireRows);
     upload(this.smokePts, smokeRows);

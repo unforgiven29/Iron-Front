@@ -3,6 +3,7 @@
  * Three.js cockpit view, keyboard input and the frame loop. Nothing here is aircraft-specific:
  * cockpit, MFD pages, switch keys and data notes come from the AircraftDefinition.
  */
+import { CountermeasureWorld, DEFAULT_EXPENDABLES, type DecoyKind } from "../world/weapons/Countermeasures.js";
 import type { Vector3 } from "../core/coordinates/CoordinateFrames.js";
 import type { ExplosionRequest } from "../rendering/three/Explosions.js";
 import { mountDebugOverlay } from "./DebugOverlay.js";
@@ -93,6 +94,19 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     const s = jet.snapshot();
     return [{ id: "player", side: "blue", positionEnuM: s.positionEnuM, velocityEnuMps: s.velocityEnuMps }];
   };
+  // Flares and chaff (basic, notional: they only fool the notional missile seekers).
+  const decoys = new CountermeasureWorld();
+  let expendables = { ...DEFAULT_EXPENDABLES };
+  let dispenseSide: -1 | 1 = 1;
+  const playerDispense = (kind: DecoyKind) => {
+    if (shotDown || expendables[kind] <= 0) return;
+    const s = jet.snapshot();
+    for (let i = 0; i < 2 && expendables[kind] > 0; i++) {
+      expendables[kind]--;
+      dispenseSide = dispenseSide === 1 ? -1 : 1;
+      decoys.dispense(kind, "blue", "player", s.positionEnuM, s.velocityEnuMps, dispenseSide);
+    }
+  };
   const hostileEnv: HostileEnvironment = {
     opponents: () => playerTarget(),
     threats: () => [
@@ -100,6 +114,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       ...missiles.states().map((m) => ({ positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps, side: "blue" as const }))
     ],
     groundHeightAt: groundAt,
+    dispense: (kind, shooter, dispenserSide) => { decoys.dispense(kind, shooter.spec.side, shooter.spec.id, shooter.positionEnuM, shooter.velocityEnuMps, dispenserSide); },
     fire: (spec, shooter, targetId, cue) => { notional.launch(spec, "red", shooter.spec.id, shooter.positionEnuM, shooter.velocityEnuMps, cue, targetId); },
     missileInFlight: (shooterId, specId) => notional.states().some((m) => m.shooterId === shooterId && m.spec.id === specId)
   };
@@ -113,7 +128,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   const notional = new NotionalMissileWorld(
     () => [...playerTarget(), ...targets.states().map((t) => ({ id: t.id, side: "red" as const, positionEnuM: t.positionEnuM, velocityEnuMps: t.velocityEnuMps }))],
     (id, m) => { if (id === "player") shotDown = `${m.spec.display}`; else targets.destroy(id); },
-    groundAt
+    groundAt,
+    () => decoys.decoys()
   );
   const weaponPort: WeaponPort = {
     launch: (...a) => { shotsFired++; return missiles.launch(...a); },
@@ -145,6 +161,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
       simTime += h;
       targets.step(h);
       missiles.step(h);
+      decoys.step(h);
       notional.step(h);
       if (avionics) {
         const s = jet.snapshot();
@@ -171,7 +188,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
         const tp = e.targetId ? lastPos.get(e.targetId) : undefined;
         if (e.kind === "kill" && (tp ?? p)) pendingFx.push({ positionEnuM: tp ?? p!, kind: "aircraft" });
       } else if (e.kind === "lost" && /ground/.test(e.detail) && p) pendingFx.push({ positionEnuM: p, kind: "ground" });
-      lastPos.delete(e.missileId);
+      if (e.kind !== "decoyed") lastPos.delete(e.missileId);
     };
     const g = missiles.events(), n = notional.events();
     for (; seenGuided < g.length; seenGuided++) handle(g[seenGuided]!);
@@ -181,6 +198,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   };
   const source: CockpitViewSource = {
     explosions: collectExplosions,
+    decoys: () => decoys.decoys(),
     snapshot: () => jet.renderSnapshot(),
     hud: () => hud(jet.snapshot(), jet.definition.annunciate),
     mfd: (screen): MfdPage => definition.mfdPages?.[screen]?.(jet.snapshot()) ?? { title: screen.toUpperCase(), lines: [] },
@@ -209,7 +227,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   const debug = mountDebugOverlay(frame, {
     timeS: () => simTime,
     ownPositionEnuM: () => jet.snapshot().positionEnuM,
-    avionics: () => avionics?.status() ?? null,
+    avionics: () => ({ ...(avionics?.status() ?? {}), flares: expendables.flare, chaff: expendables.chaff, decoysAirborne: decoys.decoys().length }),
     missiles: () => [
       ...missiles.states().map((m) => ({ id: m.id, type: m.specId, side: "blue", timeS: m.timeS, positionEnuM: m.positionEnuM, velocityEnuMps: m.velocityEnuMps, phase: m.phase,
         seeker: m.seekerLocked ? "LOCKED" : "searching", extra: `M${m.mach.toFixed(2)} α ${(m.alphaRad * DEG).toFixed(1)}° batt ${m.batteryLeftS.toFixed(0)} s` })),
@@ -221,7 +239,7 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
   });
   let paused = false;
   const restart = () => {
-    const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); avionics?.reset();
+    const s = startState(); jet.reset({ ...s, positionEnuM: [...s.positionEnuM] }); targets.reset(); missiles.reset(); notional.reset(); decoys.reset(); expendables = { ...DEFAULT_EXPENDABLES }; avionics?.reset();
     simTime = 0; avionicsAcc = 0; throttle = s.throttle; stick = { pitch: 0, roll: 0, yaw: 0, brakes: 0 };
     shotDown = null; missionOver = false; shotsFired = 0; endAt = null;
     seenGuided = 0; seenNotional = 0; ownExploded = false; lastPos.clear(); pendingFx.length = 0;
@@ -244,6 +262,8 @@ export function startAircraftSession(View: typeof import("../rendering/three/Thr
     if (k === "v") { view.resetLook(); return; }
     if (k === "c") { view.toggleExternal(); return; }
     if (k === "`") { debug.toggle(); return; }
+    if (k === "9") { playerDispense("flare"); return; }
+    if (k === "0") { playerDispense("chaff"); return; }
     held.add(k);
   });
   frame.addEventListener("keyup", (e) => { const k = keyOf(e); held.delete(k); avionics?.key(k, false); });

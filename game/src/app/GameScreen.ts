@@ -260,7 +260,7 @@ export function mountGameScreen(root: HTMLElement): void {
     }
     const tips = el("ul", "tips");
     for (const t of s.hostile
-      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile. No Home/End/PgUp/PgDn/Ins/Del keys? Use H / M / . / , / T / Z.", "Watch the RWR display on the panel: a lock or a missile means turn to put the threat on your beam and dive. MiG-29: the SPO-15 front sectors are blind while your radar transmits (Home / H for standby).", "Press C for the external view, ` for radar/weapon debug info, Esc to pause."]
+      ? ["Lock with the radar (cursor + Enter), then launch with L. F selects the missile. No Home/End/PgUp/PgDn/Ins/Del keys? Use H / M / . / , / T / Z.", "Watch the RWR display on the panel: a lock or a missile means turn to put the threat on your beam and dive. MiG-29: the SPO-15 front sectors are blind while your radar transmits (Home / H for standby).", "9 drops flares (beats IR missiles), 0 drops chaff (beats radar missiles); 30 of each. Press C for the external view, ` for radar/weapon debug info, Esc to pause."]
       : ["Shift/Ctrl set throttle; W/S/A/D fly. Press C for the external view.", "` shows radar/weapon debug info. Esc pauses the game."]) tips.append(el("li", undefined, t));
     p.append(facts, tips);
     return p;

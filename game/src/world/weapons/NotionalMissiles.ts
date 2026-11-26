@@ -12,6 +12,13 @@ import { createScopedRandom } from "../../core/random/SeededRandom.js";
 import { standardAtmosphere } from "../../physics/environment/Atmosphere.js";
 import type { NotionalMissileSpec } from "../../weapons/catalog/NotionalAirToAir.js";
 import type { RfEmitter } from "../../physics/radar/RfEmission.js";
+import type { Decoy } from "./Countermeasures.js";
+
+/**
+ * Chance that a fresh decoy inside the seeker's track gate pulls the seeker off its target
+ * (NOTIONAL gameplay values; one roll per decoy per missile).
+ */
+export const DECOY_SEDUCTION = Object.freeze({ flare: 0.3, chaff: 0.25, gateRad: 8 * Math.PI / 180, freshS: 2 });
 
 export type Side = "blue" | "red";
 
@@ -38,7 +45,7 @@ export interface NotionalMissileState {
   readonly seekerTargetId: string | null;
 }
 
-export interface NotionalWeaponEvent { readonly timeS: number; readonly missileId: string; readonly kind: "launch" | "kill" | "miss" | "lost"; readonly targetId?: string; readonly detail: string }
+export interface NotionalWeaponEvent { readonly timeS: number; readonly missileId: string; readonly kind: "launch" | "kill" | "miss" | "lost" | "decoyed"; readonly targetId?: string; readonly detail: string }
 
 const G = 9.80665;
 const len = (v: Vector3) => Math.hypot(v[0], v[1], v[2]);
@@ -61,6 +68,8 @@ class NotionalMissile {
   public t = 0;
   public alive = true;
   public seekerId: string | null = null;
+  /** Decoys this seeker has already been tested against. */
+  public readonly rolledDecoys = new Set<string>();
   public prevRel = new Map<string, Vector3>();
   public lastCue: { positionEnuM: Vector3; velocityEnuMps: Vector3 } | null = null;
   /** Active seeker transmitting (terminal phase of a radar missile). */
@@ -87,7 +96,8 @@ export class NotionalMissileWorld {
    * @param onKill  called when a warhead destroys an aircraft
    */
   public constructor(private readonly targets: () => readonly CombatTarget[], private readonly onKill: (targetId: string, missile: NotionalMissileState) => void,
-    private readonly groundHeightAt: (x: number, y: number) => number = () => 0) {}
+    private readonly groundHeightAt: (x: number, y: number) => number = () => 0,
+    private readonly decoys: () => readonly Decoy[] = () => []) {}
 
   public reset(): void { this.missiles = []; this.log = []; this.time = 0; this.rng = createScopedRandom(91, "notional-missiles"); }
 
@@ -105,9 +115,31 @@ export class NotionalMissileWorld {
       const r = sub(t.positionEnuM, m.pos), d = len(r);
       return d < m.spec.seekerRangeM && dot(r, fwd) / (d || 1) > Math.cos(m.spec.seekerHalfAngleRad);
     };
+    const wanted = m.spec.guidance === "ir" ? "flare" : "chaff";
+    const decoys = this.decoys().filter((d) => d.kind === wanted && d.side !== m.side);
     if (m.seekerId) {
+      const dec = decoys.find((d) => d.id === m.seekerId);
+      if (dec) {
+        const t: CombatTarget = { id: dec.id, side: dec.side, positionEnuM: dec.positionEnuM, velocityEnuMps: dec.velocityEnuMps };
+        if (inFov(t)) return t;
+      }
       const t = list.find((x) => x.id === m.seekerId);
-      if (t && inFov(t)) return t;
+      if (t && inFov(t)) {
+        // A fresh decoy inside the track gate may pull the seeker off (one roll per decoy).
+        const r = sub(t.positionEnuM, m.pos), rn = len(r) || 1;
+        for (const d of decoys) {
+          if (d.ageS > DECOY_SEDUCTION.freshS || m.rolledDecoys.has(d.id)) continue;
+          const q = sub(d.positionEnuM, m.pos), qn = len(q) || 1;
+          if (Math.acos(Math.max(-1, Math.min(1, dot(r, q) / (rn * qn)))) > DECOY_SEDUCTION.gateRad) continue;
+          m.rolledDecoys.add(d.id);
+          if (this.rng.nextFloat() < DECOY_SEDUCTION[wanted]) {
+            m.seekerId = d.id;
+            this.log.push({ timeS: this.time, missileId: m.id, kind: "decoyed", targetId: t.id, detail: `seduced by ${d.id}` });
+            return { id: d.id, side: d.side, positionEnuM: d.positionEnuM, velocityEnuMps: d.velocityEnuMps };
+          }
+        }
+        return t;
+      }
       m.seekerId = null;
     }
     // Radar missiles go active only near the cued point; IR missiles look from launch.
