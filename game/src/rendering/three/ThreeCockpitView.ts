@@ -114,6 +114,7 @@ export class ThreeCockpitView {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
     this.renderer.domElement.className = "cockpit-gl";
+    this.renderer.domElement.dataset.cockpitShell = layout.shellModel ? "loading" : "none";
     this.hudCanvas = document.createElement("canvas");
     this.hudCanvas.className = "cockpit-hud";
     container.append(this.renderer.domElement, this.hudCanvas);
@@ -299,24 +300,38 @@ export class ThreeCockpitView {
     return new THREE.Vector3(p[1], -p[2], -p[0]);
   }
 
-  /** Load the layout's optional shell model; failures leave the simple parts on their own. */
+  /** Load the aircraft's physical cockpit shell and report the result on the view canvas for browser QA. */
   private loadShell(): void {
     const shell = this.layout.shellModel;
-    if (!shell) return;
+    if (!shell) {
+      this.renderer.domElement.dataset.cockpitShell = "none";
+      return;
+    }
     new GLTFLoader().load(shell.url, (gltf) => {
       const model = gltf.scene;
+      model.name = `${this.layout.aircraftId}-cockpit-shell`;
       const [rx, ry, rz] = shell.rotationRad ?? [0, 0, 0];
       model.rotation.set(rx, ry, rz);
       model.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
-      const k = shell.lengthM / Math.max(size.x, size.z, 1e-6);
+      const horizontalExtent = Math.max(size.x, size.z);
+      if (!Number.isFinite(horizontalExtent) || horizontalExtent <= 1e-6 || !Number.isFinite(shell.lengthM) || shell.lengthM <= 0) {
+        this.renderer.domElement.dataset.cockpitShell = "error";
+        console.error(`Invalid cockpit shell dimensions for ${this.layout.aircraftId}`, { size, lengthM: shell.lengthM });
+        return;
+      }
+      const k = shell.lengthM / horizontalExtent;
       model.scale.setScalar(k);
       model.updateMatrixWorld(true);
       const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
       model.position.copy(this.bodyToCamera(shell.centreM).sub(centre));
       model.traverse((o) => { o.userData = { ...o.userData, shell: true }; });
       this.cockpit.add(model);
-    }, undefined, () => { /* keep the simple cockpit */ });
+      this.renderer.domElement.dataset.cockpitShell = "loaded";
+    }, undefined, (error) => {
+      this.renderer.domElement.dataset.cockpitShell = "error";
+      console.error(`Failed to load cockpit shell for ${this.layout.aircraftId}`, shell.url, error);
+    });
   }
 
   private buildCockpit(): void {
