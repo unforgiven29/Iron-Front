@@ -14,6 +14,18 @@ describe("MiG-29 cockpit", () => {
   it("every instrument part has a value source, and every lever is bound to a real switch with its real positions", () => {
     const def = createMiG29Definition();
     const ids = new Set(Object.values(MIG29_SWITCHES) as string[]);
+    const clickableSwitches = MIG29_COCKPIT_LAYOUT.parts.filter((p) => p.binding?.kind === "switch");
+    expect(clickableSwitches.map((p) => p.binding?.kind === "switch" ? p.binding.switchId : "").sort()).toEqual([
+      MIG29_SWITCHES.acGen,
+      MIG29_SWITCHES.batGnd,
+      MIG29_SWITCHES.dcGen,
+      MIG29_SWITCHES.emergencyGear,
+      MIG29_SWITCHES.flaps,
+      MIG29_SWITCHES.gear,
+      MIG29_SWITCHES.pto,
+      MIG29_SWITCHES.speedbrake
+    ].sort());
+    expect(new Set(clickableSwitches.map((p) => p.binding?.kind === "switch" ? p.binding.switchId : "")).size).toBe(8);
     for (const p of MIG29_COCKPIT_LAYOUT.parts) {
       if (p.kind === "instrument") expect(MIG29_COCKPIT_INSTRUMENTS[p.id], p.id).toBeDefined();
       if (p.binding?.kind === "switch") {
