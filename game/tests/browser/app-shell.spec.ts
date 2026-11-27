@@ -154,6 +154,7 @@ test("MiG-29 cockpit shell, live instruments and controls load without page erro
   const shellCanvas = page.locator("canvas.cockpit-gl");
   await expect(shellCanvas).toBeVisible();
   await expect(shellCanvas).toHaveAttribute("data-cockpit-shell", "loaded", { timeout: 15_000 });
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-shell-meshes", /^(1[0-9]|[2-9][0-9]+)$/);
   const frame = page.getByLabel(/cockpit view/);
   await frame.click();
   await page.keyboard.press("x"); // flap lever
