@@ -15,7 +15,7 @@ The runtime now has an original procedural shell in `game/src/platforms/aircraft
 - HUD, panel-wing angles, cockpit eye point, stick dimensions, throttle dimensions, side-console controls and several instrument identifications are estimated or inferred.
 - The layout is primarily simple boxes, circles, cylinders and flat display planes. It omits much of the tub, seat, seat rails, footwell, rudder pedals, sidewall structure, central pedestal, switchgear, wiring, canopy mechanisms, detailed bezels, guards, placards and fasteners.
 
-The shared renderer is `game/src/rendering/three/ThreeCockpitView.ts`. Its `CockpitPartKind` currently supports only `box`, `cylinder`, `screen`, `glass` and `instrument`. It can load an optional GLB/GLTF `shellModel`, but the MiG-29 layout does not supply one. The current click raycast excludes objects marked as shell content, so detailed GLB-mounted controls will not become interactive merely by adding a shell. Fix or deliberately provide tested hit-volume overlays before declaring the 3D controls complete.
+The shared renderer is `game/src/rendering/three/ThreeCockpitView.ts`. In addition to simple `CockpitPartKind` overlays, it now accepts an aircraft-owned `buildShell()` factory or an optional GLB/GLTF asset. The MiG-29 currently uses the procedural factory in `MiG29CockpitModel.ts`. Its material groups are merged into bounded mesh batches and the canvas exposes shell-build status and mesh count for automated tests. The click raycast deliberately excludes shell geometry; only controls represented by separate `CockpitPart` layout entries are currently interactive. Do not claim every physical switch in the shell works until each required control has a correctly positioned, tested hit target and command mapping.
 
 **Do not "improve" this layout by inventing another set of precise-looking coordinates.** Replace provisional geometry only when the corresponding measurement or placement has traceable evidence. Keep unknowns unknown.
 
@@ -166,7 +166,7 @@ Coordinate integration:
 
 ### Interactive nodes
 
-Use stable, unique node names and IDs. Every interactive control needs a declared type, allowed detents/axis, owning subsystem command, feedback source and failure/power behavior. No click target may directly edit aircraft simulation state. Use a deliberate solution for GLB control hit-testing: renderer-recognized node metadata or transparent hit volumes tested in the actual cockpit camera. The current shell-only loader/raycast path does not prove this works.
+Use stable, unique node names and IDs. Every interactive control needs a declared type, allowed detents/axis, owning subsystem command, feedback source and failure/power behavior. No click target may directly edit aircraft simulation state. Use a deliberate solution for detailed shell control hit-testing: renderer-recognized node metadata or transparent hit volumes tested in the actual cockpit camera. The current procedural shell is non-interactive by design; only controls with explicit overlay parts and bindings are clickable.
 
 ### Materials
 
@@ -177,7 +177,7 @@ Use a consistent physically based material workflow. Separate painted metal, ano
 A correct source asset can still render incorrectly. Run all of the following in the actual Vite/Three.js application and on the deployed GitHub Pages URL.
 
 ### Asset-load gates
-- No GLB, buffer, texture, font or relative-path 404s on the Pages base path.
+- No procedural shell build errors or missing external GLB/buffer/texture/font/relative-path requests on the Pages base path.
 - No missing materials, broken UVs, invalid normals, non-finite transforms, transparent sorting problems or console/WebGL errors.
 - Confirm all expected meshes and textures load; report load failure visibly rather than silently substituting an empty cockpit.
 - Confirm cleanup/disposal and repeated entry/exit do not leak GPU resources.
