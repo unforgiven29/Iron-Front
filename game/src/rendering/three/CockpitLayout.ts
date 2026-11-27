@@ -37,6 +37,8 @@ export interface CockpitLayout {
   readonly parts: readonly CockpitPart[];
   /** Vertical field of view, degrees. */
   readonly fieldOfViewDeg: number;
+  /** Optional aircraft-specific procedural shell, returned in cockpit-camera coordinates. */
+  readonly buildShell?: () => Object3D;
   /**
    * Optional 3D shell model (glTF/GLB) drawn around the simple parts (tub, sills, canopy frame).
    * Visual only: it is never clicked and never used for reach or vision analysis. The view scales
