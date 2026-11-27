@@ -3,6 +3,7 @@
  * (FRD, metres) relative to the pilot's design eye point. Aircraft packages supply a layout;
  * the shared Three.js view renders any layout without aircraft-specific code.
  */
+import type { Object3D } from "three";
 import type { InstrumentFace } from "../instruments/Gauges.js";
 
 export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass" | "instrument";
