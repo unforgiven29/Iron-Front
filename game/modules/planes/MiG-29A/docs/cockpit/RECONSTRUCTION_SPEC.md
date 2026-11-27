@@ -8,7 +8,7 @@ This document is deliberately strict. A visually convincing cockpit is not autom
 
 ## 1. Current implementation: known gaps
 
-The present implementation is `game/src/platforms/aircraft/mig29/MiG29Cockpit.ts`. It is explicitly an approximation:
+The runtime now has an original procedural shell in `game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts`, integrated through `CockpitLayout.buildShell` and `ThreeCockpitView.loadShell()`. The current build is a first substantial geometry pass, not a measured final asset. The legacy layout in `MiG29Cockpit.ts` is still explicitly approximate:
 
 - It derives panel positions from pixel measurements on an oblique photograph and assumes a 100 mm attitude indicator for scale. Perspective is not corrected.
 - It cites Soviet-standard 9.12-family photographs; applicability to product 9.13 is not established.
@@ -148,15 +148,15 @@ This inventory is a coverage checklist, not permission to place undocumented equ
 
 ## 5. Asset and coordinate contract
 
-Target asset location:
+Current procedural source:
 
-`game/modules/planes/MiG-29A/assets/cockpit/mig29-9-13-cockpit.glb`
+`game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts`
 
-Required adjacent manifest:
+Current integration:
 
-`game/modules/planes/MiG-29A/assets/cockpit/mig29-9-13-cockpit.asset.json`
+`game/src/platforms/aircraft/mig29/MiG29Cockpit.ts` → `CockpitLayout.buildShell` → `ThreeCockpitView`.
 
-The manifest must state: asset ID/version; target variant/operator; source IDs; author; creation tool/version; license and redistribution rights; SHA-256; real-world dimensions; unit; local axes/handedness; origin/pivot; cockpit eye datum; material/texture inventory; named node inventory; animation names; clickable node IDs; LODs; and export settings.
+The eventual model may be moved to an authored GLB if that improves measured geometry/detail and supports named animated nodes; this is not a prerequisite for the current browser runtime. A GLB conversion or replacement still needs a manifest with: asset ID/version; target variant/operator; source IDs; author; creation tool/version; license and redistribution rights; SHA-256; real-world dimensions; unit; local axes/handedness; origin/pivot; cockpit eye datum; material/texture inventory; named node inventory; animation names; clickable node IDs; LODs; and export settings.
 
 Coordinate integration:
 - Keep the aircraft simulation convention documented in the existing project: body frame is FRD (forward, right, down), with metres.
@@ -208,13 +208,14 @@ A correct source asset can still render incorrectly. Run all of the following in
 
 ## 7. Required delivery files
 
-- `assets/cockpit/mig29-9-13-cockpit.glb` — main geometry.
-- `assets/cockpit/mig29-9-13-cockpit.asset.json` — scale, axes, variant, provenance, license, node and texture manifest.
+- `game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts` — current material-batched procedural shell. Replace/extend from measured data; do not treat the current source as a final 1:1 model.
+- If a measured authored GLB supersedes the procedural source: a GLB plus an adjacent manifest with scale, axes, variant, provenance, license, node and texture inventory.
 - `assets/cockpit/source-register.json` — page/figure/photo references and evidence labels.
 - `assets/cockpit/measurement-report.md` — measured dimensions, datums, uncertainty and unresolved values.
 - `assets/cockpit/validation/` — repeatable screenshots, comparison overlays and visual QA checklist.
-- Updated `MiG29Cockpit.ts` — only aircraft-specific component placement, bindings and eye datum; remove obsolete pixel-derived coordinates when replacement measurements exist.
-- Browser tests covering asset loading, camera alignment, control hit-testing and visible instruments.
+- Updated `MiG29Cockpit.ts` — aircraft-specific component placement, bindings and eye datum; remove obsolete pixel-derived coordinates when replacement measurements exist.
+- Updated `CockpitLayout.ts` and `ThreeCockpitView.ts` shell-factory/load-diagnostics support.
+- Unit tests for finite geometry, dimensions and mesh inventory, plus browser tests covering shell construction, camera visibility, control hit-testing and visible instruments.
 
 ## 8. Immediate no-shortcuts rule
 
