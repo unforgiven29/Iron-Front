@@ -38,6 +38,7 @@ const palette: Record<Surface, THREE.Material> = {
 };
 
 type GeometryBucket = { positions: number[]; normals: number[]; indices: number[] };
+const empty = (): GeometryBucket => ({ positions: [], normals: [], indices: [] });
 
 function panelPoint(u: number, v: number): THREE.Vector3 {
   const over = Math.max(0, Math.abs(u) - WING_U);
