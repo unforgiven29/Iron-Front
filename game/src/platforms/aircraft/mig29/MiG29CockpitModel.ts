@@ -49,6 +49,66 @@ function panelPoint(u: number, v: number): THREE.Vector3 {
   return new THREE.Vector3(lateral, -bodyZ, -bodyX);
 }
 
+function panelRotation(u: number): Vec3 {
+  return [TILT, Math.abs(u) > WING_U ? -Math.sign(u) * WING_YAW : 0, 0];
+}
+
+function panelNormal(u: number): THREE.Vector3 {
+  return new THREE.Vector3(0, 0, 1)
+    .applyEuler(new THREE.Euler(...panelRotation(u), "XYZ"))
+    .normalize();
+}
+
+function panelSurfacePoint(u: number, v: number, depth = 0): THREE.Vector3 {
+  return panelPoint(u, v).addScaledVector(panelNormal(u), depth);
+}
+
+function panelBox(
+  bucket: GeometryBucket,
+  u: number,
+  v: number,
+  offsetU: number,
+  offsetV: number,
+  depth: number,
+  size: Vec3
+): void {
+  const centreU = u + offsetU, centreV = v + offsetV;
+  const p = panelSurfacePoint(centreU, centreV, depth);
+  buildBox(bucket, [p.x, p.y, p.z], size, panelRotation(centreU));
+}
+
+function panelCylinder(
+  bucket: GeometryBucket,
+  u: number,
+  v: number,
+  offsetU: number,
+  offsetV: number,
+  depth: number,
+  radius: number,
+  length: number,
+  radial = 16
+): void {
+  const centreU = u + offsetU, centreV = v + offsetV;
+  const p = panelSurfacePoint(centreU, centreV, depth), n = panelNormal(centreU);
+  buildCylinder(bucket, [p.x, p.y, p.z], radius, length, [n.x, n.y, n.z], radial);
+}
+
+function panelTorus(
+  bucket: GeometryBucket,
+  u: number,
+  v: number,
+  offsetU: number,
+  offsetV: number,
+  depth: number,
+  radius: number,
+  tube: number,
+  radial = 36
+): void {
+  const centreU = u + offsetU, centreV = v + offsetV;
+  const p = panelSurfacePoint(centreU, centreV, depth), n = panelNormal(centreU);
+  buildTorus(bucket, [p.x, p.y, p.z], radius, tube, [n.x, n.y, n.z], radial);
+}
+
 function instrumentPoint(px: number, py: number): THREE.Vector3 {
   const u = (px - OX) * PX, v = (py - OY) * PX;
   return panelPoint(u, v);
@@ -242,38 +302,37 @@ export function createMiG29CockpitShell(): THREE.Group {
     ["egt-l", 445, 210, 55], ["egt-r", 505, 210, 55]
   ];
   for (const [, px, py, sizePx] of gauges) {
-    const p = instrumentPoint(px, py), diameter = sizePx * PX;
-    // Annular backing and raised bezel leave the live CanvasTexture face unobstructed.
-    buildTorus(b("black"), [p.x, p.y, p.z - 0.006], diameter * 0.515, diameter * 0.060, [0, 0, 1], 40);
-    buildTorus(b("bezel"), [p.x, p.y, p.z + 0.004], diameter * 0.515, diameter * 0.040, [0, 0, 1], 40);
-    buildTorus(b("metal"), [p.x, p.y, p.z + 0.012], diameter * 0.545, 0.0015, [0, 0, 1], 40);
+    const u = (px - OX) * PX, v = (py - OY) * PX, diameter = sizePx * PX;
+    // Rings, lens rim and fasteners follow the same tilted/turned surface as the live gauge plane.
+    panelTorus(b("black"), u, v, 0, 0, -0.006, diameter * 0.515, diameter * 0.060, 40);
+    panelTorus(b("bezel"), u, v, 0, 0, 0.004, diameter * 0.515, diameter * 0.040, 40);
+    panelTorus(b("metal"), u, v, 0, 0, 0.012, diameter * 0.545, 0.0015, 40);
     for (let i = 0; i < 4; i++) {
-      const a = Math.PI * 0.5 * i;
-      buildCylinder(b("metal"), [p.x + Math.cos(a) * diameter * 0.54, p.y + Math.sin(a) * diameter * 0.54, p.z + 0.014], 0.0032, 0.0025, [0, 0, 1], 8);
+      const angle = Math.PI * 0.5 * i;
+      panelCylinder(b("metal"), u, v, Math.cos(angle) * diameter * 0.54, Math.sin(angle) * diameter * 0.54, 0.014, 0.0032, 0.0025, 8);
     }
   }
   const rectangles: readonly [number, number, number, number][] = [[570, 180, 32, 72], [435, 255, 55, 42], [490, 255, 55, 42], [555, 255, 55, 42]];
   for (const [px, py, widthPx, heightPx] of rectangles) {
-    const p = instrumentPoint(px, py), w = widthPx * PX, h = heightPx * PX;
-    // Recessed backing stays behind the face; four raised rails form the aperture.
-    buildBox(b("black"), [p.x, p.y, p.z - 0.014], [w + 0.020, h + 0.020, 0.008]);
+    const u = (px - OX) * PX, v = (py - OY) * PX, w = widthPx * PX, h = heightPx * PX;
+    // Recessed backing stays behind the face; four raised rails follow the turned panel plane.
+    panelBox(b("black"), u, v, 0, 0, -0.014, [w + 0.020, h + 0.020, 0.008]);
     const rail = Math.max(0.006, Math.min(0.012, Math.min(w, h) * 0.10));
-    buildBox(b("bezel"), [p.x - w / 2 - rail / 2, p.y, p.z + 0.004], [rail, h + rail * 2, 0.012]);
-    buildBox(b("bezel"), [p.x + w / 2 + rail / 2, p.y, p.z + 0.004], [rail, h + rail * 2, 0.012]);
-    buildBox(b("bezel"), [p.x, p.y - h / 2 - rail / 2, p.z + 0.004], [w, rail, 0.012]);
-    buildBox(b("bezel"), [p.x, p.y + h / 2 + rail / 2, p.z + 0.004], [w, rail, 0.012]);
+    panelBox(b("bezel"), u, v, -w / 2 - rail / 2, 0, 0.004, [rail, h + rail * 2, 0.012]);
+    panelBox(b("bezel"), u, v, w / 2 + rail / 2, 0, 0.004, [rail, h + rail * 2, 0.012]);
+    panelBox(b("bezel"), u, v, 0, -h / 2 - rail / 2, 0.004, [w, rail, 0.012]);
+    panelBox(b("bezel"), u, v, 0, h / 2 + rail / 2, 0.004, [w, rail, 0.012]);
   }
   for (const [px, py, width, height] of [[600, 95, 0.15, 0.13], [650, 215, 0.10, 0.10]] as const) {
-    const p = instrumentPoint(px, py);
-    const rail = 0.012;
-    buildBox(b("black"), [p.x, p.y, p.z - 0.018], [width + 0.024, height + 0.024, 0.010]);
-    buildBox(b("bezel"), [p.x - width / 2 - rail / 2, p.y, p.z + 0.005], [rail, height + rail * 2, 0.014]);
-    buildBox(b("bezel"), [p.x + width / 2 + rail / 2, p.y, p.z + 0.005], [rail, height + rail * 2, 0.014]);
-    buildBox(b("bezel"), [p.x, p.y - height / 2 - rail / 2, p.z + 0.005], [width, rail, 0.014]);
-    buildBox(b("bezel"), [p.x, p.y + height / 2 + rail / 2, p.z + 0.005], [width, rail, 0.014]);
+    const u = (px - OX) * PX, v = (py - OY) * PX, rail = 0.012;
+    panelBox(b("black"), u, v, 0, 0, -0.018, [width + 0.024, height + 0.024, 0.010]);
+    panelBox(b("bezel"), u, v, -width / 2 - rail / 2, 0, 0.005, [rail, height + rail * 2, 0.014]);
+    panelBox(b("bezel"), u, v, width / 2 + rail / 2, 0, 0.005, [rail, height + rail * 2, 0.014]);
+    panelBox(b("bezel"), u, v, 0, -height / 2 - rail / 2, 0.005, [width, rail, 0.014]);
+    panelBox(b("bezel"), u, v, 0, height / 2 + rail / 2, 0.005, [width, rail, 0.014]);
   }
-  for (const x of [-0.39, -0.2925, -0.195, -0.0975, 0, 0.0975, 0.195, 0.2925, 0.39]) {
-    for (const y of [-0.205, -0.565]) buildCylinder(b("metal"), [x, y, -0.833], 0.0032, 0.003, [0, 0, 1], 8);
+  for (const u of [-0.39, -0.2925, -0.195, -0.0975, 0, 0.0975, 0.195, 0.2925, 0.39]) {
+    for (const v of [V_TOP + 0.012, V_BOTTOM - 0.012]) panelCylinder(b("metal"), u, v, 0, 0, 0.001, 0.0032, 0.003, 8);
   }
   for (const [x, y] of [[-0.38, -0.27], [0.38, -0.27], [-0.39, -0.52], [0.39, -0.52]] as const) {
     buildCylinder(b("bezel"), [x, y, -0.824], 0.012, 0.010, [0, 0, 1], 16);
