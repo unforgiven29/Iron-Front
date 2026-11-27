@@ -131,29 +131,37 @@ test("data panel toggles with I and shows surfaces, engines and systems pages", 
   await page.waitForTimeout(400);
   await page.keyboard.press("i");
   await expect(page.locator(".data-panel")).toBeVisible();
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-1.png` });
   await page.keyboard.press("2");
   await expect(page.locator(".data-panel .efb-svg")).toBeVisible();
   await page.waitForTimeout(600);
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-2.png` });
   await page.keyboard.up("d");
   for (const k of ["3", "4", "5"]) {
     await page.keyboard.press(k);
     await expect(page.locator(".data-panel .dp-body > *").first()).toBeVisible();
-    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/panel-${k}.png` });
   }
   await page.keyboard.press("i");
   await expect(page.locator(".data-panel")).toBeHidden();
   expect(errors).toEqual([]);
 });
 
-test("MiG-29 cockpit with live instruments loads and flies without page errors", async ({ page }) => {
+test("MiG-29 cockpit shell, live instruments and controls load without page errors", async ({ page }) => {
+  test.setTimeout(90_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await launch(page, { aircraft: "MiG-29", mission: /Free flight/, start: "Runway" });
+  const shellCanvas = page.locator("canvas.cockpit-gl");
+  await expect(shellCanvas).toBeVisible();
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-shell", "loaded", { timeout: 15_000 });
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-shell-meshes", /^(1[0-9]|[2-9][0-9]+)$/);
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-switch-targets", "8");
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-switch-ids", /mig29\.gear\.handle.*mig29\.flaps/);
   const frame = page.getByLabel(/cockpit view/);
   await frame.click();
   await page.keyboard.press("x"); // flap lever
   await page.waitForTimeout(500);
+  if (process.env.SHOTS) await shellCanvas.screenshot({ path: `${process.env.SHOTS}/mig29-cockpit-front.png`, animations: "disabled", timeout: 20_000 });
+  await page.keyboard.press("c"); // verify the detailed outer view still switches cleanly
+  await page.waitForTimeout(200);
+  await page.keyboard.press("c");
   expect(errors).toEqual([]);
 });

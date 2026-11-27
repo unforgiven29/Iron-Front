@@ -3,6 +3,7 @@
  * (FRD, metres) relative to the pilot's design eye point. Aircraft packages supply a layout;
  * the shared Three.js view renders any layout without aircraft-specific code.
  */
+import type { Object3D } from "three";
 import type { InstrumentFace } from "../instruments/Gauges.js";
 
 export type CockpitPartKind = "box" | "cylinder" | "screen" | "glass" | "instrument";
@@ -36,6 +37,8 @@ export interface CockpitLayout {
   readonly parts: readonly CockpitPart[];
   /** Vertical field of view, degrees. */
   readonly fieldOfViewDeg: number;
+  /** Optional aircraft-specific procedural shell, returned in cockpit-camera coordinates. */
+  readonly buildShell?: () => Object3D;
   /**
    * Optional 3D shell model (glTF/GLB) drawn around the simple parts (tub, sills, canopy frame).
    * Visual only: it is never clicked and never used for reach or vision analysis. The view scales

@@ -114,6 +114,7 @@ export class ThreeCockpitView {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
     this.renderer.domElement.className = "cockpit-gl";
+    this.renderer.domElement.dataset.cockpitShell = layout.buildShell || layout.shellModel ? "loading" : "none";
     this.hudCanvas = document.createElement("canvas");
     this.hudCanvas.className = "cockpit-hud";
     container.append(this.renderer.domElement, this.hudCanvas);
@@ -299,24 +300,64 @@ export class ThreeCockpitView {
     return new THREE.Vector3(p[1], -p[2], -p[0]);
   }
 
-  /** Load the layout's optional shell model; failures leave the simple parts on their own. */
+  /** Build or load the aircraft's physical cockpit shell and expose a browser QA status. */
   private loadShell(): void {
+    if (this.layout.buildShell) {
+      try {
+        const model = this.layout.buildShell();
+        model.name ||= `${this.layout.aircraftId}-cockpit-shell`;
+        let meshes = 0;
+        model.traverse((o) => {
+          o.userData = { ...o.userData, shell: true };
+          if (o instanceof THREE.Mesh) meshes++;
+        });
+        if (meshes === 0) throw new Error("Cockpit shell factory returned no meshes");
+        this.cockpit.add(model);
+        this.renderer.domElement.dataset.cockpitShellMeshes = String(meshes);
+        this.renderer.domElement.dataset.cockpitShell = "loaded";
+      } catch (error) {
+        this.renderer.domElement.dataset.cockpitShell = "error";
+        this.renderer.domElement.dataset.cockpitShellError = error instanceof Error ? error.message : String(error);
+      }
+      return;
+    }
+
     const shell = this.layout.shellModel;
-    if (!shell) return;
+    if (!shell) {
+      this.renderer.domElement.dataset.cockpitShell = "none";
+      this.renderer.domElement.dataset.cockpitShellMeshes = "0";
+      return;
+    }
     new GLTFLoader().load(shell.url, (gltf) => {
       const model = gltf.scene;
+      model.name = `${this.layout.aircraftId}-cockpit-shell`;
       const [rx, ry, rz] = shell.rotationRad ?? [0, 0, 0];
       model.rotation.set(rx, ry, rz);
       model.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
-      const k = shell.lengthM / Math.max(size.x, size.z, 1e-6);
+      const horizontalExtent = Math.max(size.x, size.z);
+      if (!Number.isFinite(horizontalExtent) || horizontalExtent <= 1e-6 || !Number.isFinite(shell.lengthM) || shell.lengthM <= 0) {
+        this.renderer.domElement.dataset.cockpitShell = "error";
+        this.renderer.domElement.dataset.cockpitShellError = "Invalid shell dimensions";
+        return;
+      }
+      const k = shell.lengthM / horizontalExtent;
       model.scale.setScalar(k);
       model.updateMatrixWorld(true);
       const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
       model.position.copy(this.bodyToCamera(shell.centreM).sub(centre));
-      model.traverse((o) => { o.userData = { ...o.userData, shell: true }; });
+      let meshes = 0;
+      model.traverse((o) => {
+        o.userData = { ...o.userData, shell: true };
+        if (o instanceof THREE.Mesh) meshes++;
+      });
       this.cockpit.add(model);
-    }, undefined, () => { /* keep the simple cockpit */ });
+      this.renderer.domElement.dataset.cockpitShellMeshes = String(meshes);
+      this.renderer.domElement.dataset.cockpitShell = "loaded";
+    }, undefined, (error) => {
+      this.renderer.domElement.dataset.cockpitShell = "error";
+      this.renderer.domElement.dataset.cockpitShellError = error instanceof Error ? error.message : String(error);
+    });
   }
 
   private buildCockpit(): void {
@@ -366,6 +407,12 @@ export class ThreeCockpitView {
       this.cockpit.add(mesh);
       if (part.binding) this.animated.push({ part, mesh, base: mesh.quaternion.clone(), basePos: mesh.position.clone() });
     }
+    const switchParts = this.layout.parts.filter((part) => part.binding?.kind === "switch");
+    this.renderer.domElement.dataset.cockpitSwitchTargets = String(switchParts.length);
+    this.renderer.domElement.dataset.cockpitSwitchIds = switchParts
+      .map((part) => part.binding?.kind === "switch" ? part.binding.switchId : "")
+      .filter(Boolean)
+      .join(",");
   }
 
   private animateParts(s: CockpitViewSnapshot): void {
