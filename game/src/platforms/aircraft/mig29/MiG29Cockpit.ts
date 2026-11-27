@@ -1,8 +1,8 @@
 /**
  * MiG-29 product 9.13 cockpit presentation.
  *
- * The static cockpit tub, seat, canopy, consoles and physical panel hardware are in the companion
- * GLB asset. The live instruments and supported click controls remain data-driven overlays here.
+ * The static cockpit tub, seat, canopy, consoles and physical panel hardware are built
+ * by the companion procedural Three.js shell module. The live instruments and supported click controls remain data-driven overlays here.
  *
  * Evidence boundary: the GLB is an original, reference-guided family-level reconstruction. The
  * public photo set is not positively identified as product 9.13 and does not provide full
@@ -20,6 +20,7 @@ import type { CockpitLayout, CockpitPart } from "../../../rendering/three/Cockpi
 import type { InstrumentFace } from "../../../rendering/instruments/Gauges.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { MIG29_HYDRAULICS as H } from "./MiG29Data.js";
+import { createMiG29CockpitShell } from "./MiG29CockpitModel.js";
 
 const RED = "#d33", YELLOW = "#e0b020";
 
@@ -63,15 +64,10 @@ const KGF = 98066.5; // Pa per kgf/cm²
 
 export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   aircraftId: "mig29",
-  provenance: "Original reference-guided cockpit shell GLB plus live overlay layout. Family-level photo arrangement only; dimensions, selected 9.13 equipment fit and eye datum are not fully verified.",
+  provenance: "Original reference-guided procedural cockpit shell plus live overlay layout. Family-level photo arrangement only; dimensions, selected 9.13 equipment fit and eye datum are not fully verified.",
   eyeFromCgM: [4.9, 0, -1.15],
   fieldOfViewDeg: 62,
-  shellModel: {
-    url: new URL("../../../../modules/planes/MiG-29A/assets/cockpit/mig29-9-13-cockpit.glb", import.meta.url).href,
-    lengthM: 2.365,
-    centreM: [-0.0075, 0, 0.1649626402],
-    provenance: "Original Iron Front GLB geometry; guided by IrasD Wikimedia CC BY-SA 4.0 photos and cross-checked against public GAF/DCS cockpit references. Dimensions are provisional estimates, not verified product 9.13 measurements."
-  },
+  buildShell: createMiG29CockpitShell,
   parts: [
     // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the GLB shell.
     // Dynamic instruments below intentionally share the same eye-relative photo transform as its bezels.
