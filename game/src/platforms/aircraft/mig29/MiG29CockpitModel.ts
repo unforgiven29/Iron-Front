@@ -9,6 +9,7 @@
  * instrument faces and supported interactive controls are overlaid by MiG29Cockpit.ts.
  */
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 type Surface = "paint" | "panel" | "console" | "frame" | "black" | "rubber" | "metal" | "bezel" | "seat" | "cushion" | "belt" | "warning" | "amber" | "glass" | "hud";
 type Vec3 = readonly [number, number, number];
@@ -136,6 +137,19 @@ function appendGeometry(bucket: GeometryBucket, geometry: THREE.BufferGeometry, 
 
 function buildBox(b: GeometryBucket, centre: Vec3, size: Vec3, rotation: Vec3 = [0, 0, 0]): void {
   appendGeometry(b, new THREE.BoxGeometry(size[0], size[1], size[2]), centre, rotation);
+}
+
+function buildRoundedBox(
+  b: GeometryBucket,
+  centre: Vec3,
+  size: Vec3,
+  radius: number,
+  rotation: Vec3 = [0, 0, 0],
+  segments = 3
+): void {
+  const limit = Math.min(...size) * 0.48;
+  const bevel = Math.max(0.0005, Math.min(radius, limit));
+  appendGeometry(b, new RoundedBoxGeometry(size[0], size[1], size[2], segments, bevel), centre, rotation);
 }
 
 function buildCylinder(b: GeometryBucket, centre: Vec3, radius: number, length: number, axis: Vec3 = [0, 1, 0], radial = 16): void {
@@ -356,8 +370,8 @@ export function createMiG29CockpitShell(): THREE.Group {
   // Side consoles and sidewall equipment panels; left/right layouts intentionally differ.
   for (const side of [-1, 1]) {
     const x = side * 0.435;
-    buildBox(b("console"), [x, -0.39, 0.12], [0.26, 0.16, 1.52], [0, 0, side * 0.035]);
-    buildBox(b("panel"), [x, -0.295, 0.12], [0.255, 0.055, 1.46], [side * 0.09, 0, side * 0.035]);
+    buildRoundedBox(b("console"), [x, -0.39, 0.12], [0.26, 0.16, 1.52], 0.025, [0, 0, side * 0.035]);
+    buildRoundedBox(b("panel"), [x, -0.295, 0.12], [0.255, 0.055, 1.46], 0.012, [side * 0.09, 0, side * 0.035]);
     buildBox(b("frame"), [side * 0.555, -0.27, 0.12], [0.035, 0.11, 1.55]);
     for (const z of [-0.64, 0.86]) buildBox(b("frame"), [x, -0.28, z], [0.28, 0.07, 0.035]);
     const rows = side < 0
@@ -392,8 +406,8 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // Twin-engine throttle quadrant. The animated lever blocks remain part of the data layout.
-  buildBox(b("black"), [-0.385, -0.235, -0.24], [0.17, 0.055, 0.40]);
-  buildBox(b("bezel"), [-0.385, -0.202, -0.24], [0.16, 0.018, 0.37]);
+  buildRoundedBox(b("black"), [-0.385, -0.235, -0.24], [0.17, 0.055, 0.40], 0.018);
+  buildRoundedBox(b("bezel"), [-0.385, -0.202, -0.24], [0.16, 0.018, 0.37], 0.006);
   for (const x of [-0.405, -0.365]) buildCylinder(b("metal"), [x, -0.17, -0.25], 0.014, 0.08, [0, 1, 0], 16);
 
   // Rudder pedals, footwells, floor tunnel and centre-stick boot/grip.
@@ -419,12 +433,12 @@ export function createMiG29CockpitShell(): THREE.Group {
     buildBox(b("seat"), [x, -0.63, 0.38], [0.055, 0.10, 0.63]);
     buildCylinder(b("bezel"), [x, -0.33, 0.67], 0.014, 0.58, [0, 1, 0], 16);
   }
-  buildBox(b("seat"), [0, -0.59, 0.48], [0.51, 0.15, 0.52], [-0.10, 0, 0]);
-  buildBox(b("seat"), [0, -0.17, 0.72], [0.49, 0.74, 0.13], [0.22, 0, 0]);
-  buildBox(b("seat"), [0, 0.285, 0.83], [0.40, 0.30, 0.22]);
-  buildBox(b("cushion"), [0, 0.305, 0.955], [0.30, 0.19, 0.045]);
-  buildBox(b("cushion"), [0, -0.515, 0.40], [0.43, 0.10, 0.40], [-0.10, 0, 0]);
-  buildBox(b("cushion"), [0, -0.665, 0.40], [0.43, 0.065, 0.43]);
+  buildRoundedBox(b("seat"), [0, -0.59, 0.48], [0.51, 0.15, 0.52], 0.055, [-0.10, 0, 0]);
+  buildRoundedBox(b("seat"), [0, -0.17, 0.72], [0.49, 0.74, 0.13], 0.045, [0.22, 0, 0]);
+  buildRoundedBox(b("seat"), [0, 0.285, 0.83], [0.40, 0.30, 0.22], 0.055);
+  buildRoundedBox(b("cushion"), [0, 0.305, 0.955], [0.30, 0.19, 0.045], 0.020);
+  buildRoundedBox(b("cushion"), [0, -0.515, 0.40], [0.43, 0.10, 0.40], 0.035, [-0.10, 0, 0]);
+  buildRoundedBox(b("cushion"), [0, -0.665, 0.40], [0.43, 0.065, 0.43], 0.025);
   for (const side of [-1, 1]) {
     const x = side * 0.21;
     buildBox(b("seat"), [x, -0.19, 0.70], [0.045, 0.55, 0.10], [0.20, 0, 0]);
