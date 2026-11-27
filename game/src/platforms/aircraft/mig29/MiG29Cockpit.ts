@@ -1,34 +1,26 @@
 /**
- * MiG-29 cockpit layout — main instrument panel laid out from reference photographs.
+ * MiG-29 product 9.13 cockpit presentation.
  *
- * REFERENCES (openly licensed; used for arrangement and instrument types only, not copied into
- * the repository):
- *  - IrasD, "MiG-29 cockpit 2" and "MiG-29 cockpit 3" (c. 1995, Soviet-standard 9.12-type cockpit
- *    with Cyrillic markings), Wikimedia Commons, CC BY-SA 4.0:
- *    https://commons.wikimedia.org/wiki/File:MiG-29_cockpit_2.jpg
- *    https://commons.wikimedia.org/wiki/File:MiG-29_cockpit_3.jpg
- *  Applicability to product 9.13 is not verified (the 9.13 panel is believed to be very similar).
+ * The static cockpit tub, seat, canopy, consoles and physical panel hardware are in the companion
+ * GLB asset. The live instruments and supported click controls remain data-driven overlays here.
  *
- * METHOD: instrument centres and sizes were measured in pixels from "cockpit 3" (an oblique view)
- * and scaled with the attitude indicator taken as 0.10 m across (ESTIMATED scale; perspective not
- * corrected), so positions are approximate to a few centimetres. Identification confidence:
- *  - read from labels in "cockpit 2": EGT ×100 °C (two dials), «ГИДРОСИСТ. ГАЗ.СИСТ.» four-tape
- *    gauge, «КЛИН» intake-ramp indicator, «Нкаб O2 ΔP» tapes;
- *  - recognised by form: attitude indicator, HSI, airspeed, altimeter, radar head-down display;
- *  - INFERRED from scale markings and position: vertical-speed (ВАР-300 type), twin tachometer,
- *    combined AoA/G, radio altimeter, fuel tape. Scale values not legible in the photos are ESTIMATED.
+ * Evidence boundary: the GLB is an original, reference-guided family-level reconstruction. The
+ * public photo set is not positively identified as product 9.13 and does not provide full
+ * dimensional drawings. Do not call the model a measured 1:1 product 9.13 cockpit. The layout's
+ * photo-derived instrument coordinates and several instrument identifications remain estimates.
  *
- * POWER (ESTIMATED assignment): pitot-static instruments, tachometers and EGT need no aircraft power;
- * gyro, AoA, pressure, ramp and fuel indications need their bus and show OFF / empty without it.
- * Instruments the simulation does not model (cabin altitude, oxygen) are drawn empty, never faked.
+ * Visual references: IrasD, MiG-29 cockpit photographs 1–4 (c.1995), Wikimedia Commons,
+ * CC BY-SA 4.0; GAF T.O. 1F-MIG29-1 (German Air Force installation, exact baseline applicability
+ * unverified); Eagle Dynamics MiG-29 manual (simulator variant caveat). Full provenance is in the
+ * companion asset manifest and cockpit reconstruction specification.
+ *
+ * Instrument power behavior and values are sourced/estimated as individually noted below.
  */
 import type { CockpitLayout, CockpitPart } from "../../../rendering/three/CockpitLayout.js";
 import type { InstrumentFace } from "../../../rendering/instruments/Gauges.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
 import { MIG29_HYDRAULICS as H } from "./MiG29Data.js";
 
-/** Panel paint and furniture colours (from the reference photographs). */
-const PANEL = "#8c9ba5", CONSOLE = "#7f8d97", DARK = "#2a2e32", FRAME = "#6f7c86";
 const RED = "#d33", YELLOW = "#e0b020";
 
 /** Switch ids (kept in step with MIG29_SWITCHES in MiG29Definition.ts; asserted by tests). */
@@ -67,34 +59,22 @@ const screenAt = (id: string, screen: string, x: number, y: number, w: number, h
 };
 const lever = (id: string, switchId: string, positions: readonly string[], positionM: [number, number, number], sizeM: [number, number, number], color: string): CockpitPart =>
   ({ id, kind: "box", positionM, sizeM, color, binding: { kind: "switch", switchId, positions } });
-/** Static furniture box. */
-const box = (id: string, positionM: [number, number, number], sizeM: [number, number, number], color: string, rotationRad?: [number, number, number]): CockpitPart =>
-  (rotationRad ? { id, kind: "box", positionM, sizeM, color, rotationRad } : { id, kind: "box", positionM, sizeM, color });
-
 const KGF = 98066.5; // Pa per kgf/cm²
-const PANEL_TOP_V = at(0, 30)[1], PANEL_BOTTOM_V = at(0, 300)[1];
-const PANEL_MID_V = (PANEL_TOP_V + PANEL_BOTTOM_V) / 2;
-const [panelX, , panelZ] = onPanel(0, PANEL_MID_V);
 
 export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   aircraftId: "mig29",
-  provenance: "Main panel arranged from CC BY-SA photographs (IrasD, Wikimedia Commons, c. 1995); positions approximate, scale and wing/HUD/stick angles ESTIMATED; not a measured 1:1 cockpit",
+  provenance: "Original reference-guided cockpit shell GLB plus live overlay layout. Family-level photo arrangement only; dimensions, selected 9.13 equipment fit and eye datum are not fully verified.",
   eyeFromCgM: [4.9, 0, -1.15],
   fieldOfViewDeg: 62,
+  shellModel: {
+    url: new URL("../../../../modules/planes/MiG-29A/assets/cockpit/mig29-9-13-cockpit.glb", import.meta.url).href,
+    lengthM: 2.365,
+    centreM: [-0.0075, 0, 0.1649626402],
+    provenance: "Original Iron Front GLB geometry; guided by IrasD Wikimedia CC BY-SA 4.0 photos and cross-checked against public GAF/DCS cockpit references. Dimensions are provisional estimates, not verified product 9.13 measurements."
+  },
   parts: [
-    // Main panel: centre section and two yawed wings (backing boxes sit just behind the faces).
-    { id: "panel", kind: "box", positionM: [panelX + 0.035, 0, panelZ], sizeM: [0.06, 2 * WING_U, PANEL_BOTTOM_V - PANEL_TOP_V], rotationRad: [0, TILT, 0], color: PANEL },
-    ...([-1, 1] as const).map((side): CockpitPart => {
-      const u = side * (WING_U + 0.11), [x, y, z] = onPanel(u, PANEL_MID_V);
-      return box(side < 0 ? "panel-wing-l" : "panel-wing-r", [x + 0.035 * Math.cos(WING_YAW), y + side * 0.035 * Math.sin(WING_YAW), z], [0.06, 0.22, PANEL_BOTTOM_V - PANEL_TOP_V], PANEL, [0, TILT, side * WING_YAW]);
-    }),
-    // Glareshield coaming and the ILS-31 HUD: projector body under the coaming, frame posts and a
-    // combiner raked back toward the pilot (rake and size ESTIMATED from photographs).
-    box("glareshield", [0.86, 0, 0.17], [0.26, 0.7, 0.05], DARK),
-    box("hud-body", [0.74, 0, 0.13], [0.16, 0.16, 0.06], DARK),
-    box("hud-post-l", [0.7, -0.075, 0.05], [0.015, 0.012, 0.13], DARK, [0, -0.45, 0]),
-    box("hud-post-r", [0.7, 0.075, 0.05], [0.015, 0.012, 0.13], DARK, [0, -0.45, 0]),
-    { id: "hud-glass", kind: "glass", positionM: [0.69, 0, 0.03], sizeM: [0.14, 0.13, 0], rotationRad: [0, -0.45, 0], color: "#7fe0a0" },
+    // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the GLB shell.
+    // Dynamic instruments below intentionally share the same eye-relative photo transform as its bezels.
     // Flight instruments (left of the stick, Soviet "T").
     round("ias", 130, 165, 65, { kind: "dial", label: "КУС", unit: "км/ч", min: 0, max: 1600, majorStep: 200, minorStep: 50, labelDivisor: 100, needles: ["", ""] }),
     round("alt", 140, 235, 65, { kind: "dial", label: "ВД", unit: "м", min: 0, max: 1000, majorStep: 100, minorStep: 20, labelDivisor: 100, startDeg: 0, sweepDeg: 360, wrap: true, readout: { divisor: 1000, digits: 2, suffix: " км" } }),
@@ -131,23 +111,10 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     // Centre stick (РУС): floor boot, shaft raked forward, grip. Only the shaft is bound to pilot input
     // (the view rotates a part about its own centre, so a separate grip would detach). Dimensions ESTIMATED.
-    box("stick-boot", [0.44, 0, 0.62], [0.12, 0.12, 0.04], DARK),
+    // Centre stick shaft and twin throttles remain live bindings over the static detailed shell.
     { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
-    // Twin throttles (РУД) on the left console; both follow the single throttle input.
     { id: "throttle", kind: "box", positionM: [0.22, -0.37, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    { id: "throttle-2", kind: "box", positionM: [0.22, -0.335, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    box("throttle-quadrant", [0.22, -0.355, 0.44], [0.3, 0.09, 0.04], DARK),
-    // Side consoles slope down toward the pilot; forward sections step up to the panel wings.
-    box("console-left", [0.15, -0.43, 0.49], [0.75, 0.16, 0.08], CONSOLE, [0.1, 0, 0]),
-    box("console-right", [0.15, 0.43, 0.49], [0.75, 0.16, 0.08], CONSOLE, [-0.1, 0, 0]),
-    box("console-fwd-left", [0.62, -0.42, 0.5], [0.22, 0.14, 0.12], CONSOLE),
-    box("console-fwd-right", [0.62, 0.42, 0.5], [0.22, 0.14, 0.12], CONSOLE),
-    // Windscreen arch and canopy rails.
-    box("canopy-bow-l", [0.75, -0.3, -0.1], [0.03, 0.03, 0.5], FRAME, [0.35, 0, 0]),
-    box("canopy-bow-r", [0.75, 0.3, -0.1], [0.03, 0.03, 0.5], FRAME, [-0.35, 0, 0]),
-    box("canopy-arch", [0.72, 0, -0.33], [0.03, 0.46, 0.03], FRAME),
-    box("sill-left", [0.25, -0.5, 0.3], [1.4, 0.04, 0.04], FRAME),
-    box("sill-right", [0.25, 0.5, 0.3], [1.4, 0.04, 0.04], FRAME)
+    { id: "throttle-2", kind: "box", positionM: [0.22, -0.335, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } }
   ]
 };
 
