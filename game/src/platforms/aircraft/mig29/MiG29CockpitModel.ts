@@ -109,11 +109,6 @@ function panelTorus(
   buildTorus(bucket, [p.x, p.y, p.z], radius, tube, [n.x, n.y, n.z], radial);
 }
 
-function instrumentPoint(px: number, py: number): THREE.Vector3 {
-  const u = (px - OX) * PX, v = (py - OY) * PX;
-  return panelPoint(u, v);
-}
-
 function appendGeometry(bucket: GeometryBucket, geometry: THREE.BufferGeometry, position: Vec3, rotation?: Vec3): void {
   if (!geometry.getAttribute("normal")) geometry.computeVertexNormals();
   const euler = new THREE.Euler(...(rotation ?? [0, 0, 0]), "XYZ");
@@ -334,9 +329,9 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (const u of [-0.39, -0.2925, -0.195, -0.0975, 0, 0.0975, 0.195, 0.2925, 0.39]) {
     for (const v of [V_TOP + 0.012, V_BOTTOM - 0.012]) panelCylinder(b("metal"), u, v, 0, 0, 0.001, 0.0032, 0.003, 8);
   }
-  for (const [x, y] of [[-0.38, -0.27], [0.38, -0.27], [-0.39, -0.52], [0.39, -0.52]] as const) {
-    buildCylinder(b("bezel"), [x, y, -0.824], 0.012, 0.010, [0, 0, 1], 16);
-    buildCylinder(b(x < 0 ? "warning" : "amber"), [x, y, -0.817], 0.007, 0.004, [0, 0, 1], 16);
+  for (const [u, v] of [[-0.38, -0.15], [0.38, -0.15], [-0.39, 0.12], [0.39, 0.12]] as const) {
+    panelCylinder(b("bezel"), u, v, 0, 0, 0.002, 0.012, 0.010, 16);
+    panelCylinder(b(u < 0 ? "warning" : "amber"), u, v, 0, 0, 0.009, 0.007, 0.004, 16);
   }
 
   // HUD projector, combiner, brackets and adjustment hardware.
