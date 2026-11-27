@@ -243,7 +243,8 @@ export function createMiG29CockpitShell(): THREE.Group {
   ];
   for (const [, px, py, sizePx] of gauges) {
     const p = instrumentPoint(px, py), diameter = sizePx * PX;
-    buildCylinder(b("black"), [p.x, p.y, p.z - 0.005], diameter * 0.515, 0.022, [0, 0, 1], 44);
+    // Annular backing and raised bezel leave the live CanvasTexture face unobstructed.
+    buildTorus(b("black"), [p.x, p.y, p.z - 0.006], diameter * 0.515, diameter * 0.060, [0, 0, 1], 40);
     buildTorus(b("bezel"), [p.x, p.y, p.z + 0.004], diameter * 0.515, diameter * 0.040, [0, 0, 1], 40);
     buildTorus(b("metal"), [p.x, p.y, p.z + 0.012], diameter * 0.545, 0.0015, [0, 0, 1], 40);
     for (let i = 0; i < 4; i++) {
@@ -254,13 +255,22 @@ export function createMiG29CockpitShell(): THREE.Group {
   const rectangles: readonly [number, number, number, number][] = [[570, 180, 32, 72], [435, 255, 55, 42], [490, 255, 55, 42], [555, 255, 55, 42]];
   for (const [px, py, widthPx, heightPx] of rectangles) {
     const p = instrumentPoint(px, py), w = widthPx * PX, h = heightPx * PX;
-    buildBox(b("black"), [p.x, p.y, p.z - 0.009], [w + 0.018, h + 0.018, 0.026]);
-    buildBox(b("bezel"), [p.x, p.y, p.z + 0.003], [w + 0.008, h + 0.008, 0.009]);
+    // Recessed backing stays behind the face; four raised rails form the aperture.
+    buildBox(b("black"), [p.x, p.y, p.z - 0.014], [w + 0.020, h + 0.020, 0.008]);
+    const rail = Math.max(0.006, Math.min(0.012, Math.min(w, h) * 0.10));
+    buildBox(b("bezel"), [p.x - w / 2 - rail / 2, p.y, p.z + 0.004], [rail, h + rail * 2, 0.012]);
+    buildBox(b("bezel"), [p.x + w / 2 + rail / 2, p.y, p.z + 0.004], [rail, h + rail * 2, 0.012]);
+    buildBox(b("bezel"), [p.x, p.y - h / 2 - rail / 2, p.z + 0.004], [w, rail, 0.012]);
+    buildBox(b("bezel"), [p.x, p.y + h / 2 + rail / 2, p.z + 0.004], [w, rail, 0.012]);
   }
   for (const [px, py, width, height] of [[600, 95, 0.15, 0.13], [650, 215, 0.10, 0.10]] as const) {
     const p = instrumentPoint(px, py);
-    buildBox(b("black"), [p.x, p.y, p.z - 0.008], [width + 0.028, height + 0.028, 0.035]);
-    buildBox(b("bezel"), [p.x, p.y, p.z + 0.008], [width + 0.012, height + 0.012, 0.012]);
+    const rail = 0.012;
+    buildBox(b("black"), [p.x, p.y, p.z - 0.018], [width + 0.024, height + 0.024, 0.010]);
+    buildBox(b("bezel"), [p.x - width / 2 - rail / 2, p.y, p.z + 0.005], [rail, height + rail * 2, 0.014]);
+    buildBox(b("bezel"), [p.x + width / 2 + rail / 2, p.y, p.z + 0.005], [rail, height + rail * 2, 0.014]);
+    buildBox(b("bezel"), [p.x, p.y - height / 2 - rail / 2, p.z + 0.005], [width, rail, 0.014]);
+    buildBox(b("bezel"), [p.x, p.y + height / 2 + rail / 2, p.z + 0.005], [width, rail, 0.014]);
   }
   for (const x of [-0.39, -0.2925, -0.195, -0.0975, 0, 0.0975, 0.195, 0.2925, 0.39]) {
     for (const y of [-0.205, -0.565]) buildCylinder(b("metal"), [x, y, -0.833], 0.0032, 0.003, [0, 0, 1], 8);
