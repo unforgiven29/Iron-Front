@@ -147,13 +147,20 @@ test("data panel toggles with I and shows surfaces, engines and systems pages", 
   expect(errors).toEqual([]);
 });
 
-test("MiG-29 cockpit with live instruments loads and flies without page errors", async ({ page }) => {
+test("MiG-29 cockpit shell, live instruments and controls load without page errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await launch(page, { aircraft: "MiG-29", mission: /Free flight/, start: "Runway" });
+  const shellCanvas = page.locator("canvas.cockpit-gl");
+  await expect(shellCanvas).toBeVisible();
+  await expect(shellCanvas).toHaveAttribute("data-cockpit-shell", "loaded", { timeout: 15_000 });
   const frame = page.getByLabel(/cockpit view/);
   await frame.click();
   await page.keyboard.press("x"); // flap lever
   await page.waitForTimeout(500);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/mig29-cockpit-front.png` });
+  await page.keyboard.press("c"); // verify the detailed outer view still switches cleanly
+  await page.waitForTimeout(200);
+  await page.keyboard.press("c");
   expect(errors).toEqual([]);
 });
