@@ -407,6 +407,12 @@ export class ThreeCockpitView {
       this.cockpit.add(mesh);
       if (part.binding) this.animated.push({ part, mesh, base: mesh.quaternion.clone(), basePos: mesh.position.clone() });
     }
+    const switchParts = this.layout.parts.filter((part) => part.binding?.kind === "switch");
+    this.renderer.domElement.dataset.cockpitSwitchTargets = String(switchParts.length);
+    this.renderer.domElement.dataset.cockpitSwitchIds = switchParts
+      .map((part) => part.binding?.kind === "switch" ? part.binding.switchId : "")
+      .filter(Boolean)
+      .join(",");
   }
 
   private animateParts(s: CockpitViewSnapshot): void {
