@@ -300,11 +300,32 @@ export class ThreeCockpitView {
     return new THREE.Vector3(p[1], -p[2], -p[0]);
   }
 
-  /** Load the aircraft's physical cockpit shell and report the result on the view canvas for browser QA. */
+  /** Build or load the aircraft's physical cockpit shell and expose a browser QA status. */
   private loadShell(): void {
+    if (this.layout.buildShell) {
+      try {
+        const model = this.layout.buildShell();
+        model.name ||= `${this.layout.aircraftId}-cockpit-shell`;
+        let meshes = 0;
+        model.traverse((o) => {
+          o.userData = { ...o.userData, shell: true };
+          if (o instanceof THREE.Mesh) meshes++;
+        });
+        if (meshes === 0) throw new Error("Cockpit shell factory returned no meshes");
+        this.cockpit.add(model);
+        this.renderer.domElement.dataset.cockpitShellMeshes = String(meshes);
+        this.renderer.domElement.dataset.cockpitShell = "loaded";
+      } catch (error) {
+        this.renderer.domElement.dataset.cockpitShell = "error";
+        console.error(`Failed to build cockpit shell for ${this.layout.aircraftId}`, error);
+      }
+      return;
+    }
+
     const shell = this.layout.shellModel;
     if (!shell) {
       this.renderer.domElement.dataset.cockpitShell = "none";
+      this.renderer.domElement.dataset.cockpitShellMeshes = "0";
       return;
     }
     new GLTFLoader().load(shell.url, (gltf) => {
@@ -325,8 +346,13 @@ export class ThreeCockpitView {
       model.updateMatrixWorld(true);
       const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
       model.position.copy(this.bodyToCamera(shell.centreM).sub(centre));
-      model.traverse((o) => { o.userData = { ...o.userData, shell: true }; });
+      let meshes = 0;
+      model.traverse((o) => {
+        o.userData = { ...o.userData, shell: true };
+        if (o instanceof THREE.Mesh) meshes++;
+      });
       this.cockpit.add(model);
+      this.renderer.domElement.dataset.cockpitShellMeshes = String(meshes);
       this.renderer.domElement.dataset.cockpitShell = "loaded";
     }, undefined, (error) => {
       this.renderer.domElement.dataset.cockpitShell = "error";
