@@ -44,8 +44,8 @@ describe("MiG-29 cockpit shell geometry", () => {
     const hud = shell.getObjectByName("mig29-cockpit-hud");
     expect(canopy).toBeInstanceOf(THREE.Mesh);
     expect(hud).toBeInstanceOf(THREE.Mesh);
-    expect((canopy as THREE.Mesh).material.transparent).toBe(true);
-    expect((hud as THREE.Mesh).material.transparent).toBe(true);
+    expect(((canopy as THREE.Mesh).material as THREE.Material).transparent).toBe(true);
+    expect(((hud as THREE.Mesh).material as THREE.Material).transparent).toBe(true);
   });
 
   it("keeps major cockpit assemblies separately addressable for render diagnostics", () => {
