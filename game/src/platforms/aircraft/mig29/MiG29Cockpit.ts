@@ -4,7 +4,7 @@
  * The static cockpit tub, seat, canopy, consoles and physical panel hardware are built
  * by the companion procedural Three.js shell module. The live instruments and supported click controls remain data-driven overlays here.
  *
- * Evidence boundary: the GLB is an original, reference-guided family-level reconstruction. The
+ * Evidence boundary: the procedural shell is an original, reference-guided family-level reconstruction. The
  * public photo set is not positively identified as product 9.13 and does not provide full
  * dimensional drawings. Do not call the model a measured 1:1 product 9.13 cockpit. The layout's
  * photo-derived instrument coordinates and several instrument identifications remain estimates.
@@ -69,7 +69,7 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   fieldOfViewDeg: 62,
   buildShell: createMiG29CockpitShell,
   parts: [
-    // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the GLB shell.
+    // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the procedural shell.
     // Dynamic instruments below intentionally share the same eye-relative photo transform as its bezels.
     // Flight instruments (left of the stick, Soviet "T").
     round("ias", 130, 165, 65, { kind: "dial", label: "КУС", unit: "км/ч", min: 0, max: 1600, majorStep: 200, minorStep: 50, labelDivisor: 100, needles: ["", ""] }),
