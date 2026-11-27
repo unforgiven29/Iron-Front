@@ -1,6 +1,6 @@
 # MiG-29 product 9.13 cockpit — reconstruction and render specification
 
-**Status: reconstruction specification only. The cockpit is not yet a measured 1:1 asset.**  
+**Implementation status: first procedural cockpit shell integrated into Three.js; not yet measured or certified 1:1.**  
 **Target:** single-seat Soviet-standard MiG-29 product 9.13, configuration ID `mig29-9-13-soviet-baseline-v1`.  
 **Do not silently substitute:** product 9.12 / MiG-29A, 9.13S / MiG-29S, 9.13B, 9.13SE, SMT, MiG-29K, MiG-29M or operator-modernized equipment.
 
@@ -13,7 +13,7 @@ The runtime now has an original procedural shell in `game/src/platforms/aircraft
 - It derives panel positions from pixel measurements on an oblique photograph and assumes a 100 mm attitude indicator for scale. Perspective is not corrected.
 - It cites Soviet-standard 9.12-family photographs; applicability to product 9.13 is not established.
 - HUD, panel-wing angles, cockpit eye point, stick dimensions, throttle dimensions, side-console controls and several instrument identifications are estimated or inferred.
-- The layout is primarily simple boxes, circles, cylinders and flat display planes. It omits much of the tub, seat, seat rails, footwell, rudder pedals, sidewall structure, central pedestal, switchgear, wiring, canopy mechanisms, detailed bezels, guards, placards and fasteners.
+- The legacy instrument/control layout is still largely photo-coordinate data with estimated positions. The new procedural shell fills in much of the tub, seat, footwell, rudder pedals, sidewalls, consoles, canopy, bezels and hardware, but those assemblies remain provisional family-level geometry. Labels, wiring, many equipment-specific sub-panels, exact seat detail, and the complete control fit remain incomplete or unverified.
 
 The shared renderer is `game/src/rendering/three/ThreeCockpitView.ts`. In addition to simple `CockpitPartKind` overlays, it now accepts an aircraft-owned `buildShell()` factory or an optional GLB/GLTF asset. The MiG-29 currently uses the procedural factory in `MiG29CockpitModel.ts`. Its material groups are merged into bounded mesh batches and the canvas exposes shell-build status and mesh count for automated tests. The click raycast deliberately excludes shell geometry; only controls represented by separate `CockpitPart` layout entries are currently interactive. Do not claim every physical switch in the shell works until each required control has a correctly positioned, tested hit target and command mapping.
 
