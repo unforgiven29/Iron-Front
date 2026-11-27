@@ -2,7 +2,7 @@
 
 The target is the single-seat Soviet product 9.13 baseline. The early cockpit is predominantly analog, with dedicated indicators, warning lamps, radar/weapon controls and HUD. Later modernized/export cockpits differ; do not create a glass cockpit without variant evidence.
 
-**The current runtime layout is provisional, not 1:1.** Its photo-derived coordinates, scale, some instrument identifications and many control locations are estimates. See the [strict cockpit reconstruction and render specification](RECONSTRUCTION_SPEC.md) before changing geometry or claiming accuracy.
+**A first procedural 3D shell is now integrated in the runtime**, including the tub, seat, canopy, panel structure, console hardware, footwells and physical bezels around live instruments. It is an initial reference-guided reconstruction, **not yet a measured 1:1 cockpit**: the existing instrument coordinates/scale, eye datum, control locations and some equipment fit remain provisional. The shell is built by `game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts`; live instruments and control bindings remain in `MiG29Cockpit.ts`. See the [strict cockpit reconstruction and render specification](RECONSTRUCTION_SPEC.md).
 
 For every control record Cyrillic label, transliteration, translation, panel location, control type/detents, owning subsystem, power/preconditions, feedback/failure state and source figure/page. Prioritize flight/engine/fuel/hydraulic/electrical instruments, HUD, radar controls, RWR panel/audio, OEPS/helmet sight, SAU-29, weapons, radios/navigation and emergency controls. Keep each record labelled by evidence state and variant applicability.
 
