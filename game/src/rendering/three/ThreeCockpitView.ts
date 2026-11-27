@@ -317,7 +317,7 @@ export class ThreeCockpitView {
         this.renderer.domElement.dataset.cockpitShell = "loaded";
       } catch (error) {
         this.renderer.domElement.dataset.cockpitShell = "error";
-        console.error(`Failed to build cockpit shell for ${this.layout.aircraftId}`, error);
+        this.renderer.domElement.dataset.cockpitShellError = error instanceof Error ? error.message : String(error);
       }
       return;
     }
@@ -338,7 +338,7 @@ export class ThreeCockpitView {
       const horizontalExtent = Math.max(size.x, size.z);
       if (!Number.isFinite(horizontalExtent) || horizontalExtent <= 1e-6 || !Number.isFinite(shell.lengthM) || shell.lengthM <= 0) {
         this.renderer.domElement.dataset.cockpitShell = "error";
-        console.error(`Invalid cockpit shell dimensions for ${this.layout.aircraftId}`, { size, lengthM: shell.lengthM });
+        this.renderer.domElement.dataset.cockpitShellError = "Invalid shell dimensions";
         return;
       }
       const k = shell.lengthM / horizontalExtent;
@@ -356,7 +356,7 @@ export class ThreeCockpitView {
       this.renderer.domElement.dataset.cockpitShell = "loaded";
     }, undefined, (error) => {
       this.renderer.domElement.dataset.cockpitShell = "error";
-      console.error(`Failed to load cockpit shell for ${this.layout.aircraftId}`, shell.url, error);
+      this.renderer.domElement.dataset.cockpitShellError = error instanceof Error ? error.message : String(error);
     });
   }
 
