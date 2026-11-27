@@ -42,7 +42,7 @@ const onPanel = (u: number, v: number): [number, number, number] => {
   return [FACE_X + Math.sin(TILT) * v - over * Math.sin(WING_YAW), lateral, FACE_Z + Math.cos(TILT) * v];
 };
 const panelRot = (u: number): [number, number, number] => [0, TILT, Math.abs(u) > WING_U ? Math.sign(u) * WING_YAW : 0];
-/** Photo pixels ("cockpit 3", 870 px crop) → panel metres: ADI 75 px ≙ 0.10 m; origin at the panel centre line. */
+/** Provisional photo-to-metre registration ("cockpit 3", 870 px crop); perspective and absolute scale are not calibrated. */
 const PX = 0.1 / 75, OX = 390, OY = 190;
 const at = (x: number, y: number): [number, number] => [(x - OX) * PX, (y - OY) * PX];
 const round = (id: string, x: number, y: number, dPx: number, face: InstrumentFace): CockpitPart => {
@@ -109,12 +109,10 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-dcgen", SW.dcGen, ["ON", "OFF"], [0.43, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-acgen", SW.acGen, ["ON", "OFF"], [0.38, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
-    // Centre stick (РУС): floor boot, shaft raked forward, grip. Only the shaft is bound to pilot input
-    // (the view rotates a part about its own centre, so a separate grip would detach). Dimensions ESTIMATED.
-    // Centre stick shaft and twin throttles remain live bindings over the static detailed shell.
+    // Live centre-stick shaft and twin-throttle levers are overlaid on the physical assemblies in the GLB.
     { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
-    { id: "throttle", kind: "box", positionM: [0.22, -0.37, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    { id: "throttle-2", kind: "box", positionM: [0.22, -0.335, 0.36], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } }
+    { id: "throttle", kind: "box", positionM: [0.22, -0.385, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
+    { id: "throttle-2", kind: "box", positionM: [0.22, -0.35, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } }
   ]
 };
 
