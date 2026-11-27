@@ -114,7 +114,7 @@ export class ThreeCockpitView {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
     this.renderer.domElement.className = "cockpit-gl";
-    this.renderer.domElement.dataset.cockpitShell = layout.shellModel ? "loading" : "none";
+    this.renderer.domElement.dataset.cockpitShell = layout.buildShell || layout.shellModel ? "loading" : "none";
     this.hudCanvas = document.createElement("canvas");
     this.hudCanvas.className = "cockpit-hud";
     container.append(this.renderer.domElement, this.hudCanvas);
