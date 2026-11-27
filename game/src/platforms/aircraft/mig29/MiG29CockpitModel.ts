@@ -108,9 +108,9 @@ function buildPanelSegment(b: GeometryBucket, u0: number, u1: number, v0: number
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices.flatMap((p) => [p.x, p.y, p.z]), 3));
   geometry.setIndex([
-    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6,
-    0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2,
-    2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0
+    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7,
+    0, 5, 4, 0, 1, 5, 1, 6, 5, 1, 2, 6,
+    2, 7, 6, 2, 3, 7, 3, 4, 7, 3, 0, 4
   ]);
   geometry.computeVertexNormals();
   const p = geometry.getAttribute("position");
@@ -162,7 +162,7 @@ function makeMaterialGeometry(bucket: GeometryBucket): THREE.BufferGeometry {
   return geometry;
 }
 
-function addSwitchCluster(b: GeometryBucket, x: number, y: number, z: number, kind: "toggle" | "knob" | "button", accent: Surface): void {
+function addSwitchCluster(b: GeometryBucket, x: number, y: number, z: number, kind: "toggle" | "knob" | "button"): void {
   buildCylinder(b, [x, y, z], 0.010, 0.009, [0, 1, 0], 14);
   if (kind === "toggle") {
     buildCylinder(b, [x, y + 0.020, z - 0.002], 0.0035, 0.035, [0.15, 0.95, -0.28], 10);
@@ -305,19 +305,19 @@ export function createMiG29CockpitShell(): THREE.Group {
         const xx = x + columns[col]!;
         const z = rows[row]!;
         const kind = (row + col) % 4 === 0 ? "knob" : (row + col) % 3 === 0 ? "button" : "toggle";
-        addSwitchCluster(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.25, z, kind, kind === "button" ? "amber" : "metal");
+        addSwitchCluster(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.25, z, kind);
       }
     }
     for (const z of side < 0 ? [-0.33, 0.28, 0.58] : [-0.25, 0.18, 0.55]) {
       buildBox(b("black"), [x, -0.252, z], [0.17, 0.012, 0.11]);
-      for (const dx of [-0.055, 0, 0.055]) addSwitchCluster(b("amber"), x + dx, -0.238, z, "button", "amber");
+      for (const dx of [-0.055, 0, 0.055]) addSwitchCluster(b("amber"), x + dx, -0.238, z, "button");
       buildBox(b("metal"), [x, -0.23, z + 0.065], [0.18, 0.018, 0.02]);
     }
     if (side > 0) {
       buildBox(b("black"), [x, -0.205, 0.16], [0.205, 0.045, 0.40]);
       for (const z of [0.02, 0.10, 0.18, 0.26, 0.34]) {
         buildBox(b("panel"), [x, -0.178, z], [0.18, 0.016, 0.055]);
-        for (const dx of [-0.045, 0, 0.045]) addSwitchCluster(b("amber"), x + dx, -0.166, z, "button", "amber");
+        for (const dx of [-0.045, 0, 0.045]) addSwitchCluster(b("amber"), x + dx, -0.166, z, "button");
       }
     }
     buildBox(b("panel"), [side * 0.445, -0.25, 0.83], [0.025, 0.42, 0.27], [0, 0, side * 0.12]);
