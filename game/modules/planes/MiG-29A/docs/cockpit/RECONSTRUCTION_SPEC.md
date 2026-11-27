@@ -38,7 +38,40 @@ The available Eagle Dynamics MiG-29 manual identifies its DCS MiG-29A as 9-12 an
 | [ICM 1:72 MiG-29 9.13 kit overview](https://aircraftinplastic.com/models/mig-29-72/mig-29-72-2.html) | External product-9.13 recognition and general airframe context | Model-kit review, not an internal cockpit dimension source. |
 | Commercial MiG-29K / SMT / Polish cockpit models | Potential visual comparison only | Wrong variant/configuration or unclear data provenance; some are editorial-use-only. Do not import, convert or redistribute without an appropriate license and a documented variant match. |
 
-### 2.3 Evidence labels
+### 2.3 Additional panel inventory from the DCS manual
+
+The DCS Russian pilot manual's cockpit overview (printed pages 24–25, Figure 15) labels 22 front-panel items. The photographed plate is valuable for arranging and checking the current instrument list. It is still a **DCS simulator reference**, not a measured plain-9.13 drawing. Preserve the original abbreviations where translation or installation identity is unclear.
+
+| Figure 15 callout | Manual's item | Reconstruction use |
+|---:|---|---|
+| 1 | Landing-gear control | Verify the handle's actual panel cut-out, grip shape and travel |
+| 2 | Weapon-control-system panel | Distinct panel and control inventory; don't replace with a generic screen |
+| 3 | Combined angle-of-attack / overload indicator | Correct dual-scale instrument, pointer and bezel |
+| 4 | Signal lamp | Separate lens/bezel and state-driven illumination |
+| 5 | Command flight director instrument (КПП) | Full instrument face, director bars, attitude display and slip indication |
+| 6 | Vertical-speed indicator | Dedicated instrument; do not conflate with turn/slip |
+| 7 | Radio altimeter | Separate scale and indication from the barometric altimeter |
+| 8 | Engine RPM indicator | Twin-engine representation and exact scale/needle treatment |
+| 9 | ИПВ | Retain original designation until the exact equipment/function is verified for the target configuration |
+| 10 | EKRAN system panel | Panel/annunciator assembly, not an arbitrary modern MFD |
+| 11 | Signal/annunciator panel | Individual lamps, legends and grouped annunciations |
+| 12 | SAU control panel | Controls and state indicators, separate from the SAU simulation logic |
+| 13 | Indicated-airspeed indicator | Correct units, tick spacing, pointer and instrument form |
+| 14 | Barometric altimeter | Correct nested scales/counters and pressure-setting control |
+| 15 | Flight/landing indicator | Gear, flap/LEF and speedbrake indication segments |
+| 16 | Horizontal navigation instrument (ПНП) | Rotating compass card, course pointers and navigation bars |
+| 17 | Clock | Clock/stopwatch layout and controls |
+| 18 | Airspeed/Mach indicator | Separate from item 13; verify exact panel fit and scale |
+| 19 | Remaining countermeasures indicator | Correct counter/display and association with the installed dispenser |
+| 20 | Exhaust-gas-temperature indicators | Two separate engine instruments with individual markings |
+| 21 | Fuel quantity indicator | Correct tank/quantity representation; do not copy another variant's fuel computer |
+| 22 | СПО-15 «Берёза» | RWR indicator/control fit; check exact product/operator nomenclature and revision |
+
+These 22 callouts must be reconciled against the current `MiG29Cockpit.ts` inventory. The existing layout does not yet represent every item as a measured, separate physical assembly. Do not blindly add all 22 at inferred coordinates: use the image as a relative arrangement reference, confirm exact target fit and obtain dimensions before claiming accuracy.
+
+The English/Russian DCS manuals and the GAF T.O. also describe systems and console controls beyond this front-panel plate. Maintain separate inventories for the left console, right console, centre/floor area and seat; do not assume Figure 15 is a complete cockpit parts list.
+
+## 2.4 Evidence labels
 
 Every geometry/control record must carry one of these evidence states:
 
