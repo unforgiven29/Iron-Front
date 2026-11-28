@@ -53,7 +53,6 @@ const CLEAR_CANOPY = new THREE.MeshPhysicalMaterial({
 const FACE_X = 0.845;
 const FACE_DOWN = 0.37;
 const FACE_TILT = -0.30;
-const WING_START = 0.20;
 const PX = 0.1 / 75;
 const OX = 390;
 const OY = 190;
