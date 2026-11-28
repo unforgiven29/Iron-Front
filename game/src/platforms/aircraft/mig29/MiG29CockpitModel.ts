@@ -141,8 +141,8 @@ function panelKeypad(getBucket: (surface: Surface) => Bucket, u: number, v: numb
       const y = v - height / 2 + insetY + cellH * (row + 0.5);
       const point = panelPoint(x, y, 0.022);
       const accent = (row + col) % 7 === 0;
-      rounded(getBucket(accent ? "amber" : "metal"), [point.x, point.y, point.z],
-        [cellW * 0.58, cellH * 0.48, 0.008], 0.002, panelRotation(u));
+      rounded(getBucket(accent ? "amber" : "bezel"), [point.x, point.y, point.z],
+        [cellW * 0.52, cellH * 0.42, 0.006], 0.002, panelRotation(u));
     }
   }
 }
@@ -380,10 +380,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     rounded(b("panel"), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, [side * 0.055, 0, side * 0.045]);
     box(b("frame"), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], [0, 0, side * 0.04]);
 
-    // Controls occupy the aft half of each deck, close enough to the pilot to remain visible and reachable.
+    // Switch rows stay in the forward portion of the side deck, between the instrument panel and the eye point.
     const rows = side < 0
-      ? [-0.04, 0.10, 0.24, 0.38, 0.52, 0.64]
-      : [-0.04, 0.12, 0.28, 0.44, 0.60];
+      ? [-0.72, -0.60, -0.53, -0.12, -0.025]
+      : [-0.69, -0.55, -0.41, -0.27, -0.13];
     const columns = side < 0 ? [-0.050, 0, 0.050] : [-0.046, 0.046];
     for (let row = 0; row < rows.length; row++) {
       const z = rows[row]!;
@@ -397,7 +397,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
 
     // Separate guarded selector plates and warning lamps along the aft edge of the visible deck.
-    const plaques = side < 0 ? [0.30, 0.57] : [0.32, 0.58];
+    const plaques = side < 0 ? [-0.10, -0.01] : [-0.17, -0.04];
     for (const z of plaques) {
       rounded(b("black"), [x, -0.424, z], [0.15, 0.010, 0.075], 0.005);
       box(b("bezel"), [x, -0.415, z + 0.041], [0.15, 0.008, 0.006]);
@@ -405,14 +405,14 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
 
     if (side > 0) {
-      // Starboard breaker / information panel: a compact aft bank of separated breaker keys.
-      rounded(b("black"), [x, -0.416, 0.34], [0.155, 0.020, 0.30], 0.008);
-      for (const z of [0.20, 0.27, 0.34, 0.41, 0.48]) {
-        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.045], 0.003);
-        for (const dx of [-0.038, 0, 0.038]) addToggle(b("metal"), x + dx, -0.394, z, "button");
+      // Starboard breaker / information panel: recessed switch bank within the forward field of view.
+      rounded(b("black"), [x, -0.416, -0.33], [0.155, 0.020, 0.30], 0.008);
+      for (const z of [-0.45, -0.39, -0.33, -0.27, -0.21]) {
+        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.040], 0.003);
+        for (const dx of [-0.038, 0, 0.038]) addToggle(b("bezel"), x + dx, -0.394, z, "button");
       }
       for (let i = 0; i < 7; i++) {
-        const z = -0.04 + i * 0.095;
+        const z = -0.74 + i * 0.085;
         box(b("black"), [side * 0.425, -0.422, z], [0.035, 0.010, 0.064]);
         for (const dx of [-0.008, 0.008]) addToggle(b("amber"), side * 0.425 + dx, -0.416, z, "button");
       }
@@ -428,14 +428,14 @@ export function createMiG29CockpitShell(): THREE.Group {
     box(b("bezel"), [x, -0.251, -0.31], [0.018, 0.012, 0.03]);
   }
 
-  // Centre control column: flexible boot, sculpted handgrip and trigger details.
+  // Centre control column: small ergonomic grip with modest trigger bosses, leaving the gauges visible.
   rounded(b("rubber"), [0, -0.748, -0.36], [0.12, 0.024, 0.15], 0.026);
-  rounded(b("rubber"), [0, -0.255, -0.405], [0.082, 0.050, 0.052], 0.014, [0.12, 0, 0]);
-  rounded(b("frame"), [0, -0.226, -0.411], [0.050, 0.012, 0.045], 0.004, [0.12, 0, 0]);
-  cylinder(b("warning"), [0, -0.224, -0.420], 0.006, 0.008, [0, 1, 0], 12);
-  for (const x of [-0.031, 0.031]) {
-    cylinder(b("metal"), [x, -0.252, -0.426], 0.0035, 0.012, [0, 0, 1], 8);
-    cylinder(b("amber"), [x, -0.239, -0.438], 0.003, 0.005, [0, 1, 0], 8);
+  rounded(b("rubber"), [0, -0.275, -0.405], [0.056, 0.034, 0.040], 0.011, [0.12, 0, 0]);
+  rounded(b("frame"), [0, -0.253, -0.412], [0.036, 0.008, 0.032], 0.003, [0.12, 0, 0]);
+  cylinder(b("warning"), [0, -0.252, -0.421], 0.005, 0.006, [0, 1, 0], 12);
+  for (const x of [-0.022, 0.022]) {
+    cylinder(b("metal"), [x, -0.272, -0.428], 0.0028, 0.009, [0, 0, 1], 8);
+    cylinder(b("amber"), [x, -0.263, -0.438], 0.0025, 0.004, [0, 1, 0], 8);
   }
 
   // Rudder pedals and footwells are below the main field of view.
