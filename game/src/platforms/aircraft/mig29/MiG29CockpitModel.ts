@@ -20,6 +20,7 @@ type ShellPart =
   | "panel-center"
   | "panel-starboard"
   | "panel-support"
+  | "panel-recess"
   | "glare-shield"
   | "port-console"
   | "starboard-console"
@@ -45,6 +46,11 @@ const INSET_CLAY = new THREE.MeshStandardMaterial({
   color: "#777777",
   roughness: 0.94,
   metalness: 0.01
+});
+const RECESS_CLAY = new THREE.MeshStandardMaterial({
+  color: "#555555",
+  roughness: 0.98,
+  metalness: 0
 });
 const CLEAR_CANOPY = new THREE.MeshPhysicalMaterial({
   color: "#b8b8b8",
@@ -256,17 +262,17 @@ function panelSegment(
 function panelRing(bucket: Bucket, u: number, v: number, radius: number): void {
   const point = panelPoint(u, v, 0.006);
   const normal = panelNormal(u);
-  torus(bucket, [point.x, point.y, point.z], radius, 0.0032, [normal.x, normal.y, normal.z], 32);
+  torus(bucket, [point.x, point.y, point.z], radius, 0.0045, [normal.x, normal.y, normal.z], 40);
 }
 
 function panelInset(bucket: Bucket, u: number, v: number, radius: number): void {
-  const point = panelPoint(u, v, -0.002);
+  const point = panelPoint(u, v, -0.016);
   const normal = panelNormal(u);
   cylinder(
     bucket,
     [point.x, point.y, point.z],
-    radius,
-    0.003,
+    radius * 0.88,
+    0.010,
     [normal.x, normal.y, normal.z],
     32
   );
@@ -294,11 +300,11 @@ function panelRectangleFrame(
 }
 
 function panelRectInset(bucket: Bucket, u: number, v: number, width: number, height: number): void {
-  const point = panelPoint(u, v, -0.002);
+  const point = panelPoint(u, v, -0.014);
   box(
     bucket,
     [point.x, point.y, point.z],
-    [width, height, 0.003],
+    [width * 0.94, height * 0.94, 0.006],
     panelRotation(u)
   );
 }
@@ -362,6 +368,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     "panel-center": emptyBucket(),
     "panel-starboard": emptyBucket(),
     "panel-support": emptyBucket(),
+    "panel-recess": emptyBucket(),
     "glare-shield": emptyBucket(),
     "port-console": emptyBucket(),
     "starboard-console": emptyBucket(),
@@ -407,7 +414,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     const v = (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE;
     const radius = diameterPx * PHOTO_SCALE * 0.44;
     const part = sectionAt(u).part;
-    panelInset(b(part), u, v, radius * 0.91);
+    panelInset(b("panel-recess"), u, v, radius * 0.91);
     panelRing(b(part), u, v, radius);
   }
   const rectangularMounts: readonly [number, number, number, number][] = [
@@ -424,7 +431,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     const width = widthPx * PHOTO_SCALE;
     const height = heightPx * PHOTO_SCALE;
     const part = sectionAt(u).part;
-    panelRectInset(b(part), u, v, width, height);
+    panelRectInset(b("panel-recess"), u, v, width, height);
     panelRectangleFrame(b(part), u, v, width, height);
   }
 
@@ -443,15 +450,15 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // Glare shield: a narrow padded brow, not a thick full-width crossbar.
-  rounded(b("glare-shield"), [0, -0.108, -0.765], [1.04, 0.034, 0.118], 0.012, [-0.045, 0, 0]);
-  box(b("glare-shield"), [0, -0.132, -0.716], [1.00, 0.008, 0.026], [-0.045, 0, 0]);
+  rounded(b("glare-shield"), [0, -0.108, -0.765], [0.96, 0.022, 0.095], 0.009, [-0.045, 0, 0]);
+  box(b("glare-shield"), [0, -0.127, -0.724], [0.92, 0.006, 0.020], [-0.045, 0, 0]);
 
   // HUD support structure only. The optical plate, screen and all controls are intentionally absent.
-  rounded(b("glare-shield"), [0, -0.005, -0.905], [0.215, 0.065, 0.090], 0.010);
+  rounded(b("glare-shield"), [0, -0.005, -0.905], [0.190, 0.046, 0.068], 0.009);
   for (const side of [-1, 1] as const) {
-    box(b("glare-shield"), [side * 0.092, 0.075, -0.946], [0.008, 0.145, 0.010], [0.045, side * 0.04, 0]);
+    box(b("glare-shield"), [side * 0.084, 0.064, -0.940], [0.007, 0.120, 0.009], [0.045, side * 0.04, 0]);
   }
-  box(b("glare-shield"), [0, 0.148, -0.940], [0.208, 0.014, 0.014]);
+  box(b("glare-shield"), [0, 0.124, -0.934], [0.180, 0.012, 0.012]);
 
   // Side consoles are narrow, low-profile and built into the sloping tub walls.
   // Their horizontal decks meet separate inward-facing vertical faces; no bulky top rails.
@@ -461,23 +468,23 @@ export function createMiG29CockpitShell(): THREE.Group {
     const deckRotation: Vec3 = [0, 0, side * 0.18];
 
     // Horizontal console deck: much thinner and narrower than the previous slab.
-    rounded(b(part), [x, -0.525, -0.10], [0.150, 0.038, 1.14], 0.010, deckRotation);
-    rounded(b(part), [side * 0.446, -0.505, -0.10], [0.014, 0.022, 1.05], 0.005, deckRotation);
+    rounded(b(part), [x, -0.485, -0.10], [0.150, 0.038, 1.14], 0.010, deckRotation);
+    rounded(b(part), [side * 0.446, -0.465, -0.10], [0.014, 0.022, 1.05], 0.005, deckRotation);
 
     // Vertical inner console face, canted toward the pilot and attached to the deck edge.
     rounded(
       b(part),
-      [side * 0.303, -0.620, -0.12],
+      [side * 0.303, -0.580, -0.12],
       [0.014, 0.185, 0.94],
       0.006,
       [0.025, side * 0.10, side * 0.12]
     );
 
     // Empty mounting bays are flush outlines only, not raised boxes or switches.
-    consoleBay(b(part), x, -0.502, -0.405, 0.112, 0.235, deckRotation);
-    consoleBay(b(part), x, -0.502, -0.055, 0.112, 0.255, deckRotation);
-    consoleBay(b(part), side * 0.303, -0.620, -0.36, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
-    consoleBay(b(part), side * 0.303, -0.620, 0.08, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
+    consoleBay(b(part), x, -0.462, -0.405, 0.112, 0.235, deckRotation);
+    consoleBay(b(part), x, -0.462, -0.055, 0.112, 0.255, deckRotation);
+    consoleBay(b(part), side * 0.303, -0.580, -0.36, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
+    consoleBay(b(part), side * 0.303, -0.580, 0.08, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
   }
 
   // Blank central lower pedestal and recessed footwell walls; no stick or rudder pedals.
@@ -528,7 +535,8 @@ export function createMiG29CockpitShell(): THREE.Group {
   const shell = new THREE.Group();
   shell.name = "mig29-9-13-cockpit-shell-frame";
   for (const part of Object.keys(buckets) as ShellPart[]) {
-    const mesh = materialMesh(part, buckets[part], part === "panel-support" ? INSET_CLAY : CLAY);
+    const material = part === "panel-support" ? INSET_CLAY : part === "panel-recess" ? RECESS_CLAY : CLAY;
+    const mesh = materialMesh(part, buckets[part], material);
     if (mesh) shell.add(mesh);
   }
   const glazing = new THREE.Mesh(canopySurface(), CLEAR_CANOPY);
