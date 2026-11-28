@@ -37,6 +37,8 @@ export interface CockpitLayout {
   readonly parts: readonly CockpitPart[];
   /** Vertical field of view, degrees. */
   readonly fieldOfViewDeg: number;
+  /** When true, show only the structural cockpit shell and suppress the collimated HUD overlay. */
+  readonly structuralOnly?: boolean;
   /** Fixed pilot-view pitch trim in radians; negative angles look slightly down. */
   readonly cameraPitchOffsetRad?: number;
   /** Optional aircraft-specific procedural shell, returned in cockpit-camera coordinates. */
