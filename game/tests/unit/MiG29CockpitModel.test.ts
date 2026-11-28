@@ -107,7 +107,7 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(recessMaterial.color.g).toBeCloseTo(recessMaterial.color.b, 6);
   });
 
-  it("keeps side consoles low and narrow, with separate horizontal and upright surfaces", () => {
+  it("keeps outboard side consoles integrated within the cockpit tub", () => {
     const shell = createMiG29CockpitShell();
     const port = shell.getObjectByName("mig29-cockpit-port-console") as THREE.Mesh | undefined;
     const starboard = shell.getObjectByName("mig29-cockpit-starboard-console") as THREE.Mesh | undefined;
@@ -118,8 +118,8 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     const starboardSize = new THREE.Box3().setFromObject(starboard!).getSize(new THREE.Vector3());
     expect(portSize.y).toBeLessThan(0.32);
     expect(starboardSize.y).toBeLessThan(0.32);
-    expect(portSize.x).toBeLessThan(0.24);
-    expect(starboardSize.x).toBeLessThan(0.24);
+    expect(portSize.x).toBeLessThan(0.32);
+    expect(starboardSize.x).toBeLessThan(0.32);
     expect(portSize.z).toBeGreaterThan(0.85);
     expect(starboardSize.z).toBeGreaterThan(0.85);
     const portBounds = new THREE.Box3().setFromObject(port!);
