@@ -11,33 +11,27 @@ const env = { originAltitudeMslM: 0, temperatureOffsetK: 0, wind: uniformWind("c
 const fly = (a: FixedWingAircraft, s: number) => { for (let i = 0; i < Math.round(s * 120); i++) a.stepTick(); return a.snapshot(); };
 
 describe("MiG-29 cockpit", () => {
-  it("every instrument part has a value source, and every lever is bound to a real switch with its real positions", () => {
-    const def = createMiG29Definition();
-    const ids = new Set(Object.values(MIG29_SWITCHES) as string[]);
-    const clickableSwitches = MIG29_COCKPIT_LAYOUT.parts.filter((p) => p.binding?.kind === "switch");
-    expect(clickableSwitches.map((p) => p.binding?.kind === "switch" ? p.binding.switchId : "").sort()).toEqual([
-      MIG29_SWITCHES.acGen,
-      MIG29_SWITCHES.batGnd,
-      MIG29_SWITCHES.dcGen,
+  it("starts as a structural-only frame with no rendered instrument or control parts", () => {
+    expect(MIG29_COCKPIT_LAYOUT.parts).toEqual([]);
+    expect(MIG29_COCKPIT_INSTRUMENTS.ias).toBeDefined();
+
+    // Aircraft-owned switch definitions remain intact; the cockpit currently has no hit targets.
+    const systemSwitches = new Set(createMiG29Definition().createSystems().switches.map((item) => item.definition.id));
+    for (const switchId of [
+      MIG29_SWITCHES.gear,
       MIG29_SWITCHES.emergencyGear,
       MIG29_SWITCHES.flaps,
-      MIG29_SWITCHES.gear,
-      MIG29_SWITCHES.pto,
-      MIG29_SWITCHES.speedbrake
-    ].sort());
-    expect(new Set(clickableSwitches.map((p) => p.binding?.kind === "switch" ? p.binding.switchId : "")).size).toBe(8);
-    for (const p of MIG29_COCKPIT_LAYOUT.parts) {
-      if (p.kind === "instrument") expect(MIG29_COCKPIT_INSTRUMENTS[p.id], p.id).toBeDefined();
-      if (p.binding?.kind === "switch") {
-        expect(ids.has(p.binding.switchId), p.binding.switchId).toBe(true);
-        const switchId = p.binding.switchId;
-        const sw = def.createSystems().switches.find((s) => s.definition.id === switchId)!;
-        expect(p.binding.positions).toEqual(sw.definition.positions);
-      }
+      MIG29_SWITCHES.speedbrake,
+      MIG29_SWITCHES.batGnd,
+      MIG29_SWITCHES.dcGen,
+      MIG29_SWITCHES.acGen,
+      MIG29_SWITCHES.pto
+    ]) {
+      expect(systemSwitches.has(switchId), switchId).toBe(true);
     }
   });
 
-  it("gauges read the live snapshot", () => {
+  it("retains snapshot-derived instrument values for a future panel integration", () => {
     const a = new FixedWingAircraft(createMiG29Definition(), terrain, env, { positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.7 });
     const s = fly(a, 3);
     const v = (id: string) => MIG29_COCKPIT_INSTRUMENTS[id]!(s);
@@ -49,10 +43,10 @@ describe("MiG-29 cockpit", () => {
     expect(v("hydgas")[0]).toBeCloseTo(s.hydraulics!.circuits.find((c) => c.id === "main")!.pressurePa / 98066.5, 6);
     expect(v("hydgas")[3]).toBeCloseTo(s.pneumatics!.systems.find((c) => c.id === "emergency")!.pressurePa / 98066.5, 6);
     expect(v("ralt")[0]).toBeCloseTo(s.ground.kind === "airborne" ? s.ground.aglM : 0, 6);
-    expect(v("cabin").every((x) => Number.isNaN(x))).toBe(true); // not simulated: drawn empty, never faked
+    expect(v("cabin").every((x) => Number.isNaN(x))).toBe(true); // not simulated: retained as empty data
   });
 
-  it("powered instruments show no reading (OFF) when their bus is unpowered; pitot-static ones keep working", () => {
+  it("powered instrument sources return no reading when their bus is unpowered; pitot-static sources keep working", () => {
     const a = new FixedWingAircraft(createMiG29Definition(), terrain, env, { positionEnuM: [0, 0, 3000], headingRad: 0, speedMps: 200, throttle: 0.7 });
     a.controls.request(MIG29_SWITCHES.acGen, "OFF", "test");
     a.controls.request(MIG29_SWITCHES.pto, "OFF", "test");
