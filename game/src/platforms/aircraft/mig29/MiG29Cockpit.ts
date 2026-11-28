@@ -20,7 +20,7 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   provenance: "Neutral structural shell only. Reference-guided family-level geometry; exact product 9.13 dimensions, equipment fit and eye datum remain unverified.",
   eyeFromCgM: [4.9, 0, -1.15],
   fieldOfViewDeg: 60,
-  cameraPitchOffsetRad: -0.11,
+  cameraPitchOffsetRad: -0.21,
   buildShell: createMiG29CockpitShell,
   parts: []
 };
