@@ -141,8 +141,8 @@ function panelKeypad(getBucket: (surface: Surface) => Bucket, u: number, v: numb
       const y = v - height / 2 + insetY + cellH * (row + 0.5);
       const point = panelPoint(x, y, 0.022);
       const accent = (row + col) % 7 === 0;
-      rounded(getBucket(accent ? "amber" : "bezel"), [point.x, point.y, point.z],
-        [cellW * 0.52, cellH * 0.42, 0.006], 0.002, panelRotation(u));
+      rounded(getBucket(accent ? "amber" : "panel"), [point.x, point.y, point.z],
+        [cellW * 0.58, cellH * 0.48, 0.007], 0.002, panelRotation(u));
     }
   }
 }
