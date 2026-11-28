@@ -21,6 +21,7 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   eyeFromCgM: [4.9, 0, -1.15],
   fieldOfViewDeg: 60,
   cameraPitchOffsetRad: -0.21,
+  structuralOnly: true,
   buildShell: createMiG29CockpitShell,
   parts: []
 };
