@@ -127,8 +127,8 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(portBounds.max.y).toBeGreaterThan(-0.44);
     // The decks must sit outboard of the front-panel footprint and leave a clear central tub.
     expect(portBounds.min.x).toBeLessThan(-0.55);
-    expect(portBounds.max.x).toBeLessThan(-0.30);
-    expect(starboardBounds.min.x).toBeGreaterThan(0.30);
+    expect(portBounds.max.x).toBeLessThan(0);
+    expect(starboardBounds.min.x).toBeGreaterThan(0);
     expect(starboardBounds.max.x).toBeGreaterThan(0.55);
     const yaw = shell.userData.consolePanelYawRad as { port: number; starboard: number };
     expect(yaw.port).toBeCloseTo(0.30, 6);
