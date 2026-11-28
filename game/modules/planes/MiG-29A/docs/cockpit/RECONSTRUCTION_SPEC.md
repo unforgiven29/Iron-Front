@@ -1,21 +1,23 @@
 # MiG-29 product 9.13 cockpit — reconstruction and render specification
 
-**Implementation status: first procedural cockpit shell integrated into Three.js; not yet measured or certified 1:1.**  
+**Current implementation: neutral structural blockout only.** No instrument faces, display surfaces, labels, lamps, switches, knobs, buttons, levers, stick, throttle or pedals are fitted. The shell is monochrome and exists as a construction frame, not as a finished cockpit.  
 **Target:** single-seat Soviet-standard MiG-29 product 9.13, configuration ID `mig29-9-13-soviet-baseline-v1`.  
 **Do not silently substitute:** product 9.12 / MiG-29A, 9.13S / MiG-29S, 9.13B, 9.13SE, SMT, MiG-29K, MiG-29M or operator-modernized equipment.
 
-This document is deliberately strict. A visually convincing cockpit is not automatically a dimensionally correct cockpit. Do not call the result 1:1 until the geometry, equipment fit, labels, locations, materials and camera registration have passed the evidence and render gates below.
+This document is deliberately strict. A visually convincing cockpit is not automatically a dimensionally correct cockpit. The current geometry remains provisional and is not a measured or certified 1:1 product 9.13 reconstruction.
 
 ## 1. Current implementation: known gaps
 
-The runtime now has an original procedural shell in `game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts`, integrated through `CockpitLayout.buildShell` and `ThreeCockpitView.loadShell()`. The current build is a first substantial geometry pass, not a measured final asset. The legacy layout in `MiG29Cockpit.ts` is still explicitly approximate:
+The runtime uses an original procedural shell in `game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts`, integrated through `CockpitLayout.buildShell` and `ThreeCockpitView.loadShell()`. The current version is a **neutral structural blockout**, not a finished cockpit and not a measured 1:1 asset.
 
-- It derives panel positions from pixel measurements on an oblique photograph and assumes a 100 mm attitude indicator for scale. Perspective is not corrected.
-- It cites Soviet-standard 9.12-family photographs; applicability to product 9.13 is not established.
-- HUD, panel-wing angles, cockpit eye point, stick dimensions, throttle dimensions, side-console controls and several instrument identifications are estimated or inferred.
-- The legacy instrument/control layout is still largely photo-coordinate data with estimated positions. The new procedural shell fills in much of the tub, seat, footwell, rudder pedals, sidewalls, consoles, canopy, bezels and hardware, but those assemblies remain provisional family-level geometry. Labels, wiring, many equipment-specific sub-panels, exact seat detail, and the complete control fit remain incomplete or unverified.
+- The shell contains the cockpit floor/tub, low sidewalls and sills, a three-piece main panel with inward-turned outer wings, blank circular and rectangular mounting outlines, a glare shield, a bare HUD support frame, empty port/starboard console trays, an unpadded seat frame, canopy rails/bows and clear neutral canopy glazing.
+- Every opaque shell component uses the same neutral grey clay material. The canopy is transparent and neutral grey; no colored paint scheme or colored control hardware is present.
+- The blank panel rings and rectangles are structural placeholders only. They do not contain gauge faces, display textures, labels, lamps, fasteners that resemble controls, or interactive hit targets.
+- The shell deliberately omits all switches, knobs, buttons, selector handles, throttle/stick/pedal geometry, seat cushions and harnesses. It is a frame for later aircraft-specific detail.
+- `MIG29_COCKPIT_LAYOUT.parts` is intentionally empty. Snapshot-derived instrument functions remain in `MiG29Cockpit.ts` for future integration, but they are not rendered. Aircraft-owned simulation switch definitions and keyboard/input bindings are unchanged; there are zero clickable cockpit switch targets.
+- Panel proportions, photo-to-metre mapping, wing angles, eye point, canopy shape and all absolute dimensions remain provisional family-level estimates. The public reference set does not establish the exact Soviet product 9.13 fit or provide a dimensioned cockpit drawing.
 
-The shared renderer is `game/src/rendering/three/ThreeCockpitView.ts`. In addition to simple `CockpitPartKind` overlays, it now accepts an aircraft-owned `buildShell()` factory or an optional GLB/GLTF asset. The MiG-29 currently uses the procedural factory in `MiG29CockpitModel.ts`. Its material groups are merged into bounded mesh batches and the canvas exposes shell-build status and mesh count for automated tests. The click raycast deliberately excludes shell geometry; only controls represented by separate `CockpitPart` layout entries are currently interactive. The current layout has eight click-bound switch controls: landing gear, emergency gear, flaps, speedbrake, battery ground switch, DC generator, AC generator and PTO. The centre stick and twin throttle levers animate from pilot input. The many additional toggle/knob/button shapes on the procedural side-console meshes are visual detail only; they are not individually clickable and do not issue subsystem commands. A browser QA attribute reports the current switch-target count/IDs, and unit tests verify that these eight IDs map to real switch definitions and allowed positions. Do not claim every physical switch in the shell works until each required control has a correctly positioned, tested hit target and command mapping.
+The shared renderer remains aircraft-agnostic. It loads the shell via `CockpitLayout.buildShell`, batches the shell geometry into bounded meshes and reports shell-build status/mesh count for browser tests. The renderer only makes controls interactive when a separate `CockpitPart` with a binding is supplied; the current MiG-29 layout supplies none. Do not infer control functionality from a blank mounting outline.
 
 **Do not "improve" this layout by inventing another set of precise-looking coordinates.** Replace provisional geometry only when the corresponding measurement or placement has traceable evidence. Keep unknowns unknown.
 
@@ -69,7 +71,7 @@ The DCS Russian pilot manual's cockpit overview (printed pages 24–25, Figure 1
 | 21 | Fuel quantity indicator | Correct tank/quantity representation; do not copy another variant's fuel computer |
 | 22 | СПО-15 «Берёза» | RWR indicator/control fit; check exact product/operator nomenclature and revision |
 
-These 22 callouts must be reconciled against the current `MiG29Cockpit.ts` inventory. The existing layout does not yet represent every item as a measured, separate physical assembly. Do not blindly add all 22 at inferred coordinates: use the image as a relative arrangement reference, confirm exact target fit and obtain dimensions before claiming accuracy.
+These 22 callouts are a future equipment-inventory reference, not a description of the current shell. No callout is presently rendered as an instrument or control. Do not blindly add all 22 at inferred coordinates: use the image as a relative arrangement reference, confirm exact target fit and obtain dimensions before claiming accuracy.
 
 The English/Russian DCS manuals and the GAF T.O. also describe systems and console controls beyond this front-panel plate. Maintain separate inventories for the left console, right console, centre/floor area and seat; do not assume Figure 15 is a complete cockpit parts list.
 
