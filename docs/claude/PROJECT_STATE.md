@@ -227,3 +227,7 @@ A browser screenshot of the previous shell was inspected; the old render showed 
 
 Geometry remains provisional family-level reconstruction, not a dimensionally verified 1:1 product 9.13 cockpit. The screenshot comparison and validation run are tracked in PR #79.
 
+
+
+A further visual refinement after reviewing the final CI screenshot: the gauge/display positions are now actual shallow-depth mounting recesses with dark neutral-grey blank interiors rather than same-grey surface rings; the glare-shield brow and HUD support were thinned; side-console surfaces were raised slightly into the sightline. No display faces or controls were added. Latest geometry validation includes a test that recess material remains monochrome and darker than the panel shell, and that the console frame reaches the pilot view.
+
