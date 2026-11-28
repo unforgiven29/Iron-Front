@@ -341,9 +341,9 @@ export function createMiG29CockpitShell(): THREE.Group {
     panelCylinder(b(i % 3 === 0 ? "warning" : "amber"), u, -0.078, 0.021, 0.0035, 0.003, 12);
   }
 
-  // Padded glare shield: a shallow faceted hood rather than a thick pill-shaped beam.
-  rounded(b("black"), [0, -0.105, -0.82], [0.88, 0.058, 0.13], 0.012, [0.06, 0, 0]);
-  box(b("frame"), [0, -0.148, -0.783], [0.86, 0.012, 0.035], [0.06, 0, 0]);
+  // Padded glare shield: low-profile, soft-edged hood with a narrow forward lip.
+  rounded(b("black"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
+  box(b("frame"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
   for (const u of [-0.31, -0.23, -0.15, -0.07, 0.07, 0.15, 0.23, 0.31]) {
     const point = panelPoint(u, -0.16, 0.016);
     cylinder(b("amber"), [point.x, point.y, point.z], 0.003, 0.003, panelNormal(u).toArray() as Vec3, 10);
@@ -380,10 +380,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     rounded(b("panel"), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, [side * 0.055, 0, side * 0.045]);
     box(b("frame"), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], [0, 0, side * 0.04]);
 
-    // Rows are deliberately concentrated in the portion forward of the pilot's eye, where they are visible.
+    // Controls occupy the aft half of each deck, close enough to the pilot to remain visible and reachable.
     const rows = side < 0
-      ? [-0.75, -0.61, -0.47, -0.33, -0.19, -0.05]
-      : [-0.72, -0.56, -0.40, -0.24, -0.08];
+      ? [-0.04, 0.10, 0.24, 0.38, 0.52, 0.64]
+      : [-0.04, 0.12, 0.28, 0.44, 0.60];
     const columns = side < 0 ? [-0.050, 0, 0.050] : [-0.046, 0.046];
     for (let row = 0; row < rows.length; row++) {
       const z = rows[row]!;
@@ -397,7 +397,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
 
     // Separate guarded selector plates and warning lamps along the aft edge of the visible deck.
-    const plaques = side < 0 ? [-0.12, 0.04] : [-0.16, 0.02];
+    const plaques = side < 0 ? [0.30, 0.57] : [0.32, 0.58];
     for (const z of plaques) {
       rounded(b("black"), [x, -0.424, z], [0.15, 0.010, 0.075], 0.005);
       box(b("bezel"), [x, -0.415, z + 0.041], [0.15, 0.008, 0.006]);
@@ -405,14 +405,14 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
 
     if (side > 0) {
-      // Starboard breaker / information panel with rows of individually raised keys.
-      rounded(b("black"), [x, -0.416, -0.02], [0.155, 0.020, 0.30], 0.008);
-      for (const z of [-0.14, -0.065, 0.01, 0.085, 0.16]) {
-        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.048], 0.003);
+      // Starboard breaker / information panel: a compact aft bank of separated breaker keys.
+      rounded(b("black"), [x, -0.416, 0.34], [0.155, 0.020, 0.30], 0.008);
+      for (const z of [0.20, 0.27, 0.34, 0.41, 0.48]) {
+        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.045], 0.003);
         for (const dx of [-0.038, 0, 0.038]) addToggle(b("metal"), x + dx, -0.394, z, "button");
       }
-      for (let i = 0; i < 8; i++) {
-        const z = -0.73 + i * 0.092;
+      for (let i = 0; i < 7; i++) {
+        const z = -0.04 + i * 0.095;
         box(b("black"), [side * 0.425, -0.422, z], [0.035, 0.010, 0.064]);
         for (const dx of [-0.008, 0.008]) addToggle(b("amber"), side * 0.425 + dx, -0.416, z, "button");
       }
@@ -428,11 +428,15 @@ export function createMiG29CockpitShell(): THREE.Group {
     box(b("bezel"), [x, -0.251, -0.31], [0.018, 0.012, 0.03]);
   }
 
-  // Centre control column boot and compact grip. The live stick overlay is the moving shaft.
+  // Centre control column: flexible boot, sculpted handgrip and trigger details.
   rounded(b("rubber"), [0, -0.748, -0.36], [0.12, 0.024, 0.15], 0.026);
-  rounded(b("rubber"), [0, -0.30, -0.405], [0.045, 0.082, 0.044], 0.012, [0.16, 0, 0]);
-  cylinder(b("warning"), [0, -0.252, -0.420], 0.007, 0.008, [0, 1, 0], 12);
-  for (const x of [-0.016, 0.016]) cylinder(b("amber"), [x, -0.262, -0.438], 0.003, 0.005, [0, 1, 0], 8);
+  rounded(b("rubber"), [0, -0.255, -0.405], [0.082, 0.050, 0.052], 0.014, [0.12, 0, 0]);
+  rounded(b("frame"), [0, -0.226, -0.411], [0.050, 0.012, 0.045], 0.004, [0.12, 0, 0]);
+  cylinder(b("warning"), [0, -0.224, -0.420], 0.006, 0.008, [0, 1, 0], 12);
+  for (const x of [-0.031, 0.031]) {
+    cylinder(b("metal"), [x, -0.252, -0.426], 0.0035, 0.012, [0, 0, 1], 8);
+    cylinder(b("amber"), [x, -0.239, -0.438], 0.003, 0.005, [0, 1, 0], 8);
+  }
 
   // Rudder pedals and footwells are below the main field of view.
   for (const side of [-1, 1] as const) {
@@ -443,6 +447,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     cylinder(b("metal"), [x, -0.69, -0.32], 0.010, 0.42, [0, 0, 1], 12);
   }
 
+  // Gear handle mounting plate and small red selector grip on the port forward console.
+  rounded(b("black"), [-0.455, -0.432, -0.60], [0.075, 0.014, 0.090], 0.008);
+  cylinder(b("metal"), [-0.455, -0.392, -0.60], 0.0055, 0.055, [0, 1, 0], 12);
+  rounded(b("warning"), [-0.455, -0.357, -0.60], [0.025, 0.018, 0.030], 0.006);
   // K-36 family seat: behind the control column, with distinct back pan, head pad and harness.
   for (const side of [-1, 1] as const) {
     const x = side * 0.245;
@@ -463,10 +471,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     torus(b("warning"), [side * 0.10, -0.70, 0.23], 0.055, 0.009, [0, 0, 1], 24);
   }
 
-  // Canopy side rails: narrow gunmetal runners with thin seals, not heavy black beams.
+  // Canopy side rails sit below the design eye and stay narrow at the edges of the sight picture.
   for (const side of [-1, 1] as const) {
-    rounded(b("panel"), [side * 0.520, 0.055, -0.11], [0.010, 0.014, 2.00], 0.003);
-    rounded(b("rubber"), [side * 0.509, 0.064, -0.11], [0.005, 0.006, 1.94], 0.002);
+    rounded(b("panel"), [side * 0.520, -0.045, -0.11], [0.010, 0.012, 1.96], 0.003);
+    rounded(b("rubber"), [side * 0.509, -0.036, -0.11], [0.005, 0.005, 1.90], 0.002);
   }
   canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
