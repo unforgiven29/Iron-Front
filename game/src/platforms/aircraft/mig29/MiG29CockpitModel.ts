@@ -130,8 +130,8 @@ function panelBox(b: Bucket, u: number, v: number, width: number, height: number
   box(b, [point.x, point.y, point.z], [width, height, thickness], panelRotation(u));
 }
 
-function panelKeypad(b: Bucket, u: number, v: number, width: number, height: number, columns: number, rows: number): void {
-  panelBox(b, u, v, width, height, 0.012, 0.012);
+function panelKeypad(getBucket: (surface: Surface) => Bucket, u: number, v: number, width: number, height: number, columns: number, rows: number): void {
+  panelBox(getBucket("black"), u, v, width, height, 0.012, 0.012);
   const insetX = width * 0.13, insetY = height * 0.16;
   const cellW = (width - insetX * 2) / columns;
   const cellH = (height - insetY * 2) / rows;
@@ -141,7 +141,7 @@ function panelKeypad(b: Bucket, u: number, v: number, width: number, height: num
       const y = v - height / 2 + insetY + cellH * (row + 0.5);
       const point = panelPoint(x, y, 0.022);
       const accent = (row + col) % 7 === 0;
-      rounded(b(accent ? "amber" : "metal"), [point.x, point.y, point.z],
+      rounded(getBucket(accent ? "amber" : "metal"), [point.x, point.y, point.z],
         [cellW * 0.58, cellH * 0.48, 0.008], 0.002, panelRotation(u));
     }
   }
