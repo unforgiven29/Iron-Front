@@ -28,6 +28,10 @@ type ShellPart =
   | "seat-frame"
   | "canopy-frame";
 
+type PanelOpening =
+  | { readonly kind: "circle"; readonly u: number; readonly v: number; readonly radius: number }
+  | { readonly kind: "rectangle"; readonly u: number; readonly v: number; readonly width: number; readonly height: number };
+
 interface PanelSection {
   readonly part: ShellPart;
   readonly minU: number;
@@ -75,10 +79,10 @@ const PHOTO_ORIGIN_Y = 190;
  * They are visual estimates from the early cockpit photographs, not measured 9.13 angles.
  */
 const PANEL_SECTIONS: readonly PanelSection[] = [
-  { part: "panel-port-outer", minU: -0.52, maxU: -0.34, yawRad: 0.54, topV: -0.20, bottomV: 0.16 },
-  { part: "panel-port-inner", minU: -0.34, maxU: -0.16, yawRad: 0.25, topV: -0.24, bottomV: 0.19 },
-  { part: "panel-center", minU: -0.16, maxU: 0.16, yawRad: 0, topV: -0.25, bottomV: 0.19 },
-  { part: "panel-starboard", minU: 0.16, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
+  { part: "panel-port-outer", minU: -0.52, maxU: -0.30, yawRad: 0.54, topV: -0.20, bottomV: 0.16 },
+  { part: "panel-port-inner", minU: -0.30, maxU: -0.13, yawRad: 0.25, topV: -0.24, bottomV: 0.19 },
+  { part: "panel-center", minU: -0.13, maxU: 0.107, yawRad: 0, topV: -0.25, bottomV: 0.19 },
+  { part: "panel-starboard", minU: 0.107, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
 ];
 
 const emptyBucket = (): Bucket => ({ positions: [], normals: [], indices: [] });
@@ -229,32 +233,52 @@ function panelPoint(u: number, v: number, depth = 0): THREE.Vector3 {
 
 function panelSegment(
   bucket: Bucket,
-  u0: number,
-  u1: number,
-  topV: number,
-  bottomV: number,
+  section: PanelSection,
+  openings: readonly PanelOpening[],
   thickness = 0.042
 ): void {
-  const front = [
-    panelPoint(u0, topV, 0.002),
-    panelPoint(u1, topV, 0.002),
-    panelPoint(u1, bottomV, 0.002),
-    panelPoint(u0, bottomV, 0.002)
-  ];
-  const normal = panelNormal((u0 + u1) * 0.5);
-  const back = front.map((point) => point.clone().addScaledVector(normal, -thickness));
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(
-    [...front, ...back].flatMap((point) => [point.x, point.y, point.z]), 3
-  ));
-  geometry.setIndex([
-    0, 2, 1, 0, 3, 2,
-    4, 5, 6, 4, 6, 7,
-    0, 5, 4, 0, 1, 5,
-    1, 6, 5, 1, 2, 6,
-    2, 7, 6, 2, 3, 7,
-    3, 4, 7, 3, 0, 4
-  ]);
+  const width = section.maxU - section.minU;
+  const height = section.bottomV - section.topV;
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(width, 0);
+  shape.lineTo(width, height);
+  shape.lineTo(0, height);
+  shape.closePath();
+
+  // Real cut-outs in the panel plate, not dark disks placed behind a continuous face.
+  for (const opening of openings) {
+    const cx = opening.u - section.minU;
+    const cy = opening.v - section.topV;
+    const hole = new THREE.Path();
+    if (opening.kind === "circle") {
+      hole.absellipse(cx, cy, opening.radius, opening.radius, 0, Math.PI * 2, true, 0);
+    } else {
+      const left = cx - opening.width / 2, right = cx + opening.width / 2;
+      const top = cy - opening.height / 2, bottom = cy + opening.height / 2;
+      hole.moveTo(left, top);
+      hole.lineTo(left, bottom);
+      hole.lineTo(right, bottom);
+      hole.lineTo(right, top);
+      hole.closePath();
+    }
+    shape.holes.push(hole);
+  }
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: false,
+    curveSegments: 40,
+    steps: 1
+  });
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const u = section.minU + position.getX(i);
+    const v = section.topV + position.getY(i);
+    // ExtrudeGeometry grows +Z; cockpit panel thickness goes aft, away from the pilot.
+    const point = panelPoint(u, v, 0.002 - position.getZ(i));
+    position.setXYZ(i, point.x, point.y, point.z);
+  }
   geometry.computeVertexNormals();
   addGeometry(bucket, geometry, [0, 0, 0]);
 }
@@ -266,13 +290,13 @@ function panelRing(bucket: Bucket, u: number, v: number, radius: number): void {
 }
 
 function panelInset(bucket: Bucket, u: number, v: number, radius: number): void {
-  const point = panelPoint(u, v, -0.016);
+  const point = panelPoint(u, v, -0.055);
   const normal = panelNormal(u);
   cylinder(
     bucket,
     [point.x, point.y, point.z],
     radius * 0.88,
-    0.010,
+    0.008,
     [normal.x, normal.y, normal.z],
     32
   );
@@ -300,11 +324,11 @@ function panelRectangleFrame(
 }
 
 function panelRectInset(bucket: Bucket, u: number, v: number, width: number, height: number): void {
-  const point = panelPoint(u, v, -0.014);
+  const point = panelPoint(u, v, -0.054);
   box(
     bucket,
     [point.x, point.y, point.z],
-    [width * 0.94, height * 0.94, 0.006],
+    [width * 0.92, height * 0.92, 0.006],
     panelRotation(u)
   );
 }
@@ -391,48 +415,59 @@ export function createMiG29CockpitShell(): THREE.Group {
   rounded(b("tub"), [0, -0.365, 1.015], [0.82, 0.70, 0.060], 0.022);
   rounded(b("tub"), [0, -0.735, 0.65], [0.78, 0.055, 0.16], 0.012);
 
-  // Four front-panel plates, each a separate mesh with its own face normal and vertical extent.
-  for (const section of PANEL_SECTIONS) {
-    const gap = 0.003;
-    panelSegment(
-      b(section.part),
-      section.minU + gap,
-      section.maxU - gap,
-      section.topV,
-      section.bottomV
-    );
-  }
-
-  // Blank, flush mounting apertures. They are only shallow structural recesses, not instrument faces.
+  // Empty equipment openings, traced from the photo registration used for the blank panel frame.
   const gaugeMounts: readonly [number, number, number][] = [
     [130, 165, 64], [140, 235, 62], [255, 150, 74], [245, 245, 88],
     [340, 140, 54], [330, 215, 50], [440, 145, 56], [515, 140, 54],
     [445, 210, 50], [505, 210, 50]
   ];
-  for (const [px, py, diameterPx] of gaugeMounts) {
-    const u = (px - PHOTO_ORIGIN_X) * PHOTO_SCALE;
-    const v = (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE;
-    const radius = diameterPx * PHOTO_SCALE * 0.44;
-    const part = sectionAt(u).part;
-    panelInset(b("panel-recess"), u, v, radius * 0.91);
-    panelRing(b(part), u, v, radius);
-  }
+  const circularOpenings: PanelOpening[] = gaugeMounts.map(([px, py, diameterPx]) => ({
+    kind: "circle",
+    u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
+    v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
+    radius: diameterPx * PHOTO_SCALE * 0.44
+  }));
   const rectangularMounts: readonly [number, number, number, number][] = [
     [570, 180, 32, 72],
-    [435, 255, 55, 42],
-    [490, 255, 55, 42],
+    [435, 255, 50, 42],
+    [490, 255, 50, 42],
     [555, 255, 55, 42],
     [600, 95, 108, 92],
     [650, 215, 72, 72]
   ];
-  for (const [px, py, widthPx, heightPx] of rectangularMounts) {
-    const u = (px - PHOTO_ORIGIN_X) * PHOTO_SCALE;
-    const v = (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE;
-    const width = widthPx * PHOTO_SCALE;
-    const height = heightPx * PHOTO_SCALE;
-    const part = sectionAt(u).part;
-    panelRectInset(b("panel-recess"), u, v, width, height);
-    panelRectangleFrame(b(part), u, v, width, height);
+  const rectangularOpenings: PanelOpening[] = rectangularMounts.map(([px, py, widthPx, heightPx]) => ({
+    kind: "rectangle",
+    u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
+    v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
+    width: widthPx * PHOTO_SCALE,
+    height: heightPx * PHOTO_SCALE
+  }));
+  const panelOpenings = [...circularOpenings, ...rectangularOpenings];
+
+  // Four separate front-panel plates with true through-openings for the future equipment.
+  for (const section of PANEL_SECTIONS) {
+    const gap = 0.003;
+    const containedOpenings = panelOpenings.filter((opening) => {
+      const halfWidth = opening.kind === "circle" ? opening.radius : opening.width / 2;
+      const halfHeight = opening.kind === "circle" ? opening.radius : opening.height / 2;
+      return opening.u - halfWidth >= section.minU + gap
+        && opening.u + halfWidth <= section.maxU - gap
+        && opening.v - halfHeight >= section.topV + gap
+        && opening.v + halfHeight <= section.bottomV - gap;
+    });
+    panelSegment(b(section.part), section, containedOpenings);
+  }
+
+  // Recessed blank backing surfaces sit behind the actual openings, not on top of the panel face.
+  for (const opening of circularOpenings) {
+    const part = sectionAt(opening.u).part;
+    panelInset(b("panel-recess"), opening.u, opening.v, opening.radius);
+    panelRing(b(part), opening.u, opening.v, opening.radius);
+  }
+  for (const opening of rectangularOpenings) {
+    const part = sectionAt(opening.u).part;
+    panelRectInset(b("panel-recess"), opening.u, opening.v, opening.width, opening.height);
+    panelRectangleFrame(b(part), opening.u, opening.v, opening.width, opening.height);
   }
 
   // A low rear casing supports the four plates and blends their lower edges into the front tub.
