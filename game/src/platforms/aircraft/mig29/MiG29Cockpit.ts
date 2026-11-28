@@ -98,7 +98,7 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     // СПО-15 indicator (right side of the panel; position approximate).
     screenAt("spo15", "rwr", 650, 215, 0.1, 0.1),
     // Levers and switches (clickable; positions approximate, not from the photographs).
-    lever("gear-lever", SW.gear, ["UP", "DN"], [0.60, -0.46, 0.38], [0.025, 0.02, 0.05], "#c33"),
+    { id: "gear-lever", kind: "cylinder", positionM: [0.60, -0.455, 0.38], sizeM: [0.0055, 0.060, 0], color: "#8f3830", binding: { kind: "switch", switchId: SW.gear, positions: ["UP", "DN"] } },
     lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.68, -0.36, 0.62], [0.025, 0.045, 0.025], YELLOW),
     lever("flap-lever", SW.flaps, ["UP", "TAKEOFF", "LANDING"], [0.32, -0.42, 0.42], [0.05, 0.025, 0.05], "#ddd"),
     lever("airbrake", SW.speedbrake, ["RETRACT", "EXTEND"], [0.24, -0.33, 0.33], [0.02, 0.02, 0.02], "#3c7"),
@@ -107,7 +107,7 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-acgen", SW.acGen, ["ON", "OFF"], [0.38, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     // Live centre-stick shaft and twin-throttle levers are overlaid on the physical procedural assemblies.
-    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
+    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.0095, 0.34, 0], rotationRad: [0, 0.12, 0], color: "#171b1a", binding: { kind: "stick" } },
     { id: "throttle", kind: "box", positionM: [0.22, -0.35, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } },
     { id: "throttle-2", kind: "box", positionM: [0.22, -0.42, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } }
   ]
