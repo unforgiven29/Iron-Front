@@ -20,7 +20,7 @@ type Vec3 = readonly [number, number, number];
 type Bucket = { positions: number[]; normals: number[]; indices: number[] };
 
 const FACE_X = 0.845;
-const FACE_DOWN = 0.42;
+const FACE_DOWN = 0.37;
 const FACE_TILT = -0.30;
 const WING_START = 0.20;
 const WING_YAW = 0.38;
@@ -309,9 +309,9 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // Padded glare shield above the instrument panel; it must not cover the instrument faces.
-  rounded(b("black"), [0, -0.135, -0.82], [0.90, 0.075, 0.13], 0.025, [0.08, 0, 0]);
-  box(b("frame"), [0, -0.188, -0.79], [0.90, 0.018, 0.055], [0.08, 0, 0]);
-  box(b("warning"), [0, -0.188, -0.748], [0.20, 0.008, 0.008]);
+  rounded(b("black"), [0, -0.115, -0.82], [0.90, 0.075, 0.13], 0.025, [0.08, 0, 0]);
+  box(b("frame"), [0, -0.168, -0.79], [0.90, 0.018, 0.055], [0.08, 0, 0]);
+  box(b("warning"), [0, -0.168, -0.748], [0.20, 0.008, 0.008]);
 
   // HUD: compact projector and paired supports, with a clear combiner—no central mast.
   rounded(b("black"), [0, 0.075, -1.00], [0.23, 0.10, 0.15], 0.018);
@@ -382,9 +382,9 @@ export function createMiG29CockpitShell(): THREE.Group {
 
   // Centre control column: small flexible boot and ergonomic grip; keep the sightline open.
   rounded(b("rubber"), [0, -0.748, -0.36], [0.135, 0.028, 0.17], 0.035);
-  rounded(b("rubber"), [0, -0.245, -0.405], [0.058, 0.115, 0.055], 0.018, [0.16, 0, 0]);
-  cylinder(b("warning"), [0, -0.178, -0.420], 0.008, 0.009, [0, 1, 0], 12);
-  for (const x of [-0.018, 0.018]) cylinder(b("amber"), [x, -0.188, -0.438], 0.0035, 0.006, [0, 1, 0], 8);
+  rounded(b("rubber"), [0, -0.285, -0.405], [0.050, 0.095, 0.050], 0.018, [0.16, 0, 0]);
+  cylinder(b("warning"), [0, -0.229, -0.420], 0.008, 0.009, [0, 1, 0], 12);
+  for (const x of [-0.018, 0.018]) cylinder(b("amber"), [x, -0.239, -0.438], 0.0035, 0.006, [0, 1, 0], 8);
 
   // Rudder pedals and footwells are below the main field of view.
   for (const side of [-1, 1] as const) {
