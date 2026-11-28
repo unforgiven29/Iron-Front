@@ -3,17 +3,37 @@
  *
  * This pass deliberately contains no fitted instruments, display faces, switches, knobs,
  * buttons, levers, stick, throttle or pedals. It is a monochrome construction frame: cockpit
- * tub, main-panel structure, blank console trays, bare seat frame and canopy structure.
+ * tub, four separately angled front-panel sections, angled blank console structures, bare seat
+ * frame and canopy structure.
  *
- * Geometry remains a reference-guided family-level approximation. Do not describe it as a
- * measured 1:1 product 9.13 reconstruction until dimensioned 9.13 evidence and visual QA exist.
+ * Geometry remains a reference-guided family-level approximation. The angle breaks are visual
+ * reconstruction estimates, not measured product 9.13 drawing dimensions.
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 type Vec3 = readonly [number, number, number];
 type Bucket = { positions: number[]; normals: number[]; indices: number[] };
-type ShellPart = "tub" | "panel" | "port-console" | "starboard-console" | "seat-frame" | "canopy-frame";
+type ShellPart =
+  | "tub"
+  | "panel-port-outer"
+  | "panel-port-inner"
+  | "panel-center"
+  | "panel-starboard"
+  | "glare-shield"
+  | "port-console"
+  | "starboard-console"
+  | "central-pedestal"
+  | "seat-frame"
+  | "canopy-frame";
+
+interface PanelSection {
+  readonly part: ShellPart;
+  readonly minU: number;
+  readonly maxU: number;
+  /** Positive yaw turns a port panel's face toward the pilot; starboard is negative. */
+  readonly yawRad: number;
+}
 
 const CLAY = new THREE.MeshStandardMaterial({
   color: "#898989",
@@ -34,12 +54,23 @@ const FACE_X = 0.845;
 const FACE_DOWN = 0.37;
 const FACE_TILT = -0.30;
 const WING_START = 0.20;
-const WING_YAW = 0.38;
 const PX = 0.1 / 75;
 const OX = 390;
 const OY = 190;
 const V_TOP = (30 - OY) * PX;
 const V_BOTTOM = (300 - OY) * PX;
+
+/**
+ * The manual describes four front-panel assemblies (two port, one centre, one starboard).
+ * Yaw angles below are visual estimates from oblique photographs; no source found here gives
+ * measured product 9.13 panel angles.
+ */
+const PANEL_SECTIONS: readonly PanelSection[] = [
+  { part: "panel-port-outer", minU: -0.43, maxU: -0.31, yawRad: 0.52 },
+  { part: "panel-port-inner", minU: -0.31, maxU: -0.20, yawRad: 0.28 },
+  { part: "panel-center", minU: -0.20, maxU: 0.20, yawRad: 0 },
+  { part: "panel-starboard", minU: 0.20, maxU: 0.43, yawRad: -0.40 }
+];
 
 const emptyBucket = (): Bucket => ({ positions: [], normals: [], indices: [] });
 
@@ -93,24 +124,47 @@ function torus(bucket: Bucket, centre: Vec3, radius: number, tube: number, axis:
   addGeometry(bucket, geometry, [0, 0, 0]);
 }
 
-function panelPoint(u: number, v: number, depth = 0): THREE.Vector3 {
-  const over = Math.max(0, Math.abs(u) - WING_START);
-  const side = Math.sign(u);
-  const lateral = side * (Math.min(Math.abs(u), WING_START) + over * Math.cos(WING_YAW));
-  const forward = FACE_X + Math.sin(FACE_TILT) * v - over * Math.sin(WING_YAW);
-  const down = FACE_DOWN + Math.cos(FACE_TILT) * v;
-  const normal = panelNormal(u);
-  return new THREE.Vector3(lateral, -down, -forward).addScaledVector(normal, depth);
+function sectionAt(u: number): PanelSection {
+  return PANEL_SECTIONS.find((section) => u >= section.minU && u <= section.maxU)
+    ?? PANEL_SECTIONS.reduce((nearest, section) =>
+      Math.abs(u - (section.minU + section.maxU) * 0.5) < Math.abs(u - (nearest.minU + nearest.maxU) * 0.5)
+        ? section
+        : nearest
+    );
+}
+
+/** Integrate each panel section so adjacent angled faces meet at their seams. */
+function panelLateralAndForwardOffset(u: number): readonly [number, number] {
+  const sign = Math.sign(u);
+  if (sign === 0) return [0, 0];
+  const lower = Math.min(0, u), upper = Math.max(0, u);
+  let lateral = 0, forward = 0;
+  for (const section of PANEL_SECTIONS) {
+    const from = Math.max(lower, section.minU);
+    const to = Math.min(upper, section.maxU);
+    if (to <= from) continue;
+    const signedWidth = sign * (to - from);
+    lateral += signedWidth * Math.cos(section.yawRad);
+    forward += signedWidth * Math.sin(section.yawRad);
+  }
+  return [lateral, forward];
 }
 
 function panelRotation(u: number): Vec3 {
-  return [FACE_TILT, Math.abs(u) > WING_START ? -Math.sign(u) * WING_YAW : 0, 0];
+  return [FACE_TILT, sectionAt(u).yawRad, 0];
 }
 
 function panelNormal(u: number): THREE.Vector3 {
   return new THREE.Vector3(0, 0, 1)
     .applyEuler(new THREE.Euler(...panelRotation(u), "XYZ"))
     .normalize();
+}
+
+function panelPoint(u: number, v: number, depth = 0): THREE.Vector3 {
+  const [lateral, forwardOffset] = panelLateralAndForwardOffset(u);
+  const forward = FACE_X + Math.sin(FACE_TILT) * v + forwardOffset;
+  const down = FACE_DOWN + Math.cos(FACE_TILT) * v;
+  return new THREE.Vector3(lateral, -down, -forward).addScaledVector(panelNormal(u), depth);
 }
 
 function panelRing(bucket: Bucket, u: number, v: number, radius: number): void {
@@ -128,14 +182,16 @@ function panelRectangleFrame(bucket: Bucket, u: number, v: number, width: number
     [width / 2, 0, bar, height]
   ];
   for (const [dx, dy, sx, sy] of rails) {
-    const point = panelPoint(u + dx, v + dy, 0.014);
-    box(bucket, [point.x, point.y, point.z], [sx, sy, 0.012], panelRotation(u + dx));
+    const panelU = u + dx;
+    const point = panelPoint(panelU, v + dy, 0.014);
+    box(bucket, [point.x, point.y, point.z], [sx, sy, 0.012], panelRotation(panelU));
   }
 }
 
 function panelSegment(bucket: Bucket, u0: number, u1: number, v0: number, v1: number): void {
   const front = [panelPoint(u0, v0), panelPoint(u1, v0), panelPoint(u1, v1), panelPoint(u0, v1)];
-  const back = front.map((point) => point.clone().add(new THREE.Vector3(0, 0, -0.045)));
+  const normal = panelNormal((u0 + u1) * 0.5);
+  const back = front.map((point) => point.clone().addScaledVector(normal, -0.045));
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(
     [...front, ...back].flatMap((point) => [point.x, point.y, point.z]), 3
@@ -208,6 +264,8 @@ function materialMesh(name: ShellPart, bucket: Bucket): THREE.Mesh | null {
   mesh.receiveShadow = true;
   mesh.userData.shell = true;
   mesh.userData.shellComponent = name;
+  const section = PANEL_SECTIONS.find((panelSection) => panelSection.part === name);
+  if (section) mesh.userData.panelYawRad = section.yawRad;
   return mesh;
 }
 
@@ -215,15 +273,20 @@ function materialMesh(name: ShellPart, bucket: Bucket): THREE.Mesh | null {
 export function createMiG29CockpitShell(): THREE.Group {
   const buckets: Record<ShellPart, Bucket> = {
     tub: emptyBucket(),
-    panel: emptyBucket(),
+    "panel-port-outer": emptyBucket(),
+    "panel-port-inner": emptyBucket(),
+    "panel-center": emptyBucket(),
+    "panel-starboard": emptyBucket(),
+    "glare-shield": emptyBucket(),
     "port-console": emptyBucket(),
     "starboard-console": emptyBucket(),
+    "central-pedestal": emptyBucket(),
     "seat-frame": emptyBucket(),
     "canopy-frame": emptyBucket()
   };
   const b = (part: ShellPart) => buckets[part];
 
-  // Cockpit tub: floor pan, low sidewalls, sill structure and aft bulkhead.
+  // Cockpit tub: floor pan, low sidewalls, sills and aft bulkhead.
   rounded(b("tub"), [0, -0.842, 0.02], [0.92, 0.055, 2.30], 0.018);
   rounded(b("tub"), [0, -0.808, 0.02], [0.84, 0.018, 2.18], 0.006);
   rounded(b("tub"), [0, -0.790, -0.58], [0.72, 0.035, 0.54], 0.012);
@@ -236,19 +299,20 @@ export function createMiG29CockpitShell(): THREE.Group {
     rounded(b("tub"), [side * 0.455, -0.785, -0.52], [0.035, 0.055, 0.52], 0.008);
   }
 
-  // Three-piece main instrument-panel frame: centre face with inward-turned outer wings.
-  panelSegment(b("panel"), -0.20, 0.20, V_TOP, V_BOTTOM);
-  panelSegment(b("panel"), -0.43, -0.20, V_TOP, V_BOTTOM);
-  panelSegment(b("panel"), 0.20, 0.43, V_TOP, V_BOTTOM);
-  for (const side of [-1, 1] as const) {
-    const top = panelPoint(side * 0.43, V_TOP, -0.025);
-    const bottom = panelPoint(side * 0.43, V_BOTTOM, -0.025);
+  // Four individually addressable front panels, each with its own face normal.
+  for (const section of PANEL_SECTIONS) {
+    panelSegment(b(section.part), section.minU, section.maxU, V_TOP, V_BOTTOM);
+  }
+  // Structural seams emphasize the changes in plane without adding controls or labels.
+  for (const u of [-0.43, -0.31, -0.20, 0.20, 0.43]) {
+    const top = panelPoint(u, V_TOP, -0.024);
+    const bottom = panelPoint(u, V_BOTTOM, -0.024);
     const delta = bottom.clone().sub(top);
     const middle = top.clone().add(bottom).multiplyScalar(0.5);
-    cylinder(b("panel"), [middle.x, middle.y, middle.z], 0.009, delta.length(), [delta.x, delta.y, delta.z], 12);
+    cylinder(b("panel-center"), [middle.x, middle.y, middle.z], 0.0045, delta.length(), [delta.x, delta.y, delta.z], 10);
   }
 
-  // Empty mounting rings and rectangular apertures only. No faces, labels, lamps or controls.
+  // Empty instrument and display mounting outlines; no faces, labels or equipment are fitted.
   const blankGaugeMounts: readonly [number, number, number][] = [
     [130, 165, 65], [140, 235, 65], [255, 150, 75], [245, 245, 95],
     [340, 140, 55], [330, 215, 55], [440, 145, 60], [515, 140, 60],
@@ -256,43 +320,60 @@ export function createMiG29CockpitShell(): THREE.Group {
   ];
   for (const [px, py, diameterPx] of blankGaugeMounts) {
     const u = (px - OX) * PX, v = (py - OY) * PX;
-    panelRing(b("panel"), u, v, diameterPx * PX * 0.49);
+    panelRing(b(sectionAt(u).part), u, v, diameterPx * PX * 0.49);
   }
   const blankRectangles: readonly [number, number, number, number][] = [
     [570, 180, 32, 72], [435, 255, 55, 42], [490, 255, 55, 42],
     [555, 255, 55, 42], [600, 95, 112, 98], [650, 215, 75, 75]
   ];
   for (const [px, py, widthPx, heightPx] of blankRectangles) {
+    const u = (px - OX) * PX;
     panelRectangleFrame(
-      b("panel"),
-      (px - OX) * PX,
+      b(sectionAt(u).part),
+      u,
       (py - OY) * PX,
       widthPx * PX,
       heightPx * PX
     );
   }
 
-  // Glare shield and HUD mounting frame: structural supports only, no combiner or display.
-  rounded(b("panel"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
-  box(b("panel"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
-  rounded(b("panel"), [0, 0.026, -0.94], [0.28, 0.022, 0.075], 0.008);
+  // Glare shield and HUD support frame only: the combiner and display hardware are absent.
+  rounded(b("glare-shield"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
+  box(b("glare-shield"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
+  rounded(b("glare-shield"), [0, 0.026, -0.94], [0.28, 0.022, 0.075], 0.008);
   for (const side of [-1, 1] as const) {
-    box(b("panel"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
+    box(b("glare-shield"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
   }
-  box(b("panel"), [0, 0.202, -1.012], [0.23, 0.018, 0.018]);
+  box(b("glare-shield"), [0, 0.202, -1.012], [0.23, 0.018, 0.018]);
 
-  // Blank side-console trays with perimeter lips and empty equipment mounting bays.
+  // Angled console decks. Their top surfaces slope inward toward the pilot rather than
+  // reading as two broad, level shelves. A separate upright inner face models the vertical
+  // console panel family documented in the DCS manual.
   for (const side of [-1, 1] as const) {
     const part: ShellPart = side < 0 ? "port-console" : "starboard-console";
     const x = side * 0.385;
-    const rotation: Vec3 = [side * 0.055, 0, side * 0.045];
-    rounded(b(part), [x, -0.505, -0.08], [0.205, 0.105, 1.48], 0.016, rotation);
-    rounded(b(part), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, rotation);
+    const deckRotation: Vec3 = [side * 0.075, 0, side * 0.23];
+    rounded(b(part), [x, -0.505, -0.08], [0.205, 0.105, 1.48], 0.016, deckRotation);
+    rounded(b(part), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, deckRotation);
     rounded(b(part), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], 0.006, [0, 0, side * 0.04]);
+
+    // Inboard-facing vertical panel, raked toward the pilot. It remains completely blank.
+    rounded(
+      b(part),
+      [side * 0.286, -0.575, -0.08],
+      [0.018, 0.235, 1.24],
+      0.008,
+      [0, side * 0.10, side * 0.16]
+    );
+    // Three blank mounting bays sit on the sloped deck; they contain no switches or buttons.
     for (const [z, length] of [[-0.60, 0.28], [-0.20, 0.34], [0.27, 0.30]] as const) {
-      rounded(b(part), [x, -0.424, z], [0.142, 0.010, length], 0.005, rotation);
+      rounded(b(part), [x, -0.424, z], [0.142, 0.010, length], 0.005, deckRotation);
     }
   }
+
+  // Lower central pedestal structure, left intentionally blank for later equipment fit.
+  rounded(b("central-pedestal"), [0, -0.707, -0.46], [0.25, 0.135, 0.38], 0.014, [0.14, 0, 0]);
+  rounded(b("central-pedestal"), [0, -0.625, -0.46], [0.225, 0.012, 0.33], 0.006, [0.14, 0, 0]);
 
   // Bare ejection-seat structure: seat pan, back pan, head support and mounting rails.
   for (const side of [-1, 1] as const) {
@@ -304,7 +385,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   rounded(b("seat-frame"), [0, -0.70, 0.48], [0.48, 0.13, 0.43], 0.045);
   rounded(b("seat-frame"), [0, 0.005, 0.99], [0.39, 0.27, 0.10], 0.035);
 
-  // Canopy sill rails, side rails and two transverse bows; glazing is clear and neutral.
+  // Canopy sill rails, side rails and two transverse bows; clear glazing is separate.
   for (const side of [-1, 1] as const) {
     rounded(b("canopy-frame"), [side * 0.520, -0.045, -0.11], [0.022, 0.025, 1.96], 0.005);
     rounded(b("canopy-frame"), [side * 0.493, -0.145, -0.11], [0.036, 0.035, 1.96], 0.010);
@@ -339,6 +420,12 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.configuration = "mig29-9-13-soviet-baseline-v1";
   shell.userData.visualMode = "neutral-structural-blockout";
   shell.userData.controlsIncluded = false;
-  shell.userData.provenance = "Reference-guided family-level structural geometry; absolute dimensions, exact product 9.13 fit and eye datum remain unverified.";
+  shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
+    name: section.part,
+    minU: section.minU,
+    maxU: section.maxU,
+    yawRad: section.yawRad
+  }));
+  shell.userData.provenance = "Reference-guided family-level structural geometry; the four-panel segmentation is documented for MiG-29A 9-12 and corroborated with early MiG-29 cockpit photographs; exact product 9.13 dimensions and angles remain unverified.";
   return shell;
 }
