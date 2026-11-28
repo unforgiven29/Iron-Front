@@ -541,6 +541,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.configuration = "mig29-9-13-soviet-baseline-v1";
   shell.userData.visualMode = "neutral-structural-blockout";
   shell.userData.controlsIncluded = false;
+  shell.userData.frontCanopyBowIncluded = false;
   shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
     name: section.part,
     minU: section.minU,
