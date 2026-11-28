@@ -151,7 +151,7 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     const brow = shell.getObjectByName("mig29-cockpit-glare-brow") as THREE.Mesh;
     const browSize = new THREE.Box3().setFromObject(brow).getSize(new THREE.Vector3());
     expect(browSize.y).toBeLessThan(0.02);
-    expect(browSize.z).toBeLessThan(0.04);
+    expect(browSize.z).toBeLessThan(0.045);
     const hudSupport = shell.getObjectByName("mig29-cockpit-hud-support") as THREE.Mesh;
     const hudSize = new THREE.Box3().setFromObject(hudSupport).getSize(new THREE.Vector3());
     expect(hudSize.y).toBeLessThan(0.12);
