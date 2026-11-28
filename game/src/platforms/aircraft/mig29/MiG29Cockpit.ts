@@ -66,7 +66,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   aircraftId: "mig29",
   provenance: "Original reference-guided procedural cockpit shell plus live overlay layout. Family-level photo arrangement only; dimensions, selected 9.13 equipment fit and eye datum are not fully verified.",
   eyeFromCgM: [4.9, 0, -1.15],
-  fieldOfViewDeg: 76,
+  fieldOfViewDeg: 72,
+  cameraPitchOffsetRad: -0.08,
   buildShell: createMiG29CockpitShell,
   parts: [
     // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the procedural shell.
@@ -97,8 +98,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     // СПО-15 indicator (right side of the panel; position approximate).
     screenAt("spo15", "rwr", 650, 215, 0.1, 0.1),
     // Levers and switches (clickable; positions approximate, not from the photographs).
-    lever("gear-lever", SW.gear, ["UP", "DN"], [0.62, -0.46, 0.36], [0.04, 0.03, 0.08], "#c33"),
-    lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.7, -0.33, 0.64], [0.03, 0.06, 0.03], YELLOW),
+    lever("gear-lever", SW.gear, ["UP", "DN"], [0.60, -0.46, 0.38], [0.025, 0.02, 0.05], "#c33"),
+    lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.68, -0.36, 0.62], [0.025, 0.045, 0.025], YELLOW),
     lever("flap-lever", SW.flaps, ["UP", "TAKEOFF", "LANDING"], [0.32, -0.42, 0.42], [0.05, 0.025, 0.05], "#ddd"),
     lever("airbrake", SW.speedbrake, ["RETRACT", "EXTEND"], [0.24, -0.33, 0.33], [0.02, 0.02, 0.02], "#3c7"),
     lever("sw-bat", SW.batGnd, ["ON", "OFF"], [0.48, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
