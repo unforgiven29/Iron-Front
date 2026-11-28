@@ -125,6 +125,28 @@ function panelCylinder(b: Bucket, u: number, v: number, depth: number, radius: n
   cylinder(b, [point.x, point.y, point.z], radius, length, [normal.x, normal.y, normal.z], radial);
 }
 
+function panelBox(b: Bucket, u: number, v: number, width: number, height: number, depth: number, thickness: number): void {
+  const point = panelPoint(u, v, depth);
+  box(b, [point.x, point.y, point.z], [width, height, thickness], panelRotation(u));
+}
+
+function panelKeypad(b: Bucket, u: number, v: number, width: number, height: number, columns: number, rows: number): void {
+  panelBox(b, u, v, width, height, 0.012, 0.012);
+  const insetX = width * 0.13, insetY = height * 0.16;
+  const cellW = (width - insetX * 2) / columns;
+  const cellH = (height - insetY * 2) / rows;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const x = u - width / 2 + insetX + cellW * (col + 0.5);
+      const y = v - height / 2 + insetY + cellH * (row + 0.5);
+      const point = panelPoint(x, y, 0.022);
+      const accent = (row + col) % 7 === 0;
+      rounded(b(accent ? "amber" : "metal"), [point.x, point.y, point.z],
+        [cellW * 0.58, cellH * 0.48, 0.008], 0.002, panelRotation(u));
+    }
+  }
+}
+
 function panelRing(b: Bucket, u: number, v: number, depth: number, radius: number, tube: number): void {
   const point = panelPoint(u, v, depth);
   const normal = panelNormal(u);
@@ -308,17 +330,32 @@ export function createMiG29CockpitShell(): THREE.Group {
     panelCylinder(b(amber ? "amber" : "warning"), u, v, 0.021, 0.0065, 0.004, 16);
   }
 
-  // Padded glare shield above the instrument panel; it must not cover the instrument faces.
-  rounded(b("black"), [0, -0.115, -0.82], [0.90, 0.075, 0.13], 0.025, [0.08, 0, 0]);
-  box(b("frame"), [0, -0.168, -0.79], [0.90, 0.018, 0.055], [0.08, 0, 0]);
-  box(b("warning"), [0, -0.168, -0.748], [0.20, 0.008, 0.008]);
+  // Additional instrument-control units: recessed keypads, signal-light banks and mechanical-state panel.
+  panelKeypad(b("black"), -0.285, -0.145, 0.17, 0.105, 4, 3);
+  panelKeypad(b("black"), -0.055, -0.157, 0.245, 0.085, 6, 2);
+  panelKeypad(b("black"), 0.105, 0.112, 0.13, 0.060, 5, 2);
+  panelKeypad(b("black"), -0.075, 0.118, 0.11, 0.080, 3, 3);
+  for (let i = 0; i < 7; i++) {
+    const u = -0.31 + i * 0.045;
+    panelCylinder(b("bezel"), u, -0.078, 0.016, 0.0065, 0.004, 12);
+    panelCylinder(b(i % 3 === 0 ? "warning" : "amber"), u, -0.078, 0.021, 0.0035, 0.003, 12);
+  }
 
-  // HUD: compact projector and paired supports, with a clear combiner—no central mast.
-  rounded(b("black"), [0, 0.075, -1.00], [0.23, 0.10, 0.15], 0.018);
-  box(b("frame"), [0, 0.018, -0.94], [0.30, 0.025, 0.09]);
+  // Padded glare shield: a shallow faceted hood rather than a thick pill-shaped beam.
+  rounded(b("black"), [0, -0.105, -0.82], [0.88, 0.058, 0.13], 0.012, [0.06, 0, 0]);
+  box(b("frame"), [0, -0.148, -0.783], [0.86, 0.012, 0.035], [0.06, 0, 0]);
+  for (const u of [-0.31, -0.23, -0.15, -0.07, 0.07, 0.15, 0.23, 0.31]) {
+    const point = panelPoint(u, -0.16, 0.016);
+    cylinder(b("amber"), [point.x, point.y, point.z], 0.003, 0.003, panelNormal(u).toArray() as Vec3, 10);
+  }
+
+  // HUD projector assembly above the glare shield; paired supports frame a thin combiner.
+  rounded(b("black"), [0, 0.075, -1.00], [0.205, 0.082, 0.135], 0.012);
+  box(b("frame"), [0, 0.026, -0.94], [0.28, 0.022, 0.075]);
+  rounded(b("bezel"), [0, 0.119, -1.015], [0.16, 0.018, 0.025], 0.005);
   for (const side of [-1, 1] as const) {
-    box(b("metal"), [side * 0.108, 0.115, -1.035], [0.012, 0.18, 0.018], [0.05, side * 0.06, 0]);
-    cylinder(b("bezel"), [side * 0.14, 0.015, -0.92], 0.010, 0.022, [0, 1, 0], 16);
+    box(b("metal"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
+    cylinder(b("bezel"), [side * 0.13, 0.015, -0.92], 0.009, 0.018, [0, 1, 0], 16);
   }
   const combiner = new THREE.BufferGeometry();
   combiner.setAttribute("position", new THREE.Float32BufferAttribute([
@@ -335,16 +372,16 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (let i = 0; i < combiner.getIndex()!.count; i++) b("hud").indices.push(combiner.getIndex()!.getX(i));
   combiner.dispose();
 
-  // Side consoles: narrow raised housings with distinct sloped control surfaces—not solid walls.
+  // Side consoles: continuous, raised angled housings running forward to the instrument panel.
   for (const side of [-1, 1] as const) {
     const x = side * 0.36;
-    rounded(b("console"), [x, -0.455, 0.12], [0.235, 0.135, 1.26], 0.025, [side * 0.04, 0, side * 0.045]);
-    rounded(b("panel"), [x, -0.378, 0.12], [0.222, 0.022, 1.20], 0.008, [side * 0.04, 0, side * 0.045]);
-    box(b("frame"), [side * 0.485, -0.48, 0.12], [0.028, 0.16, 1.25], [0, 0, side * 0.04]);
+    rounded(b("console"), [x, -0.455, -0.08], [0.235, 0.135, 1.48], 0.020, [side * 0.055, 0, side * 0.045]);
+    rounded(b("panel"), [x, -0.378, -0.08], [0.222, 0.022, 1.42], 0.007, [side * 0.055, 0, side * 0.045]);
+    box(b("frame"), [side * 0.485, -0.48, -0.08], [0.026, 0.16, 1.46], [0, 0, side * 0.04]);
 
     const rows = side < 0
-      ? [-0.40, -0.17, 0.07, 0.32, 0.56]
-      : [-0.36, -0.10, 0.16, 0.42, 0.63];
+      ? [-0.70, -0.44, -0.18, 0.10, 0.38, 0.64]
+      : [-0.68, -0.40, -0.12, 0.16, 0.44, 0.66];
     const columns = side < 0 ? [-0.065, 0.005, 0.070] : [-0.052, 0.052];
     for (let row = 0; row < rows.length; row++) {
       for (let col = 0; col < columns.length; col++) {
@@ -364,10 +401,15 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
 
     if (side > 0) {
-      rounded(b("black"), [x, -0.34, 0.11], [0.18, 0.028, 0.34], 0.012);
-      for (const z of [-0.01, 0.07, 0.15, 0.23]) {
-        rounded(b("panel"), [x, -0.319, z], [0.16, 0.012, 0.052], 0.004);
+      rounded(b("black"), [x, -0.34, 0.02], [0.18, 0.028, 0.38], 0.010);
+      for (const z of [-0.13, -0.045, 0.04, 0.125, 0.21]) {
+        rounded(b("panel"), [x, -0.319, z], [0.16, 0.012, 0.058], 0.004);
         for (const dx of [-0.044, 0, 0.044]) addToggle(b("metal"), x + dx, -0.311, z, "button");
+      }
+      for (let i = 0; i < 10; i++) {
+        const z = -0.69 + i * 0.135;
+        box(b("black"), [side * 0.405, -0.342, z], [0.045, 0.012, 0.085]);
+        for (const dx of [-0.01, 0.01]) addToggle(b("amber"), side * 0.405 + dx, -0.334, z, "button");
       }
     }
   }
@@ -380,11 +422,11 @@ export function createMiG29CockpitShell(): THREE.Group {
     rounded(b("rubber"), [x, -0.145, -0.29], [0.028, 0.06, 0.045], 0.008, [0.10, 0, 0]);
   }
 
-  // Centre control column: small flexible boot and ergonomic grip; keep the sightline open.
-  rounded(b("rubber"), [0, -0.748, -0.36], [0.135, 0.028, 0.17], 0.035);
-  rounded(b("rubber"), [0, -0.285, -0.405], [0.050, 0.095, 0.050], 0.018, [0.16, 0, 0]);
-  cylinder(b("warning"), [0, -0.229, -0.420], 0.008, 0.009, [0, 1, 0], 12);
-  for (const x of [-0.018, 0.018]) cylinder(b("amber"), [x, -0.239, -0.438], 0.0035, 0.006, [0, 1, 0], 8);
+  // Centre control column boot and compact grip. The live stick overlay is the moving shaft.
+  rounded(b("rubber"), [0, -0.748, -0.36], [0.12, 0.024, 0.15], 0.026);
+  rounded(b("rubber"), [0, -0.30, -0.405], [0.045, 0.082, 0.044], 0.012, [0.16, 0, 0]);
+  cylinder(b("warning"), [0, -0.252, -0.420], 0.007, 0.008, [0, 1, 0], 12);
+  for (const x of [-0.016, 0.016]) cylinder(b("amber"), [x, -0.262, -0.438], 0.003, 0.005, [0, 1, 0], 8);
 
   // Rudder pedals and footwells are below the main field of view.
   for (const side of [-1, 1] as const) {
@@ -415,10 +457,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     torus(b("warning"), [side * 0.10, -0.70, 0.23], 0.055, 0.009, [0, 0, 1], 24);
   }
 
-  // Canopy side rails, front windshield bow and aft arch are slender structural members.
+  // Canopy side rails: narrow gunmetal runners with thin seals, not heavy black beams.
   for (const side of [-1, 1] as const) {
-    rounded(b("frame"), [side * 0.515, 0.085, -0.11], [0.035, 0.035, 2.12], 0.012);
-    rounded(b("rubber"), [side * 0.495, 0.108, -0.11], [0.012, 0.012, 2.04], 0.004);
+    rounded(b("frame"), [side * 0.515, 0.080, -0.11], [0.022, 0.024, 2.08], 0.007);
+    rounded(b("rubber"), [side * 0.498, 0.094, -0.11], [0.008, 0.009, 2.02], 0.003);
   }
   canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
@@ -431,7 +473,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     for (let i = 0; i < points.length - 1; i++) {
       const delta = points[i + 1]!.clone().sub(points[i]!);
       const mid = points[i]!.clone().add(points[i + 1]!).multiplyScalar(0.5);
-      cylinder(b("frame"), [mid.x, mid.y, mid.z], 0.0065, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
+      cylinder(b("metal"), [mid.x, mid.y, mid.z], 0.0048, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
     }
   }
 
