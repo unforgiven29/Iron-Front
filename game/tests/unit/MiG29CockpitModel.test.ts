@@ -75,6 +75,19 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(new Set(sections.map((section) => section.yawRad)).size).toBe(4);
   });
 
+  it("has deep blank mounting recesses in monochrome neutral-grey material", () => {
+    const shell = createMiG29CockpitShell();
+    const panel = shell.getObjectByName("mig29-cockpit-panel-center") as THREE.Mesh | undefined;
+    const recess = shell.getObjectByName("mig29-cockpit-panel-recess") as THREE.Mesh | undefined;
+    expect(panel).toBeInstanceOf(THREE.Mesh);
+    expect(recess).toBeInstanceOf(THREE.Mesh);
+    const panelMaterial = (panel as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    const recessMaterial = (recess as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    expect(recessMaterial.color.r).toBeLessThan(panelMaterial.color.r);
+    expect(recessMaterial.color.r).toBeCloseTo(recessMaterial.color.g, 6);
+    expect(recessMaterial.color.g).toBeCloseTo(recessMaterial.color.b, 6);
+  });
+
   it("keeps side consoles low and narrow, with separate horizontal and upright surfaces", () => {
     const shell = createMiG29CockpitShell();
     const port = shell.getObjectByName("mig29-cockpit-port-console") as THREE.Mesh | undefined;
@@ -90,6 +103,8 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(starboardSize.x).toBeLessThan(0.24);
     expect(portSize.z).toBeGreaterThan(0.85);
     expect(starboardSize.z).toBeGreaterThan(0.85);
+    const portBounds = new THREE.Box3().setFromObject(port!);
+    expect(portBounds.max.y).toBeGreaterThan(-0.50);
   });
 
   it("uses tapered sidewall structure and a blank lower pedestal without raised side rails", () => {
@@ -119,6 +134,7 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
       "mig29-cockpit-panel-center",
       "mig29-cockpit-panel-starboard",
       "mig29-cockpit-panel-support",
+      "mig29-cockpit-panel-recess",
       "mig29-cockpit-glare-shield",
       "mig29-cockpit-port-console",
       "mig29-cockpit-starboard-console",
