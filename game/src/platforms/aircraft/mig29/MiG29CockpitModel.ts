@@ -51,7 +51,7 @@ const CLEAR_CANOPY = new THREE.MeshPhysicalMaterial({
   roughness: 0.18,
   metalness: 0,
   transparent: true,
-  opacity: 0.045,
+  opacity: 0.008,
   depthWrite: false,
   side: THREE.DoubleSide
 });
@@ -461,23 +461,23 @@ export function createMiG29CockpitShell(): THREE.Group {
     const deckRotation: Vec3 = [0, 0, side * 0.18];
 
     // Horizontal console deck: much thinner and narrower than the previous slab.
-    rounded(b(part), [x, -0.585, -0.10], [0.150, 0.038, 1.14], 0.010, deckRotation);
-    rounded(b(part), [side * 0.446, -0.565, -0.10], [0.014, 0.022, 1.05], 0.005, deckRotation);
+    rounded(b(part), [x, -0.525, -0.10], [0.150, 0.038, 1.14], 0.010, deckRotation);
+    rounded(b(part), [side * 0.446, -0.505, -0.10], [0.014, 0.022, 1.05], 0.005, deckRotation);
 
     // Vertical inner console face, canted toward the pilot and attached to the deck edge.
     rounded(
       b(part),
-      [side * 0.303, -0.675, -0.12],
+      [side * 0.303, -0.620, -0.12],
       [0.014, 0.185, 0.94],
       0.006,
       [0.025, side * 0.10, side * 0.12]
     );
 
     // Empty mounting bays are flush outlines only, not raised boxes or switches.
-    consoleBay(b(part), x, -0.562, -0.405, 0.112, 0.235, deckRotation);
-    consoleBay(b(part), x, -0.562, -0.055, 0.112, 0.255, deckRotation);
-    consoleBay(b(part), side * 0.303, -0.675, -0.36, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
-    consoleBay(b(part), side * 0.303, -0.675, 0.08, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
+    consoleBay(b(part), x, -0.502, -0.405, 0.112, 0.235, deckRotation);
+    consoleBay(b(part), x, -0.502, -0.055, 0.112, 0.255, deckRotation);
+    consoleBay(b(part), side * 0.303, -0.620, -0.36, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
+    consoleBay(b(part), side * 0.303, -0.620, 0.08, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
   }
 
   // Blank central lower pedestal and recessed footwell walls; no stick or rudder pedals.
