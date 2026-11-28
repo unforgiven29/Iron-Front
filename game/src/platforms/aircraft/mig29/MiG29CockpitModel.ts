@@ -1,23 +1,34 @@
 /**
- * MiG-29 cockpit interior — rebuilt procedural presentation model.
+ * MiG-29 product 9.13 cockpit — neutral structural shell.
  *
- * Coordinates are camera-local: X right, Y up, Z aft; the pilot design-eye is the origin.
- * The panel and instrument registration follow public MiG-29 cockpit photographs and the
- * documented instrument grouping. Overall dimensions, panel angles and the exact product 9.13
- * fit remain provisional because no dimensioned Soviet 9.13 cockpit drawing has been verified.
+ * This pass deliberately contains no fitted instruments, display faces, switches, knobs,
+ * buttons, levers, stick, throttle or pedals. It is a monochrome construction frame: cockpit
+ * tub, main-panel structure, blank console trays, bare seat frame and canopy structure.
  *
- * Dynamic instrument faces and the eight currently supported clickable switches are overlaid
- * by MiG29Cockpit.ts. This module supplies the physical structure and visible hardware only.
+ * Geometry remains a reference-guided family-level approximation. Do not describe it as a
+ * measured 1:1 product 9.13 reconstruction until dimensioned 9.13 evidence and visual QA exist.
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
-type Surface =
-  | "paint" | "panel" | "console" | "frame" | "black" | "rubber"
-  | "metal" | "bezel" | "seat" | "cushion" | "belt" | "warning"
-  | "amber" | "glass" | "hud";
 type Vec3 = readonly [number, number, number];
 type Bucket = { positions: number[]; normals: number[]; indices: number[] };
+type ShellPart = "tub" | "panel" | "port-console" | "starboard-console" | "seat-frame" | "canopy-frame";
+
+const CLAY = new THREE.MeshStandardMaterial({
+  color: "#898989",
+  roughness: 0.9,
+  metalness: 0.02
+});
+const CLEAR_CANOPY = new THREE.MeshPhysicalMaterial({
+  color: "#b8b8b8",
+  roughness: 0.18,
+  metalness: 0,
+  transparent: true,
+  opacity: 0.055,
+  depthWrite: false,
+  side: THREE.DoubleSide
+});
 
 const FACE_X = 0.845;
 const FACE_DOWN = 0.37;
@@ -30,24 +41,6 @@ const OY = 190;
 const V_TOP = (30 - OY) * PX;
 const V_BOTTOM = (300 - OY) * PX;
 
-const palette: Record<Surface, THREE.Material> = {
-  paint: new THREE.MeshStandardMaterial({ color: "#69777a", roughness: 0.86, metalness: 0.12 }),
-  panel: new THREE.MeshStandardMaterial({ color: "#737f81", roughness: 0.82, metalness: 0.18 }),
-  console: new THREE.MeshStandardMaterial({ color: "#535f62", roughness: 0.88, metalness: 0.12 }),
-  frame: new THREE.MeshStandardMaterial({ color: "#303638", roughness: 0.72, metalness: 0.38 }),
-  black: new THREE.MeshStandardMaterial({ color: "#171b1d", roughness: 0.92, metalness: 0.06 }),
-  rubber: new THREE.MeshStandardMaterial({ color: "#252a29", roughness: 0.98, metalness: 0 }),
-  metal: new THREE.MeshStandardMaterial({ color: "#929a99", roughness: 0.42, metalness: 0.68 }),
-  bezel: new THREE.MeshStandardMaterial({ color: "#353b3d", roughness: 0.55, metalness: 0.56 }),
-  seat: new THREE.MeshStandardMaterial({ color: "#505c4d", roughness: 0.92, metalness: 0.04 }),
-  cushion: new THREE.MeshStandardMaterial({ color: "#353d38", roughness: 1, metalness: 0 }),
-  belt: new THREE.MeshStandardMaterial({ color: "#a18a50", roughness: 0.92, metalness: 0 }),
-  warning: new THREE.MeshStandardMaterial({ color: "#b83c2c", roughness: 0.58, metalness: 0.1 }),
-  amber: new THREE.MeshStandardMaterial({ color: "#bd8b37", roughness: 0.58, metalness: 0.08 }),
-  glass: new THREE.MeshPhysicalMaterial({ color: "#c0d6dc", roughness: 0.08, metalness: 0, transparent: true, opacity: 0.045, depthWrite: false, side: THREE.DoubleSide }),
-  hud: new THREE.MeshPhysicalMaterial({ color: "#b7e2c8", roughness: 0.04, metalness: 0, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })
-};
-
 const emptyBucket = (): Bucket => ({ positions: [], normals: [], indices: [] });
 
 function addGeometry(bucket: Bucket, geometry: THREE.BufferGeometry, centre: Vec3, rotation: Vec3 = [0, 0, 0]): void {
@@ -58,6 +51,7 @@ function addGeometry(bucket: Bucket, geometry: THREE.BufferGeometry, centre: Vec
     new THREE.Vector3(1, 1, 1)
   );
   geometry.applyMatrix4(matrix);
+
   const position = geometry.getAttribute("position");
   const normal = geometry.getAttribute("normal");
   const offset = bucket.positions.length / 3;
@@ -74,29 +68,29 @@ function addGeometry(bucket: Bucket, geometry: THREE.BufferGeometry, centre: Vec
   geometry.dispose();
 }
 
-function box(b: Bucket, centre: Vec3, size: Vec3, rotation: Vec3 = [0, 0, 0]): void {
-  addGeometry(b, new THREE.BoxGeometry(...size), centre, rotation);
+function box(bucket: Bucket, centre: Vec3, size: Vec3, rotation: Vec3 = [0, 0, 0]): void {
+  addGeometry(bucket, new THREE.BoxGeometry(...size), centre, rotation);
 }
 
-function rounded(b: Bucket, centre: Vec3, size: Vec3, radius: number, rotation: Vec3 = [0, 0, 0]): void {
+function rounded(bucket: Bucket, centre: Vec3, size: Vec3, radius: number, rotation: Vec3 = [0, 0, 0]): void {
   const bevel = Math.max(0.0005, Math.min(radius, Math.min(...size) * 0.46));
-  addGeometry(b, new RoundedBoxGeometry(...size, 3, bevel), centre, rotation);
+  addGeometry(bucket, new RoundedBoxGeometry(...size, 4, bevel), centre, rotation);
 }
 
-function cylinder(b: Bucket, centre: Vec3, radius: number, length: number, axis: Vec3 = [0, 1, 0], radial = 16): void {
+function cylinder(bucket: Bucket, centre: Vec3, radius: number, length: number, axis: Vec3, radial = 16): void {
   const direction = new THREE.Vector3(...axis).normalize();
   const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
   const geometry = new THREE.CylinderGeometry(radius, radius, length, radial, 1, false);
   geometry.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...centre), quaternion, new THREE.Vector3(1, 1, 1)));
-  addGeometry(b, geometry, [0, 0, 0]);
+  addGeometry(bucket, geometry, [0, 0, 0]);
 }
 
-function torus(b: Bucket, centre: Vec3, radius: number, tube: number, axis: Vec3 = [0, 0, 1], radial = 36): void {
+function torus(bucket: Bucket, centre: Vec3, radius: number, tube: number, axis: Vec3): void {
   const direction = new THREE.Vector3(...axis).normalize();
   const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
-  const geometry = new THREE.TorusGeometry(radius, tube, 8, radial);
+  const geometry = new THREE.TorusGeometry(radius, tube, 8, 40);
   geometry.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...centre), quaternion, new THREE.Vector3(1, 1, 1)));
-  addGeometry(b, geometry, [0, 0, 0]);
+  addGeometry(bucket, geometry, [0, 0, 0]);
 }
 
 function panelPoint(u: number, v: number, depth = 0): THREE.Vector3 {
@@ -119,46 +113,32 @@ function panelNormal(u: number): THREE.Vector3 {
     .normalize();
 }
 
-function panelCylinder(b: Bucket, u: number, v: number, depth: number, radius: number, length: number, radial = 24): void {
-  const point = panelPoint(u, v, depth);
+function panelRing(bucket: Bucket, u: number, v: number, radius: number): void {
+  const point = panelPoint(u, v, 0.014);
   const normal = panelNormal(u);
-  cylinder(b, [point.x, point.y, point.z], radius, length, [normal.x, normal.y, normal.z], radial);
+  torus(bucket, [point.x, point.y, point.z], radius, 0.004, [normal.x, normal.y, normal.z]);
 }
 
-function panelBox(b: Bucket, u: number, v: number, width: number, height: number, depth: number, thickness: number): void {
-  const point = panelPoint(u, v, depth);
-  box(b, [point.x, point.y, point.z], [width, height, thickness], panelRotation(u));
-}
-
-function panelKeypad(getBucket: (surface: Surface) => Bucket, u: number, v: number, width: number, height: number, columns: number, rows: number): void {
-  panelBox(getBucket("black"), u, v, width, height, 0.012, 0.012);
-  const insetX = width * 0.13, insetY = height * 0.16;
-  const cellW = (width - insetX * 2) / columns;
-  const cellH = (height - insetY * 2) / rows;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < columns; col++) {
-      const x = u - width / 2 + insetX + cellW * (col + 0.5);
-      const y = v - height / 2 + insetY + cellH * (row + 0.5);
-      const point = panelPoint(x, y, 0.022);
-      const accent = (row + col) % 7 === 0;
-      rounded(getBucket(accent ? "amber" : "panel"), [point.x, point.y, point.z],
-        [cellW * 0.58, cellH * 0.48, 0.007], 0.002, panelRotation(u));
-    }
+function panelRectangleFrame(bucket: Bucket, u: number, v: number, width: number, height: number): void {
+  const bar = 0.008;
+  const rails: readonly [number, number, number, number][] = [
+    [0, -height / 2, width + bar, bar],
+    [0, height / 2, width + bar, bar],
+    [-width / 2, 0, bar, height],
+    [width / 2, 0, bar, height]
+  ];
+  for (const [dx, dy, sx, sy] of rails) {
+    const point = panelPoint(u + dx, v + dy, 0.014);
+    box(bucket, [point.x, point.y, point.z], [sx, sy, 0.012], panelRotation(u + dx));
   }
 }
 
-function panelRing(b: Bucket, u: number, v: number, depth: number, radius: number, tube: number): void {
-  const point = panelPoint(u, v, depth);
-  const normal = panelNormal(u);
-  torus(b, [point.x, point.y, point.z], radius, tube, [normal.x, normal.y, normal.z], 40);
-}
-
-function panelSegment(b: Bucket, u0: number, u1: number, v0: number, v1: number): void {
+function panelSegment(bucket: Bucket, u0: number, u1: number, v0: number, v1: number): void {
   const front = [panelPoint(u0, v0), panelPoint(u1, v0), panelPoint(u1, v1), panelPoint(u0, v1)];
-  const back = front.map((p) => p.clone().add(new THREE.Vector3(0, 0, -0.045)));
+  const back = front.map((point) => point.clone().add(new THREE.Vector3(0, 0, -0.045)));
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(
-    [...front, ...back].flatMap((p) => [p.x, p.y, p.z]), 3
+    [...front, ...back].flatMap((point) => [point.x, point.y, point.z]), 3
   ));
   geometry.setIndex([
     0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7,
@@ -166,10 +146,10 @@ function panelSegment(b: Bucket, u0: number, u1: number, v0: number, v1: number)
     2, 7, 6, 2, 3, 7, 3, 4, 7, 3, 0, 4
   ]);
   geometry.computeVertexNormals();
-  addGeometry(b, geometry, [0, 0, 0]);
+  addGeometry(bucket, geometry, [0, 0, 0]);
 }
 
-function extrudedSidewall(b: Bucket, side: -1 | 1): void {
+function extrudedSidewall(bucket: Bucket, side: -1 | 1): void {
   const shape = new THREE.Shape();
   shape.moveTo(side * 0.34, -0.82);
   shape.lineTo(side * 0.48, -0.82);
@@ -178,22 +158,21 @@ function extrudedSidewall(b: Bucket, side: -1 | 1): void {
   shape.lineTo(side * 0.405, -0.405);
   shape.lineTo(side * 0.36, -0.47);
   shape.closePath();
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 1.86, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.008, bevelThickness: 0.008 });
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: 1.86,
+    bevelEnabled: true,
+    bevelSegments: 2,
+    steps: 1,
+    bevelSize: 0.008,
+    bevelThickness: 0.008
+  });
   geometry.translate(0, 0, -0.88);
-  const position = geometry.getAttribute("position");
-  const normal = geometry.getAttribute("normal");
-  const offset = b.positions.length / 3;
-  for (let i = 0; i < position.count; i++) {
-    b.positions.push(position.getX(i), position.getY(i), position.getZ(i));
-    b.normals.push(normal.getX(i), normal.getY(i), normal.getZ(i));
-  }
-  const index = geometry.getIndex();
-  if (index) for (let i = 0; i < index.count; i++) b.indices.push(index.getX(i) + offset);
-  geometry.dispose();
+  addGeometry(bucket, geometry, [0, 0, 0]);
 }
 
-function canopySurface(b: Bucket): void {
-  const rows = 24, columns = 41, positions: number[] = [], indices: number[] = [];
+function canopySurface(): THREE.BufferGeometry {
+  const rows = 24, columns = 41;
+  const positions: number[] = [], indices: number[] = [];
   for (let row = 0; row < rows; row++) {
     const z = -1.17 + 2.22 * row / (rows - 1);
     const top = 0.47 - 0.08 * Math.max(0, z / 1.05);
@@ -213,270 +192,123 @@ function canopySurface(b: Bucket): void {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
-  const p = geometry.getAttribute("position"), n = geometry.getAttribute("normal");
-  const offset = b.positions.length / 3;
-  for (let i = 0; i < p.count; i++) {
-    b.positions.push(p.getX(i), p.getY(i), p.getZ(i));
-    b.normals.push(n.getX(i), n.getY(i), n.getZ(i));
-  }
-  for (let i = 0; i < geometry.getIndex()!.count; i++) b.indices.push(geometry.getIndex()!.getX(i) + offset);
-  geometry.dispose();
+  return geometry;
 }
 
-function addToggle(b: Bucket, x: number, y: number, z: number, kind: "toggle" | "knob" | "button", accent = false): void {
-  cylinder(b, [x, y + 0.006, z], 0.012, 0.012, [0, 1, 0], 14);
-  if (kind === "toggle") {
-    cylinder(b, [x, y + 0.027, z - 0.003], 0.0038, 0.036, [0.10, 0.94, -0.30], 10);
-    cylinder(b, [x + 0.002, y + 0.043, z - 0.008], 0.006, 0.012, [0.10, 0.94, -0.30], 12);
-  } else if (kind === "knob") {
-    cylinder(b, [x, y + 0.017, z], accent ? 0.014 : 0.011, 0.022, [0, 1, 0], 18);
-    cylinder(b, [x, y + 0.031, z], 0.008, 0.006, [0, 1, 0], 18);
-  } else {
-    cylinder(b, [x, y + 0.017, z], accent ? 0.010 : 0.008, 0.016, [0, 1, 0], 16);
-  }
-}
-
-function materialMesh(name: Surface, bucket: Bucket): THREE.Mesh | null {
+function materialMesh(name: ShellPart, bucket: Bucket): THREE.Mesh | null {
   if (bucket.indices.length === 0) return null;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(bucket.positions, 3));
   geometry.setAttribute("normal", new THREE.Float32BufferAttribute(bucket.normals, 3));
   geometry.setIndex(bucket.indices);
   geometry.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geometry, palette[name]);
-  mesh.name = `mig29-cockpit-${name}`;
+  const mesh = new THREE.Mesh(geometry, CLAY);
+  mesh.name = "mig29-cockpit-" + name;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.shell = true;
+  mesh.userData.shellComponent = name;
   return mesh;
 }
 
-/** Build the rebuilt MiG-29 cockpit shell. Shape and dimensions are provisional, not measured. */
+/** Build a neutral, switch-free structural frame for the MiG-29 cockpit. */
 export function createMiG29CockpitShell(): THREE.Group {
-  const buckets = Object.fromEntries(
-    (["paint", "panel", "console", "frame", "black", "rubber", "metal", "bezel", "seat", "cushion", "belt", "warning", "amber", "glass", "hud"] as Surface[])
-      .map((surface) => [surface, emptyBucket()])
-  ) as Record<Surface, Bucket>;
-  const b = (surface: Surface) => buckets[surface];
+  const buckets: Record<ShellPart, Bucket> = {
+    tub: emptyBucket(),
+    panel: emptyBucket(),
+    "port-console": emptyBucket(),
+    "starboard-console": emptyBucket(),
+    "seat-frame": emptyBucket(),
+    "canopy-frame": emptyBucket()
+  };
+  const b = (part: ShellPart) => buckets[part];
 
-  // Lower cockpit tub: thin floor, low side liners and aft bulkhead. No shoulder-high side slabs.
-  rounded(b("frame"), [0, -0.842, 0.02], [0.92, 0.055, 2.30], 0.018);
-  rounded(b("paint"), [0, -0.808, 0.02], [0.84, 0.018, 2.18], 0.006);
+  // Cockpit tub: floor pan, low sidewalls, sill structure and aft bulkhead.
+  rounded(b("tub"), [0, -0.842, 0.02], [0.92, 0.055, 2.30], 0.018);
+  rounded(b("tub"), [0, -0.808, 0.02], [0.84, 0.018, 2.18], 0.006);
+  rounded(b("tub"), [0, -0.790, -0.58], [0.72, 0.035, 0.54], 0.012);
+  rounded(b("tub"), [0, -0.745, -0.27], [0.28, 0.085, 0.52], 0.018);
+  rounded(b("tub"), [0, -0.34, 1.08], [0.90, 0.90, 0.085], 0.025);
   for (const side of [-1, 1] as const) {
-    extrudedSidewall(b("paint"), side);
-    rounded(b("frame"), [side * 0.475, -0.575, 0.045], [0.035, 0.43, 1.88], 0.012);
-    box(b("rubber"), [side * 0.492, -0.355, 0.045], [0.012, 0.018, 1.82]);
-    for (let i = 0; i < 15; i++) {
-      const z = -0.80 + i * 1.72 / 14;
-      cylinder(b("metal"), [side * 0.492, -0.32, z], 0.0028, 0.0035, [1, 0, 0], 8);
-    }
+    extrudedSidewall(b("tub"), side);
+    rounded(b("tub"), [side * 0.475, -0.575, 0.045], [0.035, 0.43, 1.88], 0.012);
+    rounded(b("tub"), [side * 0.495, -0.355, -0.11], [0.026, 0.035, 1.92], 0.008);
+    rounded(b("tub"), [side * 0.455, -0.785, -0.52], [0.035, 0.055, 0.52], 0.008);
   }
-  rounded(b("frame"), [0, -0.34, 1.08], [0.90, 0.90, 0.085], 0.025);
 
-  // Main instrument panel: one central face and two inward-turned outer panels.
+  // Three-piece main instrument-panel frame: centre face with inward-turned outer wings.
   panelSegment(b("panel"), -0.20, 0.20, V_TOP, V_BOTTOM);
   panelSegment(b("panel"), -0.43, -0.20, V_TOP, V_BOTTOM);
   panelSegment(b("panel"), 0.20, 0.43, V_TOP, V_BOTTOM);
   for (const side of [-1, 1] as const) {
-    const top = panelPoint(side * 0.43, V_TOP);
-    const bottom = panelPoint(side * 0.43, V_BOTTOM);
+    const top = panelPoint(side * 0.43, V_TOP, -0.025);
+    const bottom = panelPoint(side * 0.43, V_BOTTOM, -0.025);
     const delta = bottom.clone().sub(top);
-    const mid = top.clone().add(bottom).multiplyScalar(0.5).add(new THREE.Vector3(0, 0, -0.02));
-    cylinder(b("frame"), [mid.x, mid.y, mid.z], 0.010, delta.length(), [delta.x, delta.y, delta.z], 12);
+    const middle = top.clone().add(bottom).multiplyScalar(0.5);
+    cylinder(b("panel"), [middle.x, middle.y, middle.z], 0.009, delta.length(), [delta.x, delta.y, delta.z], 12);
   }
 
-  // Recessed dark wells and raised bezels behind the live gauge/screen textures.
-  const gauges: readonly [number, number, number][] = [
+  // Empty mounting rings and rectangular apertures only. No faces, labels, lamps or controls.
+  const blankGaugeMounts: readonly [number, number, number][] = [
     [130, 165, 65], [140, 235, 65], [255, 150, 75], [245, 245, 95],
     [340, 140, 55], [330, 215, 55], [440, 145, 60], [515, 140, 60],
     [445, 210, 55], [505, 210, 55]
   ];
-  for (const [px, py, sizePx] of gauges) {
-    const u = (px - OX) * PX, v = (py - OY) * PX, diameter = sizePx * PX;
-    panelCylinder(b("black"), u, v, 0.002, diameter * 0.49, 0.008, 32);
-    panelRing(b("bezel"), u, v, 0.012, diameter * 0.52, diameter * 0.055);
-    panelRing(b("metal"), u, v, 0.020, diameter * 0.54, 0.0018);
-    for (let i = 0; i < 4; i++) {
-      const angle = Math.PI * 0.5 * i;
-      panelCylinder(b("metal"), u + Math.cos(angle) * diameter * 0.53, v + Math.sin(angle) * diameter * 0.53, 0.021, 0.0028, 0.003, 8);
-    }
-  }
-  const windows: readonly [number, number, number, number][] = [
-    [570, 180, 32, 72], [435, 255, 55, 42], [490, 255, 55, 42], [555, 255, 55, 42], [600, 95, 0, 0], [650, 215, 0, 0]
-  ];
-  for (const [px, py, widthPx, heightPx] of windows) {
+  for (const [px, py, diameterPx] of blankGaugeMounts) {
     const u = (px - OX) * PX, v = (py - OY) * PX;
-    const width = widthPx > 0 ? widthPx * PX : (px === 600 ? 0.15 : 0.10);
-    const height = heightPx > 0 ? heightPx * PX : (px === 600 ? 0.13 : 0.10);
-    const rail = 0.008;
-    const centre = panelPoint(u, v, 0.009);
-    box(b("black"), [centre.x, centre.y, centre.z], [width + 0.018, height + 0.018, 0.012], panelRotation(u));
-    for (const [dx, dy, sx, sy] of [
-      [-width / 2 - rail / 2, 0, rail, height + rail * 2],
-      [width / 2 + rail / 2, 0, rail, height + rail * 2],
-      [0, -height / 2 - rail / 2, width, rail],
-      [0, height / 2 + rail / 2, width, rail]
-    ] as const) {
-      const p = panelPoint(u + dx, v + dy, 0.018);
-      box(b("bezel"), [p.x, p.y, p.z], [sx, sy, 0.014], panelRotation(u + dx));
-    }
+    panelRing(b("panel"), u, v, diameterPx * PX * 0.49);
   }
-  for (const u of [-0.39, -0.2925, -0.195, -0.0975, 0, 0.0975, 0.195, 0.2925, 0.39]) {
-    for (const v of [V_TOP + 0.012, V_BOTTOM - 0.012]) panelCylinder(b("metal"), u, v, 0.013, 0.003, 0.003, 8);
-  }
-  // Warning/caution lamps at the outer shoulders of the main panel.
-  for (const [u, v, amber] of [[-0.38, -0.15, false], [0.38, -0.15, true], [-0.39, 0.12, false], [0.39, 0.12, true]] as const) {
-    panelCylinder(b("bezel"), u, v, 0.012, 0.012, 0.012, 16);
-    panelCylinder(b(amber ? "amber" : "warning"), u, v, 0.021, 0.0065, 0.004, 16);
+  const blankRectangles: readonly [number, number, number, number][] = [
+    [570, 180, 32, 72], [435, 255, 55, 42], [490, 255, 55, 42],
+    [555, 255, 55, 42], [600, 95, 112, 98], [650, 215, 75, 75]
+  ];
+  for (const [px, py, widthPx, heightPx] of blankRectangles) {
+    panelRectangleFrame(
+      b("panel"),
+      (px - OX) * PX,
+      (py - OY) * PX,
+      widthPx * PX,
+      heightPx * PX
+    );
   }
 
-  // Additional instrument-control units: recessed keypads, signal-light banks and mechanical-state panel.
-  panelKeypad(b, -0.285, -0.145, 0.17, 0.105, 4, 3);
-  panelKeypad(b, -0.055, -0.157, 0.245, 0.085, 6, 2);
-  panelKeypad(b, 0.105, 0.112, 0.13, 0.060, 5, 2);
-  panelKeypad(b, -0.075, 0.118, 0.11, 0.080, 3, 3);
-  for (let i = 0; i < 7; i++) {
-    const u = -0.31 + i * 0.045;
-    panelCylinder(b("bezel"), u, -0.078, 0.016, 0.0065, 0.004, 12);
-    panelCylinder(b(i % 3 === 0 ? "warning" : "amber"), u, -0.078, 0.021, 0.0035, 0.003, 12);
-  }
-
-  // Padded glare shield: low-profile, soft-edged hood with a narrow forward lip.
-  rounded(b("black"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
-  box(b("frame"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
-  for (const u of [-0.31, -0.23, -0.15, -0.07, 0.07, 0.15, 0.23, 0.31]) {
-    const point = panelPoint(u, -0.16, 0.016);
-    cylinder(b("amber"), [point.x, point.y, point.z], 0.003, 0.003, panelNormal(u).toArray() as Vec3, 10);
-  }
-
-  // HUD projector assembly above the glare shield; paired supports frame a thin combiner.
-  rounded(b("black"), [0, 0.075, -1.00], [0.205, 0.082, 0.135], 0.012);
-  box(b("frame"), [0, 0.026, -0.94], [0.28, 0.022, 0.075]);
-  rounded(b("bezel"), [0, 0.119, -1.015], [0.16, 0.018, 0.025], 0.005);
+  // Glare shield and HUD mounting frame: structural supports only, no combiner or display.
+  rounded(b("panel"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
+  box(b("panel"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
+  rounded(b("panel"), [0, 0.026, -0.94], [0.28, 0.022, 0.075], 0.008);
   for (const side of [-1, 1] as const) {
-    box(b("metal"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
-    cylinder(b("bezel"), [side * 0.13, 0.015, -0.92], 0.009, 0.018, [0, 1, 0], 16);
+    box(b("panel"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
   }
-  const combiner = new THREE.BufferGeometry();
-  combiner.setAttribute("position", new THREE.Float32BufferAttribute([
-    -0.105, 0.015, -1.045, 0.105, 0.015, -1.045,
-    0.105, 0.205, -1.005, -0.105, 0.205, -1.005
-  ], 3));
-  combiner.setIndex([0, 1, 2, 0, 2, 3]);
-  combiner.computeVertexNormals();
-  const pos = combiner.getAttribute("position"), norm = combiner.getAttribute("normal");
-  for (let i = 0; i < pos.count; i++) {
-    b("hud").positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
-    b("hud").normals.push(norm.getX(i), norm.getY(i), norm.getZ(i));
-  }
-  for (let i = 0; i < combiner.getIndex()!.count; i++) b("hud").indices.push(combiner.getIndex()!.getX(i));
-  combiner.dispose();
+  box(b("panel"), [0, 0.202, -1.012], [0.23, 0.018, 0.018]);
 
-  // Side consoles: compact raised control shelves integrated into the sidewalls.
-  // The deck is lower and narrower than the earlier slab geometry so the central panel remains clear.
+  // Blank side-console trays with perimeter lips and empty equipment mounting bays.
   for (const side of [-1, 1] as const) {
+    const part: ShellPart = side < 0 ? "port-console" : "starboard-console";
     const x = side * 0.385;
-    rounded(b("console"), [x, -0.505, -0.08], [0.195, 0.105, 1.48], 0.016, [side * 0.055, 0, side * 0.045]);
-    rounded(b("panel"), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, [side * 0.055, 0, side * 0.045]);
-    box(b("frame"), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], [0, 0, side * 0.04]);
-
-    // Switch rows stay in the forward portion of the side deck, between the instrument panel and the eye point.
-    const rows = side < 0
-      ? [-0.72, -0.60, -0.53, -0.12, -0.025]
-      : [-0.69, -0.55, -0.41, -0.27, -0.13];
-    const columns = side < 0 ? [-0.050, 0, 0.050] : [-0.046, 0.046];
-    for (let row = 0; row < rows.length; row++) {
-      const z = rows[row]!;
-      // Individual recessed switch strips keep the panel from reading as an empty flat slab.
-      rounded(b("black"), [x, -0.425, z], [side < 0 ? 0.155 : 0.125, 0.010, 0.105], 0.005);
-      for (let col = 0; col < columns.length; col++) {
-        const xx = x + columns[col]!;
-        const kind = (row + col) % 4 === 0 ? "knob" : (row + col) % 3 === 0 ? "button" : "toggle";
-        addToggle(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.420, z, kind, row === 0);
-      }
-    }
-
-    // Separate guarded selector plates and warning lamps along the aft edge of the visible deck.
-    const plaques = side < 0 ? [-0.10, -0.01] : [-0.17, -0.04];
-    for (const z of plaques) {
-      rounded(b("black"), [x, -0.424, z], [0.15, 0.010, 0.075], 0.005);
-      box(b("bezel"), [x, -0.415, z + 0.041], [0.15, 0.008, 0.006]);
-      for (const dx of [-0.045, 0, 0.045]) addToggle(b("amber"), x + dx, -0.414, z, "button");
-    }
-
-    if (side > 0) {
-      // Starboard breaker / information panel: recessed switch bank within the forward field of view.
-      rounded(b("black"), [x, -0.416, -0.33], [0.155, 0.020, 0.30], 0.008);
-      for (const z of [-0.45, -0.39, -0.33, -0.27, -0.21]) {
-        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.040], 0.003);
-        for (const dx of [-0.038, 0, 0.038]) addToggle(b("bezel"), x + dx, -0.394, z, "button");
-      }
-      for (let i = 0; i < 7; i++) {
-        const z = -0.74 + i * 0.085;
-        box(b("black"), [side * 0.425, -0.422, z], [0.035, 0.010, 0.064]);
-        for (const dx of [-0.008, 0.008]) addToggle(b("amber"), side * 0.425 + dx, -0.416, z, "button");
-      }
+    const rotation: Vec3 = [side * 0.055, 0, side * 0.045];
+    rounded(b(part), [x, -0.505, -0.08], [0.205, 0.105, 1.48], 0.016, rotation);
+    rounded(b(part), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, rotation);
+    rounded(b(part), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], 0.006, [0, 0, side * 0.04]);
+    for (const [z, length] of [[-0.60, 0.28], [-0.20, 0.34], [0.27, 0.30]] as const) {
+      rounded(b(part), [x, -0.424, z], [0.142, 0.010, length], 0.005, rotation);
     }
   }
 
-  // Left-console twin-throttle quadrant: shallow raised base and two separate grips.
-  rounded(b("black"), [-0.385, -0.405, -0.34], [0.155, 0.040, 0.34], 0.012, [0.06, 0, 0]);
-  rounded(b("bezel"), [-0.385, -0.380, -0.34], [0.14, 0.012, 0.31], 0.005);
-  for (const x of [-0.420, -0.350]) {
-    cylinder(b("metal"), [x, -0.335, -0.31], 0.009, 0.085, [0, 1, 0], 16);
-    rounded(b("rubber"), [x, -0.285, -0.31], [0.023, 0.055, 0.035], 0.007, [0.10, 0, 0]);
-    box(b("bezel"), [x, -0.251, -0.31], [0.018, 0.012, 0.03]);
-  }
-
-  // Centre control column: small ergonomic grip with modest trigger bosses, leaving the gauges visible.
-  rounded(b("rubber"), [0, -0.748, -0.36], [0.12, 0.024, 0.15], 0.026);
-  rounded(b("rubber"), [0, -0.275, -0.405], [0.056, 0.034, 0.040], 0.011, [0.12, 0, 0]);
-  rounded(b("frame"), [0, -0.253, -0.412], [0.036, 0.008, 0.032], 0.003, [0.12, 0, 0]);
-  cylinder(b("warning"), [0, -0.252, -0.421], 0.005, 0.006, [0, 1, 0], 12);
-  for (const x of [-0.022, 0.022]) {
-    cylinder(b("metal"), [x, -0.272, -0.428], 0.0028, 0.009, [0, 0, 1], 8);
-    cylinder(b("amber"), [x, -0.263, -0.438], 0.0025, 0.004, [0, 1, 0], 8);
-  }
-
-  // Rudder pedals and footwells are below the main field of view.
-  for (const side of [-1, 1] as const) {
-    const x = side * 0.205;
-    box(b("frame"), [x, -0.735, -0.51], [0.025, 0.045, 0.46]);
-    box(b("metal"), [x, -0.658, -0.59], [0.14, 0.052, 0.10], [-0.15, side * 0.04, 0]);
-    box(b("rubber"), [x, -0.627, -0.592], [0.13, 0.022, 0.07], [-0.15, side * 0.04, 0]);
-    cylinder(b("metal"), [x, -0.69, -0.32], 0.010, 0.42, [0, 0, 1], 12);
-  }
-
-  // Gear handle mounting plate and small red selector grip on the port forward console.
-  rounded(b("black"), [-0.455, -0.432, -0.60], [0.075, 0.014, 0.090], 0.008);
-  cylinder(b("metal"), [-0.455, -0.392, -0.60], 0.0055, 0.055, [0, 1, 0], 12);
-  rounded(b("warning"), [-0.455, -0.357, -0.60], [0.025, 0.018, 0.030], 0.006);
-  // K-36 family seat: behind the control column, with distinct back pan, head pad and harness.
+  // Bare ejection-seat structure: seat pan, back pan, head support and mounting rails.
   for (const side of [-1, 1] as const) {
     const x = side * 0.245;
-    box(b("metal"), [x, -0.42, 0.70], [0.028, 0.67, 0.09], [0.16, 0, 0]);
-    cylinder(b("bezel"), [x, -0.40, 0.76], 0.012, 0.55, [0, 1, 0], 14);
+    box(b("seat-frame"), [x, -0.42, 0.70], [0.028, 0.67, 0.09], [0.16, 0, 0]);
+    cylinder(b("seat-frame"), [x, -0.40, 0.76], 0.010, 0.55, [0, 1, 0], 14);
   }
-  rounded(b("seat"), [0, -0.40, 0.78], [0.48, 0.60, 0.12], 0.05, [0.16, 0, 0]);
-  rounded(b("cushion"), [0, -0.47, 0.70], [0.42, 0.10, 0.40], 0.035, [-0.08, 0, 0]);
-  rounded(b("seat"), [0, -0.70, 0.48], [0.48, 0.13, 0.43], 0.05);
-  rounded(b("cushion"), [0, -0.625, 0.48], [0.42, 0.035, 0.36], 0.018);
-  rounded(b("seat"), [0, 0.005, 0.99], [0.39, 0.27, 0.16], 0.045);
-  rounded(b("cushion"), [0, 0.022, 1.075], [0.30, 0.09, 0.045], 0.018);
-  for (const side of [-1, 1] as const) {
-    const x = side * 0.12;
-    box(b("belt"), [x, -0.20, 0.60], [0.045, 0.48, 0.018], [0.19, 0, side * 0.12]);
-    box(b("belt"), [x, -0.48, 0.34], [0.04, 0.30, 0.018], [-0.22, 0, side * 0.12]);
-    rounded(b("metal"), [x, -0.34, 0.48], [0.045, 0.055, 0.025], 0.006);
-    torus(b("warning"), [side * 0.10, -0.70, 0.23], 0.055, 0.009, [0, 0, 1], 24);
-  }
+  rounded(b("seat-frame"), [0, -0.40, 0.78], [0.46, 0.60, 0.095], 0.035, [0.16, 0, 0]);
+  rounded(b("seat-frame"), [0, -0.70, 0.48], [0.48, 0.13, 0.43], 0.045);
+  rounded(b("seat-frame"), [0, 0.005, 0.99], [0.39, 0.27, 0.10], 0.035);
 
-  // Canopy side rails sit below the design eye and stay narrow at the edges of the sight picture.
+  // Canopy sill rails, side rails and two transverse bows; glazing is clear and neutral.
   for (const side of [-1, 1] as const) {
-    rounded(b("panel"), [side * 0.520, -0.045, -0.11], [0.010, 0.012, 1.96], 0.003);
-    rounded(b("rubber"), [side * 0.509, -0.036, -0.11], [0.005, 0.005, 1.90], 0.002);
+    rounded(b("canopy-frame"), [side * 0.520, -0.045, -0.11], [0.022, 0.025, 1.96], 0.005);
+    rounded(b("canopy-frame"), [side * 0.493, -0.145, -0.11], [0.036, 0.035, 1.96], 0.010);
   }
-  canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
     const top = z < 0 ? 0.47 : 0.40;
     const points: THREE.Vector3[] = [];
@@ -486,18 +318,27 @@ export function createMiG29CockpitShell(): THREE.Group {
     }
     for (let i = 0; i < points.length - 1; i++) {
       const delta = points[i + 1]!.clone().sub(points[i]!);
-      const mid = points[i]!.clone().add(points[i + 1]!).multiplyScalar(0.5);
-      cylinder(b("metal"), [mid.x, mid.y, mid.z], 0.0048, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
+      const middle = points[i]!.clone().add(points[i + 1]!).multiplyScalar(0.5);
+      cylinder(b("canopy-frame"), [middle.x, middle.y, middle.z], 0.0055, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
     }
   }
 
   const shell = new THREE.Group();
-  shell.name = "mig29-9-13-cockpit-shell-provisional";
-  for (const surface of Object.keys(buckets) as Surface[]) {
-    const mesh = materialMesh(surface, buckets[surface]);
+  shell.name = "mig29-9-13-cockpit-shell-frame";
+  for (const part of Object.keys(buckets) as ShellPart[]) {
+    const mesh = materialMesh(part, buckets[part]);
     if (mesh) shell.add(mesh);
   }
+  const glazing = new THREE.Mesh(canopySurface(), CLEAR_CANOPY);
+  glazing.name = "mig29-cockpit-canopy-glazing";
+  glazing.userData.shell = true;
+  glazing.userData.shellComponent = "canopy-glazing";
+  shell.add(glazing);
+
   shell.userData.shell = true;
-  shell.userData.provenance = "Rebuilt family-level reconstruction guided by public MiG-29 cockpit images; product 9.13 dimensions and exact equipment fit remain unverified.";
+  shell.userData.configuration = "mig29-9-13-soviet-baseline-v1";
+  shell.userData.visualMode = "neutral-structural-blockout";
+  shell.userData.controlsIncluded = false;
+  shell.userData.provenance = "Reference-guided family-level structural geometry; absolute dimensions, exact product 9.13 fit and eye datum remain unverified.";
   return shell;
 }
