@@ -636,6 +636,7 @@ export class ThreeCockpitView {
     if (!g) return;
     const w = this.hudCanvas.width, h = this.hudCanvas.height;
     g.clearRect(0, 0, w, h);
+    if (this.layout.structuralOnly) return;
     const d = this.source.hud();
     const u = h / 100;
     const color = "#7dff9a";
