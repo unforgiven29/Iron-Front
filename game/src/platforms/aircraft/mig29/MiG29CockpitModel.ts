@@ -495,22 +495,24 @@ export function createMiG29CockpitShell(): THREE.Group {
   box(b("glare-brow"), [0, -0.118, -0.744], [0.82, 0.003, 0.007], [-0.045, 0, 0]);
 
   // HUD support is a small mounting bracket only; no combiner, screen, symbology or controls.
-  rounded(b("hud-support"), [0, -0.005, -0.905], [0.170, 0.035, 0.052], 0.006);
+  rounded(b("hud-support"), [0, -0.075, -0.855], [0.150, 0.026, 0.040], 0.005);
   for (const side of [-1, 1] as const) {
-    box(b("hud-support"), [side * 0.078, 0.040, -0.935], [0.006, 0.070, 0.008], [0.035, side * 0.03, 0]);
+    box(b("hud-support"), [side * 0.070, -0.042, -0.875], [0.005, 0.052, 0.007], [0.035, side * 0.03, 0]);
   }
-  box(b("hud-support"), [0, 0.078, -0.932], [0.150, 0.008, 0.008]);
+  box(b("hud-support"), [0, -0.010, -0.872], [0.135, 0.006, 0.007]);
 
   // Each side console sits outboard of the front instrument panel and runs forward
   // alongside it. The deck, sloping wall and upright inner face are one connected assembly.
   for (const side of [-1, 1] as const) {
     const part: ShellPart = side < 0 ? "port-console" : "starboard-console";
     const x = side * 0.515;
-    const deckRotation: Vec3 = [0, 0, side * 0.14];
-    const verticalRotation: Vec3 = [0.035, side * 0.12, side * 0.15];
+    const deckRotation: Vec3 = [0, 0, side * 0.24];
+    // Face the blank inner console planes inboard and slightly forward toward the pilot.
+    const verticalYaw = side < 0 ? 0.30 : Math.PI - 0.30;
+    const verticalRotation: Vec3 = [0.035, verticalYaw, side * 0.08];
 
     // Outboard horizontal deck; its forward edge reaches the lower panel cheek.
-    rounded(b(part), [x, -0.455, -0.12], [0.155, 0.022, 1.20], 0.006, deckRotation);
+    rounded(b(part), [x, -0.455, -0.12], [0.145, 0.020, 1.18], 0.006, deckRotation);
     // Outer rolled edge follows the cockpit sill, not a separate tall rail.
     rounded(b(part), [side * 0.592, -0.447, -0.12], [0.009, 0.014, 1.10], 0.003, deckRotation);
 
@@ -613,6 +615,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.controlsIncluded = false;
   shell.userData.frontCanopyBowIncluded = false;
   shell.userData.panelCutouts = assignedPanelCutouts;
+  shell.userData.consolePanelYawRad = { port: 0.30, starboard: Math.PI - 0.30 };
   shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
     name: section.part,
     minU: section.minU,
