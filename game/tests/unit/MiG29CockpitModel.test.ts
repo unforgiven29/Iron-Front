@@ -75,6 +75,25 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(new Set(sections.map((section) => section.yawRad)).size).toBe(4);
   });
 
+  it("cuts every circular and rectangular mount through its angled panel plate", () => {
+    const shell = createMiG29CockpitShell();
+    const cutouts = shell.userData.panelCutouts as readonly { panelPart: string; kind: string }[];
+    expect(cutouts).toHaveLength(16);
+
+    for (const panelName of [
+      "panel-port-outer",
+      "panel-port-inner",
+      "panel-center",
+      "panel-starboard"
+    ]) {
+      const mesh = shell.getObjectByName("mig29-cockpit-" + panelName) as THREE.Mesh | undefined;
+      expect(mesh).toBeInstanceOf(THREE.Mesh);
+      expect(cutouts.filter((cutout) => cutout.panelPart === panelName).length).toBeGreaterThan(0);
+      // The extruded panel mesh includes its outer shell, opening walls and back faces.
+      expect(mesh!.geometry.getAttribute("position").count).toBeGreaterThan(100);
+    }
+  });
+
   it("has deep blank mounting recesses in monochrome neutral-grey material", () => {
     const shell = createMiG29CockpitShell();
     const panel = shell.getObjectByName("mig29-cockpit-panel-center") as THREE.Mesh | undefined;
