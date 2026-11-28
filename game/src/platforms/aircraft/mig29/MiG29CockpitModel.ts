@@ -372,54 +372,60 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (let i = 0; i < combiner.getIndex()!.count; i++) b("hud").indices.push(combiner.getIndex()!.getX(i));
   combiner.dispose();
 
-  // Side consoles: continuous, raised angled housings running forward to the instrument panel.
+  // Side consoles: compact raised control shelves integrated into the sidewalls.
+  // The deck is lower and narrower than the earlier slab geometry so the central panel remains clear.
   for (const side of [-1, 1] as const) {
-    const x = side * 0.36;
-    rounded(b("console"), [x, -0.455, -0.08], [0.235, 0.135, 1.48], 0.020, [side * 0.055, 0, side * 0.045]);
-    rounded(b("panel"), [x, -0.378, -0.08], [0.222, 0.022, 1.42], 0.007, [side * 0.055, 0, side * 0.045]);
-    box(b("frame"), [side * 0.485, -0.48, -0.08], [0.026, 0.16, 1.46], [0, 0, side * 0.04]);
+    const x = side * 0.385;
+    rounded(b("console"), [x, -0.505, -0.08], [0.195, 0.105, 1.48], 0.016, [side * 0.055, 0, side * 0.045]);
+    rounded(b("panel"), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, [side * 0.055, 0, side * 0.045]);
+    box(b("frame"), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], [0, 0, side * 0.04]);
 
+    // Rows are deliberately concentrated in the portion forward of the pilot's eye, where they are visible.
     const rows = side < 0
-      ? [-0.70, -0.44, -0.18, 0.10, 0.38, 0.64]
-      : [-0.68, -0.40, -0.12, 0.16, 0.44, 0.66];
-    const columns = side < 0 ? [-0.065, 0.005, 0.070] : [-0.052, 0.052];
+      ? [-0.75, -0.61, -0.47, -0.33, -0.19, -0.05]
+      : [-0.72, -0.56, -0.40, -0.24, -0.08];
+    const columns = side < 0 ? [-0.050, 0, 0.050] : [-0.046, 0.046];
     for (let row = 0; row < rows.length; row++) {
+      const z = rows[row]!;
+      // Individual recessed switch strips keep the panel from reading as an empty flat slab.
+      rounded(b("black"), [x, -0.425, z], [side < 0 ? 0.155 : 0.125, 0.010, 0.105], 0.005);
       for (let col = 0; col < columns.length; col++) {
         const xx = x + columns[col]!;
-        const z = rows[row]!;
         const kind = (row + col) % 4 === 0 ? "knob" : (row + col) % 3 === 0 ? "button" : "toggle";
-        addToggle(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.368, z, kind, row === 0);
+        addToggle(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.420, z, kind, row === 0);
       }
     }
 
-    // A few guarded controls, instrument windows and placards break up the dense switch fields.
-    const plaques = side < 0 ? [-0.27, 0.40] : [-0.24, 0.34, 0.59];
+    // Separate guarded selector plates and warning lamps along the aft edge of the visible deck.
+    const plaques = side < 0 ? [-0.12, 0.04] : [-0.16, 0.02];
     for (const z of plaques) {
-      rounded(b("black"), [x, -0.357, z], [0.14, 0.014, 0.095], 0.006);
-      box(b("bezel"), [x, -0.346, z + 0.052], [0.15, 0.009, 0.008]);
-      for (const dx of [-0.045, 0, 0.045]) addToggle(b("amber"), x + dx, -0.343, z, "button");
+      rounded(b("black"), [x, -0.424, z], [0.15, 0.010, 0.075], 0.005);
+      box(b("bezel"), [x, -0.415, z + 0.041], [0.15, 0.008, 0.006]);
+      for (const dx of [-0.045, 0, 0.045]) addToggle(b("amber"), x + dx, -0.414, z, "button");
     }
 
     if (side > 0) {
-      rounded(b("black"), [x, -0.34, 0.02], [0.18, 0.028, 0.38], 0.010);
-      for (const z of [-0.13, -0.045, 0.04, 0.125, 0.21]) {
-        rounded(b("panel"), [x, -0.319, z], [0.16, 0.012, 0.058], 0.004);
-        for (const dx of [-0.044, 0, 0.044]) addToggle(b("metal"), x + dx, -0.311, z, "button");
+      // Starboard breaker / information panel with rows of individually raised keys.
+      rounded(b("black"), [x, -0.416, -0.02], [0.155, 0.020, 0.30], 0.008);
+      for (const z of [-0.14, -0.065, 0.01, 0.085, 0.16]) {
+        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.048], 0.003);
+        for (const dx of [-0.038, 0, 0.038]) addToggle(b("metal"), x + dx, -0.394, z, "button");
       }
-      for (let i = 0; i < 10; i++) {
-        const z = -0.69 + i * 0.135;
-        box(b("black"), [side * 0.405, -0.342, z], [0.045, 0.012, 0.085]);
-        for (const dx of [-0.01, 0.01]) addToggle(b("amber"), side * 0.405 + dx, -0.334, z, "button");
+      for (let i = 0; i < 8; i++) {
+        const z = -0.73 + i * 0.092;
+        box(b("black"), [side * 0.425, -0.422, z], [0.035, 0.010, 0.064]);
+        for (const dx of [-0.008, 0.008]) addToggle(b("amber"), side * 0.425 + dx, -0.416, z, "button");
       }
     }
   }
 
-  // Left-console twin throttle quadrant: physical base and guard rails around the live levers.
-  rounded(b("black"), [-0.36, -0.285, -0.27], [0.18, 0.065, 0.39], 0.018, [0.08, 0, 0]);
-  rounded(b("bezel"), [-0.36, -0.248, -0.27], [0.16, 0.016, 0.36], 0.006);
-  for (const x of [-0.405, -0.365]) {
-    cylinder(b("metal"), [x, -0.20, -0.29], 0.012, 0.085, [0, 1, 0], 16);
-    rounded(b("rubber"), [x, -0.145, -0.29], [0.028, 0.06, 0.045], 0.008, [0.10, 0, 0]);
+  // Left-console twin-throttle quadrant: shallow raised base and two separate grips.
+  rounded(b("black"), [-0.385, -0.405, -0.34], [0.155, 0.040, 0.34], 0.012, [0.06, 0, 0]);
+  rounded(b("bezel"), [-0.385, -0.380, -0.34], [0.14, 0.012, 0.31], 0.005);
+  for (const x of [-0.420, -0.350]) {
+    cylinder(b("metal"), [x, -0.335, -0.31], 0.009, 0.085, [0, 1, 0], 16);
+    rounded(b("rubber"), [x, -0.285, -0.31], [0.023, 0.055, 0.035], 0.007, [0.10, 0, 0]);
+    box(b("bezel"), [x, -0.251, -0.31], [0.018, 0.012, 0.03]);
   }
 
   // Centre control column boot and compact grip. The live stick overlay is the moving shaft.
@@ -459,8 +465,8 @@ export function createMiG29CockpitShell(): THREE.Group {
 
   // Canopy side rails: narrow gunmetal runners with thin seals, not heavy black beams.
   for (const side of [-1, 1] as const) {
-    rounded(b("frame"), [side * 0.515, 0.080, -0.11], [0.022, 0.024, 2.08], 0.007);
-    rounded(b("rubber"), [side * 0.498, 0.094, -0.11], [0.008, 0.009, 2.02], 0.003);
+    rounded(b("metal"), [side * 0.518, 0.065, -0.11], [0.012, 0.016, 2.04], 0.004);
+    rounded(b("rubber"), [side * 0.507, 0.075, -0.11], [0.006, 0.007, 1.98], 0.002);
   }
   canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
