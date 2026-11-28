@@ -258,3 +258,7 @@ After inspecting the browser capture, the cross-cockpit glare brow and HUD brack
 
 Geometry remains a family-level estimate; no measured or certified 1:1 Soviet product 9.13 cockpit claim is made.
 
+
+
+The latest console refinement also turns the two upright blank console panels inward and slightly forward toward the pilot (estimated yaw: port +0.30 rad; starboard π−0.30 rad); the deck top surfaces slope upward toward the inboard side. The HUD support bracket has been lowered to sit just above the flat brow. These angles remain reference-guided estimates, not measured production dimensions.
+
