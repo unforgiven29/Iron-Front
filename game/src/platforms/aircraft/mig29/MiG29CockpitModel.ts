@@ -465,8 +465,8 @@ export function createMiG29CockpitShell(): THREE.Group {
 
   // Canopy side rails: narrow gunmetal runners with thin seals, not heavy black beams.
   for (const side of [-1, 1] as const) {
-    rounded(b("metal"), [side * 0.518, 0.065, -0.11], [0.012, 0.016, 2.04], 0.004);
-    rounded(b("rubber"), [side * 0.507, 0.075, -0.11], [0.006, 0.007, 1.98], 0.002);
+    rounded(b("panel"), [side * 0.520, 0.055, -0.11], [0.010, 0.014, 2.00], 0.003);
+    rounded(b("rubber"), [side * 0.509, 0.064, -0.11], [0.005, 0.006, 1.94], 0.002);
   }
   canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
