@@ -123,7 +123,13 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(portSize.z).toBeGreaterThan(0.85);
     expect(starboardSize.z).toBeGreaterThan(0.85);
     const portBounds = new THREE.Box3().setFromObject(port!);
-    expect(portBounds.max.y).toBeGreaterThan(-0.50);
+    const starboardBounds = new THREE.Box3().setFromObject(starboard!);
+    expect(portBounds.max.y).toBeGreaterThan(-0.44);
+    // The decks must sit outboard of the front-panel footprint rather than hidden beneath it.
+    expect(portBounds.min.x).toBeLessThan(-0.55);
+    expect(portBounds.max.x).toBeLessThan(-0.38);
+    expect(starboardBounds.min.x).toBeGreaterThan(0.38);
+    expect(starboardBounds.max.x).toBeGreaterThan(0.55);
   });
 
   it("uses tapered sidewall structure and a blank lower pedestal without raised side rails", () => {
