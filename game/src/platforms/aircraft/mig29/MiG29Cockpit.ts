@@ -107,8 +107,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     // Live centre-stick shaft and twin-throttle levers are overlaid on the physical procedural assemblies.
     { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
-    { id: "throttle", kind: "box", positionM: [0.22, -0.385, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    { id: "throttle-2", kind: "box", positionM: [0.22, -0.35, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } }
+    { id: "throttle", kind: "box", positionM: [0.22, -0.35, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } },
+    { id: "throttle-2", kind: "box", positionM: [0.22, -0.42, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } }
   ]
 };
 
