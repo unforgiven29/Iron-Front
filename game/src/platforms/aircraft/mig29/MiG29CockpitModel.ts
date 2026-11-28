@@ -21,7 +21,8 @@ type ShellPart =
   | "panel-starboard"
   | "panel-support"
   | "panel-recess"
-  | "glare-shield"
+  | "glare-brow"
+  | "hud-support"
   | "port-console"
   | "starboard-console"
   | "central-pedestal"
@@ -336,7 +337,7 @@ function panelRectInset(bucket: Bucket, u: number, v: number, width: number, hei
 }
 
 function consoleBay(bucket: Bucket, x: number, y: number, z: number, width: number, length: number, rotation: Vec3): void {
-  rounded(bucket, [x, y, z], [width, 0.008, length], 0.004, rotation);
+  rounded(bucket, [x, y, z], [width, 0.0035, length], 0.0015, rotation);
 }
 
 function canopySurface(): THREE.BufferGeometry {
@@ -395,7 +396,8 @@ export function createMiG29CockpitShell(): THREE.Group {
     "panel-starboard": emptyBucket(),
     "panel-support": emptyBucket(),
     "panel-recess": emptyBucket(),
-    "glare-shield": emptyBucket(),
+    "glare-brow": emptyBucket(),
+    "hud-support": emptyBucket(),
     "port-console": emptyBucket(),
     "starboard-console": emptyBucket(),
     "central-pedestal": emptyBucket(),
@@ -475,75 +477,77 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // A low rear casing supports the four plates and blends their lower edges into the front tub.
-  rounded(b("panel-support"), [0, -0.635, -0.545], [0.92, 0.105, 0.19], 0.025, [-0.24, 0, 0]);
-  rounded(b("panel-support"), [0, -0.735, -0.43], [0.72, 0.055, 0.18], 0.018, [-0.16, 0, 0]);
+  rounded(b("panel-support"), [0, -0.635, -0.545], [0.88, 0.075, 0.15], 0.018, [-0.24, 0, 0]);
+  rounded(b("panel-support"), [0, -0.735, -0.43], [0.68, 0.042, 0.13], 0.012, [-0.16, 0, 0]);
   for (const side of [-1, 1] as const) {
     // Panel end cheeks bridge the dashboard into the consoles without forming square pillars.
     rounded(
       b("panel-support"),
-      [side * 0.455, -0.45, -0.655],
-      [0.070, 0.22, 0.16],
-      0.018,
+      [side * 0.475, -0.45, -0.655],
+      [0.038, 0.16, 0.12],
+      0.010,
       [0.12, side * 0.20, side * 0.12]
     );
   }
 
-  // Glare shield: a narrow padded brow, not a thick full-width crossbar.
-  rounded(b("glare-shield"), [0, -0.108, -0.765], [0.92, 0.018, 0.060], 0.008, [-0.045, 0, 0]);
-  box(b("glare-shield"), [0, -0.123, -0.734], [0.88, 0.004, 0.012], [-0.045, 0, 0]);
+  // Glare shield is a shallow flat brow, not a rounded cross-cockpit pipe.
+  rounded(b("glare-brow"), [0, -0.108, -0.765], [0.86, 0.010, 0.034], 0.003, [-0.045, 0, 0]);
+  box(b("glare-brow"), [0, -0.118, -0.744], [0.82, 0.003, 0.007], [-0.045, 0, 0]);
 
-  // HUD support structure only. The optical plate, screen and all controls are intentionally absent.
-  rounded(b("glare-shield"), [0, -0.005, -0.905], [0.190, 0.046, 0.068], 0.009);
+  // HUD support is a small mounting bracket only; no combiner, screen, symbology or controls.
+  rounded(b("hud-support"), [0, -0.150, -0.800], [0.150, 0.026, 0.040], 0.005);
   for (const side of [-1, 1] as const) {
-    box(b("glare-shield"), [side * 0.084, 0.064, -0.940], [0.007, 0.105, 0.009], [0.045, side * 0.04, 0]);
+    box(b("hud-support"), [side * 0.070, -0.105, -0.820], [0.005, 0.052, 0.007], [0.035, side * 0.03, 0]);
   }
-  box(b("glare-shield"), [0, 0.116, -0.934], [0.170, 0.010, 0.010]);
+  box(b("hud-support"), [0, -0.075, -0.817], [0.135, 0.006, 0.007]);
 
   // Each side console sits outboard of the front instrument panel and runs forward
   // alongside it. The deck, sloping wall and upright inner face are one connected assembly.
   for (const side of [-1, 1] as const) {
     const part: ShellPart = side < 0 ? "port-console" : "starboard-console";
     const x = side * 0.515;
-    const deckRotation: Vec3 = [0, 0, side * 0.14];
-    const verticalRotation: Vec3 = [0.035, side * 0.12, side * 0.15];
+    const deckRotation: Vec3 = [0, 0, side * 0.24];
+    // Face the blank inner console planes inboard and slightly forward toward the pilot.
+    const verticalYaw = side < 0 ? 0.30 : Math.PI - 0.30;
+    const verticalRotation: Vec3 = [0.035, verticalYaw, side * 0.08];
 
     // Outboard horizontal deck; its forward edge reaches the lower panel cheek.
-    rounded(b(part), [x, -0.455, -0.12], [0.180, 0.046, 1.28], 0.012, deckRotation);
+    rounded(b(part), [x, -0.455, -0.12], [0.145, 0.020, 1.18], 0.006, deckRotation);
     // Outer rolled edge follows the cockpit sill, not a separate tall rail.
-    rounded(b(part), [side * 0.602, -0.438, -0.12], [0.014, 0.024, 1.16], 0.005, deckRotation);
+    rounded(b(part), [side * 0.592, -0.447, -0.12], [0.009, 0.014, 1.10], 0.003, deckRotation);
 
     // Inboard sloping console wall. This is a real upright structural face visible from
     // the pilot eye, rather than a vertical slab hidden underneath the dashboard.
     rounded(
       b(part),
       [side * 0.412, -0.535, -0.14],
-      [0.018, 0.245, 1.14],
-      0.008,
+      [0.012, 0.205, 1.10],
+      0.005,
       verticalRotation
     );
     // Lower transition web joins the upright face to the tub and sidewall.
     rounded(
       b(part),
-      [side * 0.49, -0.675, -0.12],
-      [0.105, 0.030, 1.08],
-      0.010,
+      [side * 0.49, -0.665, -0.12],
+      [0.052, 0.016, 0.98],
+      0.006,
       [0, 0, side * 0.14]
     );
 
     // Blank deck mounting bays; no raised switch or button geometry.
-    consoleBay(b(part), x, -0.428, -0.48, 0.135, 0.245, deckRotation);
-    consoleBay(b(part), x, -0.428, -0.11, 0.135, 0.260, deckRotation);
-    consoleBay(b(part), x, -0.428, 0.28, 0.135, 0.245, deckRotation);
+    consoleBay(b(part), x, -0.441, -0.48, 0.118, 0.220, deckRotation);
+    consoleBay(b(part), x, -0.441, -0.11, 0.118, 0.235, deckRotation);
+    consoleBay(b(part), x, -0.441, 0.28, 0.118, 0.220, deckRotation);
 
     // Blank rectangular bays on the upright inboard face, framed in its own plane.
     const bayX = side * 0.400;
     const bayY = -0.535;
     for (const z of [-0.40, 0.13]) {
-      const rail = 0.006;
-      rounded(b(part), [bayX, bayY - 0.092, z], [0.006, rail, 0.22], 0.002, verticalRotation);
-      rounded(b(part), [bayX, bayY + 0.092, z], [0.006, rail, 0.22], 0.002, verticalRotation);
-      rounded(b(part), [bayX, bayY, z - 0.107], [0.006, 0.184, rail], 0.002, verticalRotation);
-      rounded(b(part), [bayX, bayY, z + 0.107], [0.006, 0.184, rail], 0.002, verticalRotation);
+      const rail = 0.004;
+      rounded(b(part), [bayX, bayY - 0.082, z], [0.004, rail, 0.19], 0.001, verticalRotation);
+      rounded(b(part), [bayX, bayY + 0.082, z], [0.004, rail, 0.19], 0.001, verticalRotation);
+      rounded(b(part), [bayX, bayY, z - 0.092], [0.004, 0.164, rail], 0.001, verticalRotation);
+      rounded(b(part), [bayX, bayY, z + 0.092], [0.004, 0.164, rail], 0.001, verticalRotation);
     }
   }
 
@@ -566,8 +570,8 @@ export function createMiG29CockpitShell(): THREE.Group {
 
   // Canopy framing: slim side rails and a single aft bow. No forward hoop across the windscreen.
   for (const side of [-1, 1] as const) {
-    rounded(b("canopy-frame"), [side * 0.548, 0.065, -0.12], [0.012, 0.014, 1.88], 0.003);
-    rounded(b("canopy-frame"), [side * 0.522, -0.160, -0.12], [0.022, 0.026, 1.90], 0.005);
+    rounded(b("canopy-frame"), [side * 0.565, 0.020, -0.12], [0.008, 0.010, 1.82], 0.002);
+    rounded(b("canopy-frame"), [side * 0.540, -0.165, -0.12], [0.014, 0.018, 1.82], 0.003);
   }
   const aftBowZ = 1.045;
   const aftPoints: THREE.Vector3[] = [];
@@ -585,7 +589,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     cylinder(
       b("canopy-frame"),
       [middle.x, middle.y, middle.z],
-      0.0042,
+      0.0034,
       delta.length() + 0.002,
       [delta.x, delta.y, delta.z],
       8
@@ -611,6 +615,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.controlsIncluded = false;
   shell.userData.frontCanopyBowIncluded = false;
   shell.userData.panelCutouts = assignedPanelCutouts;
+  shell.userData.consolePanelYawRad = { port: 0.30, starboard: Math.PI - 0.30 };
   shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
     name: section.part,
     minU: section.minU,

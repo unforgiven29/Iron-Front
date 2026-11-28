@@ -245,3 +245,20 @@ The cutout pass exposed that the former side consoles were too far inboard and m
 
 No switches, labels, instruments, screens, knobs, or functional controls are added. Exact console angles and dimensions remain photo-estimated, not a verified measured product 9.13 drawing.
 
+
+
+### MiG-29 final shell presentation cleanup (28 November 2026)
+
+After inspecting the browser capture, the cross-cockpit glare brow and HUD bracket were still too bulky, and the side consoles still read like armrests. The current refinement:
+- Separates the brow and HUD bracket into independent meshes; the brow is a thin flat strip and the bracket is a shorter, compact support with no combiner.
+- Thins each outboard console deck to a panel tray, reduces the outer edge and lower transition web, and slims the upright blank inboard face and its mounting-bay outlines.
+- Narrows the canopy side rails and aft bow so they read as frame members rather than large bars.
+- Adds CockpitLayout.structuralOnly; when enabled, the shared cockpit renderer clears the operational collimated HUD canvas. The MiG-29 shell therefore shows no warning captions or flight symbology while it is being used as a blank construction frame.
+- Maintains zero layout overlay parts and no fitted instruments, displays, labels, switches, knobs, buttons, stick, throttle or pedals.
+
+Geometry remains a family-level estimate; no measured or certified 1:1 Soviet product 9.13 cockpit claim is made.
+
+
+
+The latest console refinement also turns the two upright blank console panels inward and slightly forward toward the pilot (estimated yaw: port +0.30 rad; starboard π−0.30 rad); the deck top surfaces slope upward toward the inboard side. The HUD support bracket has been lowered to sit just above the flat brow. These angles remain reference-guided estimates, not measured production dimensions.
+
