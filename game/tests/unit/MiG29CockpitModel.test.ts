@@ -130,6 +130,9 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(portBounds.max.x).toBeLessThan(-0.30);
     expect(starboardBounds.min.x).toBeGreaterThan(0.30);
     expect(starboardBounds.max.x).toBeGreaterThan(0.55);
+    const yaw = shell.userData.consolePanelYawRad as { port: number; starboard: number };
+    expect(yaw.port).toBeCloseTo(0.30, 6);
+    expect(yaw.starboard).toBeCloseTo(Math.PI - 0.30, 6);
     expect(starboardBounds.min.x - portBounds.max.x).toBeGreaterThan(0.60);
   });
 
