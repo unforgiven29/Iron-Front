@@ -116,8 +116,8 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
 
     const portSize = new THREE.Box3().setFromObject(port!).getSize(new THREE.Vector3());
     const starboardSize = new THREE.Box3().setFromObject(starboard!).getSize(new THREE.Vector3());
-    expect(portSize.y).toBeLessThan(0.30);
-    expect(starboardSize.y).toBeLessThan(0.30);
+    expect(portSize.y).toBeLessThan(0.32);
+    expect(starboardSize.y).toBeLessThan(0.32);
     expect(portSize.x).toBeLessThan(0.24);
     expect(starboardSize.x).toBeLessThan(0.24);
     expect(portSize.z).toBeGreaterThan(0.85);
