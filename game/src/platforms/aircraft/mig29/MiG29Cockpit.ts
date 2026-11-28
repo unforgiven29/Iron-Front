@@ -34,9 +34,9 @@ const SW = {
  * Panel geometry. The main panel is a centre section tilted 0.3 rad (top away from the pilot) with
  * left and right wings yawed toward the pilot beyond |u| > WING_U (the photographs show the outer
  * instruments turned inward; the 0.38 rad yaw is ESTIMATED from "cockpit 3", not measured).
- * Face coordinates u (right), v (down), metres → body FRD from the eye.
+ * Face coordinates u (right), v (down), metres → body FRD from the eye. The live face planes sit 27 mm forward of the structural panel to prevent z-fighting.
  */
-const TILT = -0.3, FACE_X = 0.845, FACE_Z = 0.42, WING_U = 0.2, WING_YAW = 0.38;
+const TILT = -0.3, FACE_X = 0.818, FACE_Z = 0.37, WING_U = 0.2, WING_YAW = 0.38;
 const onPanel = (u: number, v: number): [number, number, number] => {
   const over = Math.max(0, Math.abs(u) - WING_U), side = Math.sign(u);
   const lateral = side * (Math.min(Math.abs(u), WING_U) + over * Math.cos(WING_YAW));
