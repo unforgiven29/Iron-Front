@@ -75,6 +75,25 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(new Set(sections.map((section) => section.yawRad)).size).toBe(4);
   });
 
+  it("cuts every circular and rectangular mount through its angled panel plate", () => {
+    const shell = createMiG29CockpitShell();
+    const cutouts = shell.userData.panelCutouts as readonly { panelPart: string; kind: string }[];
+    expect(cutouts).toHaveLength(16);
+
+    for (const panelName of [
+      "panel-port-outer",
+      "panel-port-inner",
+      "panel-center",
+      "panel-starboard"
+    ]) {
+      const mesh = shell.getObjectByName("mig29-cockpit-" + panelName) as THREE.Mesh | undefined;
+      expect(mesh).toBeInstanceOf(THREE.Mesh);
+      expect(cutouts.filter((cutout) => cutout.panelPart === panelName).length).toBeGreaterThan(0);
+      // The extruded panel mesh includes its outer shell, opening walls and back faces.
+      expect(mesh!.geometry.getAttribute("position").count).toBeGreaterThan(100);
+    }
+  });
+
   it("has deep blank mounting recesses in monochrome neutral-grey material", () => {
     const shell = createMiG29CockpitShell();
     const panel = shell.getObjectByName("mig29-cockpit-panel-center") as THREE.Mesh | undefined;
@@ -88,7 +107,7 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(recessMaterial.color.g).toBeCloseTo(recessMaterial.color.b, 6);
   });
 
-  it("keeps side consoles low and narrow, with separate horizontal and upright surfaces", () => {
+  it("keeps outboard side consoles integrated within the cockpit tub", () => {
     const shell = createMiG29CockpitShell();
     const port = shell.getObjectByName("mig29-cockpit-port-console") as THREE.Mesh | undefined;
     const starboard = shell.getObjectByName("mig29-cockpit-starboard-console") as THREE.Mesh | undefined;
@@ -97,14 +116,21 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
 
     const portSize = new THREE.Box3().setFromObject(port!).getSize(new THREE.Vector3());
     const starboardSize = new THREE.Box3().setFromObject(starboard!).getSize(new THREE.Vector3());
-    expect(portSize.y).toBeLessThan(0.30);
-    expect(starboardSize.y).toBeLessThan(0.30);
-    expect(portSize.x).toBeLessThan(0.24);
-    expect(starboardSize.x).toBeLessThan(0.24);
+    expect(portSize.y).toBeLessThan(0.32);
+    expect(starboardSize.y).toBeLessThan(0.32);
+    expect(portSize.x).toBeLessThan(0.32);
+    expect(starboardSize.x).toBeLessThan(0.32);
     expect(portSize.z).toBeGreaterThan(0.85);
     expect(starboardSize.z).toBeGreaterThan(0.85);
     const portBounds = new THREE.Box3().setFromObject(port!);
-    expect(portBounds.max.y).toBeGreaterThan(-0.50);
+    const starboardBounds = new THREE.Box3().setFromObject(starboard!);
+    expect(portBounds.max.y).toBeGreaterThan(-0.44);
+    // The decks must sit outboard of the front-panel footprint and leave a clear central tub.
+    expect(portBounds.min.x).toBeLessThan(-0.55);
+    expect(portBounds.max.x).toBeLessThan(-0.30);
+    expect(starboardBounds.min.x).toBeGreaterThan(0.30);
+    expect(starboardBounds.max.x).toBeGreaterThan(0.55);
+    expect(starboardBounds.min.x - portBounds.max.x).toBeGreaterThan(0.60);
   });
 
   it("uses tapered sidewall structure and a blank lower pedestal without raised side rails", () => {

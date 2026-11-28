@@ -28,6 +28,12 @@ type ShellPart =
   | "seat-frame"
   | "canopy-frame";
 
+type PanelOpening =
+  | { readonly kind: "circle"; readonly u: number; readonly v: number; readonly radius: number }
+  | { readonly kind: "rectangle"; readonly u: number; readonly v: number; readonly width: number; readonly height: number };
+type CircularPanelOpening = Extract<PanelOpening, { readonly kind: "circle" }>;
+type RectangularPanelOpening = Extract<PanelOpening, { readonly kind: "rectangle" }>;
+
 interface PanelSection {
   readonly part: ShellPart;
   readonly minU: number;
@@ -75,10 +81,10 @@ const PHOTO_ORIGIN_Y = 190;
  * They are visual estimates from the early cockpit photographs, not measured 9.13 angles.
  */
 const PANEL_SECTIONS: readonly PanelSection[] = [
-  { part: "panel-port-outer", minU: -0.52, maxU: -0.34, yawRad: 0.54, topV: -0.20, bottomV: 0.16 },
-  { part: "panel-port-inner", minU: -0.34, maxU: -0.16, yawRad: 0.25, topV: -0.24, bottomV: 0.19 },
-  { part: "panel-center", minU: -0.16, maxU: 0.16, yawRad: 0, topV: -0.25, bottomV: 0.19 },
-  { part: "panel-starboard", minU: 0.16, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
+  { part: "panel-port-outer", minU: -0.52, maxU: -0.30, yawRad: 0.54, topV: -0.20, bottomV: 0.16 },
+  { part: "panel-port-inner", minU: -0.30, maxU: -0.13, yawRad: 0.25, topV: -0.24, bottomV: 0.19 },
+  { part: "panel-center", minU: -0.13, maxU: 0.114, yawRad: 0, topV: -0.25, bottomV: 0.19 },
+  { part: "panel-starboard", minU: 0.114, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
 ];
 
 const emptyBucket = (): Bucket => ({ positions: [], normals: [], indices: [] });
@@ -164,12 +170,12 @@ function torus(
 
 function extrudedSidewall(bucket: Bucket, side: -1 | 1): void {
   const shape = new THREE.Shape();
-  shape.moveTo(side * 0.30, -0.855);
-  shape.lineTo(side * 0.405, -0.855);
-  shape.lineTo(side * 0.465, -0.59);
-  shape.lineTo(side * 0.455, -0.48);
-  shape.lineTo(side * 0.415, -0.455);
-  shape.lineTo(side * 0.365, -0.555);
+  shape.moveTo(side * 0.34, -0.855);
+  shape.lineTo(side * 0.47, -0.855);
+  shape.lineTo(side * 0.585, -0.60);
+  shape.lineTo(side * 0.575, -0.47);
+  shape.lineTo(side * 0.525, -0.43);
+  shape.lineTo(side * 0.425, -0.555);
   shape.closePath();
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: 1.88,
@@ -229,32 +235,52 @@ function panelPoint(u: number, v: number, depth = 0): THREE.Vector3 {
 
 function panelSegment(
   bucket: Bucket,
-  u0: number,
-  u1: number,
-  topV: number,
-  bottomV: number,
+  section: PanelSection,
+  openings: readonly PanelOpening[],
   thickness = 0.042
 ): void {
-  const front = [
-    panelPoint(u0, topV, 0.002),
-    panelPoint(u1, topV, 0.002),
-    panelPoint(u1, bottomV, 0.002),
-    panelPoint(u0, bottomV, 0.002)
-  ];
-  const normal = panelNormal((u0 + u1) * 0.5);
-  const back = front.map((point) => point.clone().addScaledVector(normal, -thickness));
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(
-    [...front, ...back].flatMap((point) => [point.x, point.y, point.z]), 3
-  ));
-  geometry.setIndex([
-    0, 2, 1, 0, 3, 2,
-    4, 5, 6, 4, 6, 7,
-    0, 5, 4, 0, 1, 5,
-    1, 6, 5, 1, 2, 6,
-    2, 7, 6, 2, 3, 7,
-    3, 4, 7, 3, 0, 4
-  ]);
+  const width = section.maxU - section.minU;
+  const height = section.bottomV - section.topV;
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.lineTo(width, 0);
+  shape.lineTo(width, height);
+  shape.lineTo(0, height);
+  shape.closePath();
+
+  // Real cut-outs in the panel plate, not dark disks placed behind a continuous face.
+  for (const opening of openings) {
+    const cx = opening.u - section.minU;
+    const cy = opening.v - section.topV;
+    const hole = new THREE.Path();
+    if (opening.kind === "circle") {
+      hole.absellipse(cx, cy, opening.radius, opening.radius, 0, Math.PI * 2, true, 0);
+    } else {
+      const left = cx - opening.width / 2, right = cx + opening.width / 2;
+      const top = cy - opening.height / 2, bottom = cy + opening.height / 2;
+      hole.moveTo(left, top);
+      hole.lineTo(left, bottom);
+      hole.lineTo(right, bottom);
+      hole.lineTo(right, top);
+      hole.closePath();
+    }
+    shape.holes.push(hole);
+  }
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: false,
+    curveSegments: 40,
+    steps: 1
+  });
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < position.count; i++) {
+    const u = section.minU + position.getX(i);
+    const v = section.topV + position.getY(i);
+    // ExtrudeGeometry grows +Z; cockpit panel thickness goes aft, away from the pilot.
+    const point = panelPoint(u, v, 0.002 - position.getZ(i));
+    position.setXYZ(i, point.x, point.y, point.z);
+  }
   geometry.computeVertexNormals();
   addGeometry(bucket, geometry, [0, 0, 0]);
 }
@@ -266,13 +292,13 @@ function panelRing(bucket: Bucket, u: number, v: number, radius: number): void {
 }
 
 function panelInset(bucket: Bucket, u: number, v: number, radius: number): void {
-  const point = panelPoint(u, v, -0.016);
+  const point = panelPoint(u, v, -0.055);
   const normal = panelNormal(u);
   cylinder(
     bucket,
     [point.x, point.y, point.z],
     radius * 0.88,
-    0.010,
+    0.008,
     [normal.x, normal.y, normal.z],
     32
   );
@@ -300,11 +326,11 @@ function panelRectangleFrame(
 }
 
 function panelRectInset(bucket: Bucket, u: number, v: number, width: number, height: number): void {
-  const point = panelPoint(u, v, -0.014);
+  const point = panelPoint(u, v, -0.054);
   box(
     bucket,
     [point.x, point.y, point.z],
-    [width * 0.94, height * 0.94, 0.006],
+    [width * 0.92, height * 0.92, 0.006],
     panelRotation(u)
   );
 }
@@ -321,7 +347,7 @@ function canopySurface(): THREE.BufferGeometry {
     const crown = 0.47 - 0.08 * Math.max(0, z / 1.05);
     for (let col = 0; col < columns; col++) {
       const theta = -Math.PI / 2 + Math.PI * col / (columns - 1);
-      positions.push(0.505 * Math.sin(theta), 0.08 + (crown - 0.08) * Math.cos(theta), z);
+      positions.push(0.55 * Math.sin(theta), 0.08 + (crown - 0.08) * Math.cos(theta), z);
     }
   }
   for (let row = 0; row < rows - 1; row++) {
@@ -384,55 +410,68 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (const side of [-1, 1] as const) {
     extrudedSidewall(b("tub"), side);
     // Thin upper sill and a low outer lip; neither rises into the pilot's sight picture.
-    rounded(b("tub"), [side * 0.455, -0.49, -0.02], [0.018, 0.026, 1.82], 0.006);
-    rounded(b("tub"), [side * 0.414, -0.815, -0.43], [0.025, 0.040, 0.48], 0.008);
+    rounded(b("tub"), [side * 0.56, -0.48, -0.04], [0.018, 0.026, 1.88], 0.006);
+    rounded(b("tub"), [side * 0.47, -0.815, -0.43], [0.025, 0.040, 0.48], 0.008);
   }
   // Aft bulkhead and seat mounting cross-member.
-  rounded(b("tub"), [0, -0.365, 1.015], [0.82, 0.70, 0.060], 0.022);
+  rounded(b("tub"), [0, -0.365, 1.015], [0.96, 0.70, 0.060], 0.022);
   rounded(b("tub"), [0, -0.735, 0.65], [0.78, 0.055, 0.16], 0.012);
 
-  // Four front-panel plates, each a separate mesh with its own face normal and vertical extent.
-  for (const section of PANEL_SECTIONS) {
-    const gap = 0.003;
-    panelSegment(
-      b(section.part),
-      section.minU + gap,
-      section.maxU - gap,
-      section.topV,
-      section.bottomV
-    );
-  }
-
-  // Blank, flush mounting apertures. They are only shallow structural recesses, not instrument faces.
+  // Empty equipment openings, traced from the photo registration used for the blank panel frame.
   const gaugeMounts: readonly [number, number, number][] = [
     [130, 165, 64], [140, 235, 62], [255, 150, 74], [245, 245, 88],
     [340, 140, 54], [330, 215, 50], [440, 145, 56], [515, 140, 54],
     [445, 210, 50], [505, 210, 50]
   ];
-  for (const [px, py, diameterPx] of gaugeMounts) {
-    const u = (px - PHOTO_ORIGIN_X) * PHOTO_SCALE;
-    const v = (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE;
-    const radius = diameterPx * PHOTO_SCALE * 0.44;
-    const part = sectionAt(u).part;
-    panelInset(b("panel-recess"), u, v, radius * 0.91);
-    panelRing(b(part), u, v, radius);
-  }
+  const circularOpenings: CircularPanelOpening[] = gaugeMounts.map(([px, py, diameterPx]) => ({
+    kind: "circle",
+    u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
+    v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
+    radius: diameterPx * PHOTO_SCALE * 0.44
+  }));
   const rectangularMounts: readonly [number, number, number, number][] = [
     [570, 180, 32, 72],
-    [435, 255, 55, 42],
-    [490, 255, 55, 42],
+    [435, 255, 50, 42],
+    [500, 255, 48, 42],
     [555, 255, 55, 42],
     [600, 95, 108, 92],
     [650, 215, 72, 72]
   ];
-  for (const [px, py, widthPx, heightPx] of rectangularMounts) {
-    const u = (px - PHOTO_ORIGIN_X) * PHOTO_SCALE;
-    const v = (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE;
-    const width = widthPx * PHOTO_SCALE;
-    const height = heightPx * PHOTO_SCALE;
-    const part = sectionAt(u).part;
-    panelRectInset(b("panel-recess"), u, v, width, height);
-    panelRectangleFrame(b(part), u, v, width, height);
+  const rectangularOpenings: RectangularPanelOpening[] = rectangularMounts.map(([px, py, widthPx, heightPx]) => ({
+    kind: "rectangle",
+    u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
+    v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
+    width: widthPx * PHOTO_SCALE,
+    height: heightPx * PHOTO_SCALE
+  }));
+  const panelOpenings = [...circularOpenings, ...rectangularOpenings];
+
+  // Four separate front-panel plates with true through-openings for the future equipment.
+  const assignedPanelCutouts: (PanelOpening & { readonly panelPart: string })[] = [];
+  for (const section of PANEL_SECTIONS) {
+    const gap = 0.003;
+    const containedOpenings = panelOpenings.filter((opening) => {
+      const halfWidth = "radius" in opening ? opening.radius : opening.width / 2;
+      const halfHeight = "radius" in opening ? opening.radius : opening.height / 2;
+      return opening.u - halfWidth >= section.minU + gap
+        && opening.u + halfWidth <= section.maxU - gap
+        && opening.v - halfHeight >= section.topV + gap
+        && opening.v + halfHeight <= section.bottomV - gap;
+    });
+    panelSegment(b(section.part), section, containedOpenings);
+    for (const opening of containedOpenings) assignedPanelCutouts.push({ ...opening, panelPart: section.part });
+  }
+
+  // Recessed blank backing surfaces sit behind the actual openings, not on top of the panel face.
+  for (const opening of circularOpenings) {
+    const part = sectionAt(opening.u).part;
+    panelInset(b("panel-recess"), opening.u, opening.v, opening.radius);
+    panelRing(b(part), opening.u, opening.v, opening.radius);
+  }
+  for (const opening of rectangularOpenings) {
+    const part = sectionAt(opening.u).part;
+    panelRectInset(b("panel-recess"), opening.u, opening.v, opening.width, opening.height);
+    panelRectangleFrame(b(part), opening.u, opening.v, opening.width, opening.height);
   }
 
   // A low rear casing supports the four plates and blends their lower edges into the front tub.
@@ -450,41 +489,62 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // Glare shield: a narrow padded brow, not a thick full-width crossbar.
-  rounded(b("glare-shield"), [0, -0.108, -0.765], [0.96, 0.022, 0.095], 0.009, [-0.045, 0, 0]);
-  box(b("glare-shield"), [0, -0.127, -0.724], [0.92, 0.006, 0.020], [-0.045, 0, 0]);
+  rounded(b("glare-shield"), [0, -0.108, -0.765], [0.92, 0.018, 0.060], 0.008, [-0.045, 0, 0]);
+  box(b("glare-shield"), [0, -0.123, -0.734], [0.88, 0.004, 0.012], [-0.045, 0, 0]);
 
   // HUD support structure only. The optical plate, screen and all controls are intentionally absent.
   rounded(b("glare-shield"), [0, -0.005, -0.905], [0.190, 0.046, 0.068], 0.009);
   for (const side of [-1, 1] as const) {
-    box(b("glare-shield"), [side * 0.084, 0.064, -0.940], [0.007, 0.120, 0.009], [0.045, side * 0.04, 0]);
+    box(b("glare-shield"), [side * 0.084, 0.064, -0.940], [0.007, 0.105, 0.009], [0.045, side * 0.04, 0]);
   }
-  box(b("glare-shield"), [0, 0.124, -0.934], [0.180, 0.012, 0.012]);
+  box(b("glare-shield"), [0, 0.116, -0.934], [0.170, 0.010, 0.010]);
 
-  // Side consoles are narrow, low-profile and built into the sloping tub walls.
-  // Their horizontal decks meet separate inward-facing vertical faces; no bulky top rails.
+  // Each side console sits outboard of the front instrument panel and runs forward
+  // alongside it. The deck, sloping wall and upright inner face are one connected assembly.
   for (const side of [-1, 1] as const) {
     const part: ShellPart = side < 0 ? "port-console" : "starboard-console";
-    const x = side * 0.385;
-    const deckRotation: Vec3 = [0, 0, side * 0.18];
+    const x = side * 0.515;
+    const deckRotation: Vec3 = [0, 0, side * 0.14];
+    const verticalRotation: Vec3 = [0.035, side * 0.12, side * 0.15];
 
-    // Horizontal console deck: much thinner and narrower than the previous slab.
-    rounded(b(part), [x, -0.485, -0.10], [0.150, 0.038, 1.14], 0.010, deckRotation);
-    rounded(b(part), [side * 0.446, -0.465, -0.10], [0.014, 0.022, 1.05], 0.005, deckRotation);
+    // Outboard horizontal deck; its forward edge reaches the lower panel cheek.
+    rounded(b(part), [x, -0.455, -0.12], [0.180, 0.046, 1.28], 0.012, deckRotation);
+    // Outer rolled edge follows the cockpit sill, not a separate tall rail.
+    rounded(b(part), [side * 0.602, -0.438, -0.12], [0.014, 0.024, 1.16], 0.005, deckRotation);
 
-    // Vertical inner console face, canted toward the pilot and attached to the deck edge.
+    // Inboard sloping console wall. This is a real upright structural face visible from
+    // the pilot eye, rather than a vertical slab hidden underneath the dashboard.
     rounded(
       b(part),
-      [side * 0.303, -0.580, -0.12],
-      [0.014, 0.185, 0.94],
-      0.006,
-      [0.025, side * 0.10, side * 0.12]
+      [side * 0.412, -0.535, -0.14],
+      [0.018, 0.245, 1.14],
+      0.008,
+      verticalRotation
+    );
+    // Lower transition web joins the upright face to the tub and sidewall.
+    rounded(
+      b(part),
+      [side * 0.49, -0.675, -0.12],
+      [0.105, 0.030, 1.08],
+      0.010,
+      [0, 0, side * 0.14]
     );
 
-    // Empty mounting bays are flush outlines only, not raised boxes or switches.
-    consoleBay(b(part), x, -0.462, -0.405, 0.112, 0.235, deckRotation);
-    consoleBay(b(part), x, -0.462, -0.055, 0.112, 0.255, deckRotation);
-    consoleBay(b(part), side * 0.303, -0.580, -0.36, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
-    consoleBay(b(part), side * 0.303, -0.580, 0.08, 0.105, 0.205, [0.025, side * 0.10, side * 0.12]);
+    // Blank deck mounting bays; no raised switch or button geometry.
+    consoleBay(b(part), x, -0.428, -0.48, 0.135, 0.245, deckRotation);
+    consoleBay(b(part), x, -0.428, -0.11, 0.135, 0.260, deckRotation);
+    consoleBay(b(part), x, -0.428, 0.28, 0.135, 0.245, deckRotation);
+
+    // Blank rectangular bays on the upright inboard face, framed in its own plane.
+    const bayX = side * 0.400;
+    const bayY = -0.535;
+    for (const z of [-0.40, 0.13]) {
+      const rail = 0.006;
+      rounded(b(part), [bayX, bayY - 0.092, z], [0.006, rail, 0.22], 0.002, verticalRotation);
+      rounded(b(part), [bayX, bayY + 0.092, z], [0.006, rail, 0.22], 0.002, verticalRotation);
+      rounded(b(part), [bayX, bayY, z - 0.107], [0.006, 0.184, rail], 0.002, verticalRotation);
+      rounded(b(part), [bayX, bayY, z + 0.107], [0.006, 0.184, rail], 0.002, verticalRotation);
+    }
   }
 
   // Blank central lower pedestal and recessed footwell walls; no stick or rudder pedals.
@@ -506,15 +566,15 @@ export function createMiG29CockpitShell(): THREE.Group {
 
   // Canopy framing: slim side rails and a single aft bow. No forward hoop across the windscreen.
   for (const side of [-1, 1] as const) {
-    rounded(b("canopy-frame"), [side * 0.502, 0.065, -0.12], [0.012, 0.014, 1.88], 0.003);
-    rounded(b("canopy-frame"), [side * 0.478, -0.160, -0.12], [0.022, 0.026, 1.90], 0.005);
+    rounded(b("canopy-frame"), [side * 0.548, 0.065, -0.12], [0.012, 0.014, 1.88], 0.003);
+    rounded(b("canopy-frame"), [side * 0.522, -0.160, -0.12], [0.022, 0.026, 1.90], 0.005);
   }
   const aftBowZ = 1.045;
   const aftPoints: THREE.Vector3[] = [];
   for (let i = 0; i <= 40; i++) {
     const theta = -Math.PI / 2 + Math.PI * i / 40;
     aftPoints.push(new THREE.Vector3(
-      0.505 * Math.sin(theta),
+      0.55 * Math.sin(theta),
       0.08 + (0.40 - 0.08) * Math.cos(theta),
       aftBowZ
     ));
@@ -550,6 +610,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.visualMode = "neutral-structural-blockout";
   shell.userData.controlsIncluded = false;
   shell.userData.frontCanopyBowIncluded = false;
+  shell.userData.panelCutouts = assignedPanelCutouts;
   shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
     name: section.part,
     minU: section.minU,

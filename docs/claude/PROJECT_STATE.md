@@ -231,3 +231,17 @@ Geometry remains provisional family-level reconstruction, not a dimensionally ve
 
 A further visual refinement after reviewing the final CI screenshot: the gauge/display positions are now actual shallow-depth mounting recesses with dark neutral-grey blank interiors rather than same-grey surface rings; the glare-shield brow and HUD support were thinned; side-console surfaces were raised slightly into the sightline. No display faces or controls were added. Latest geometry validation includes a test that recess material remains monochrome and darker than the panel shell, and that the console frame reaches the pilot view.
 
+
+
+### MiG-29 panel aperture correction (28 November 2026)
+
+The prior shell placed dark backing discs behind intact panel faces, which could read as slashes instead of real mounting bays. The front dashboard now uses extruded panel plates with actual circular and rectangular holes. Sixteen mounting locations are assigned to one of the four angled panel plates; the openings have sidewalls and dark neutral-grey blank backing surfaces set behind the plate thickness. Unit tests verify all 16 locations are assigned and every panel mesh contains its opening geometry. No instruments, displays, labels or controls are present.
+
+
+
+### MiG-29 console/tub relationship refinement (28 November 2026)
+
+The cutout pass exposed that the former side consoles were too far inboard and mostly hidden behind the front dashboard. The current shell moves both console decks outboard of the main-panel footprint, brings their forward ends up to the panel cheeks, and gives each a low rolled outer edge, a blank upright inboard face, and a lower transition web into the widened tapered tub shoulder. The canopy side rails follow the widened shoulder. The pilot-view pitch offset is now −0.21 rad (60° vertical FOV) so more of the console surfaces are visible from the eye point.
+
+No switches, labels, instruments, screens, knobs, or functional controls are added. Exact console angles and dimensions remain photo-estimated, not a verified measured product 9.13 drawing.
+
