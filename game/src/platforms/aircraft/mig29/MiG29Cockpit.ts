@@ -66,25 +66,26 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
   aircraftId: "mig29",
   provenance: "Original reference-guided procedural cockpit shell plus live overlay layout. Family-level photo arrangement only; dimensions, selected 9.13 equipment fit and eye datum are not fully verified.",
   eyeFromCgM: [4.9, 0, -1.15],
-  fieldOfViewDeg: 62,
+  fieldOfViewDeg: 72,
+  cameraPitchOffsetRad: -0.08,
   buildShell: createMiG29CockpitShell,
   parts: [
     // Physical dashboard, HUD assembly, canopy rails, cockpit tub and consoles are in the procedural shell.
     // Dynamic instruments below intentionally share the same eye-relative photo transform as its bezels.
     // Flight instruments (left of the stick, Soviet "T").
-    round("ias", 130, 165, 65, { kind: "dial", label: "КУС", unit: "км/ч", min: 0, max: 1600, majorStep: 200, minorStep: 50, labelDivisor: 100, needles: ["", ""] }),
-    round("alt", 140, 235, 65, { kind: "dial", label: "ВД", unit: "м", min: 0, max: 1000, majorStep: 100, minorStep: 20, labelDivisor: 100, startDeg: 0, sweepDeg: 360, wrap: true, readout: { divisor: 1000, digits: 2, suffix: " км" } }),
-    round("adi", 255, 150, 75, { kind: "attitude", label: "КПП" }),
-    round("hsi", 245, 245, 95, { kind: "hsi", label: "ПНП" }),
-    round("aoa", 340, 140, 55, { kind: "dial", label: "α", unit: "град", min: 0, max: 40, majorStep: 10, minorStep: 2, startDeg: -120, sweepDeg: 240, bands: [{ from: 26, to: 40, color: RED }], readout: { index: 1, digits: 1, suffix: " g" } }),
-    round("ralt", 330, 215, 55, { kind: "dial", label: "РВ", unit: "м", min: 0, max: 1500, majorStep: 100, marks: [0, 50, 100, 200, 300, 600, 1000, 1500],
+    round("ias", 130, 165, 60, { kind: "dial", label: "КУС", unit: "км/ч", min: 0, max: 1600, majorStep: 200, minorStep: 50, labelDivisor: 100, needles: ["", ""] }),
+    round("alt", 140, 235, 60, { kind: "dial", label: "ВД", unit: "м", min: 0, max: 1000, majorStep: 100, minorStep: 20, labelDivisor: 100, startDeg: 0, sweepDeg: 360, wrap: true, readout: { divisor: 1000, digits: 2, suffix: " км" } }),
+    round("adi", 255, 150, 70, { kind: "attitude", label: "КПП" }),
+    round("hsi", 245, 245, 85, { kind: "hsi", label: "ПНП" }),
+    round("aoa", 340, 140, 52, { kind: "dial", label: "α", unit: "град", min: 0, max: 40, majorStep: 10, minorStep: 2, startDeg: -120, sweepDeg: 240, bands: [{ from: 26, to: 40, color: RED }], readout: { index: 1, digits: 1, suffix: " g" } }),
+    round("ralt", 330, 215, 50, { kind: "dial", label: "РВ", unit: "м", min: 0, max: 1500, majorStep: 100, marks: [0, 50, 100, 200, 300, 600, 1000, 1500],
       scale: [[0, 0], [50, 0.15], [100, 0.27], [200, 0.43], [300, 0.55], [600, 0.75], [1000, 0.9], [1500, 1]] }),
     // Engine and systems cluster (right of the stick).
-    round("vvi", 440, 145, 60, { kind: "dial", label: "ВАР", unit: "м/с", min: -300, max: 300, majorStep: 100, marks: [-300, -100, -50, -20, 0, 20, 50, 100, 300], startDeg: -260, sweepDeg: 340,
+    round("vvi", 440, 145, 55, { kind: "dial", label: "ВАР", unit: "м/с", min: -300, max: 300, majorStep: 100, marks: [-300, -100, -50, -20, 0, 20, 50, 100, 300], startDeg: -260, sweepDeg: 340,
       scale: [[-300, 0], [-100, 0.12], [-50, 0.22], [-20, 0.35], [0, 0.5], [20, 0.65], [50, 0.78], [100, 0.88], [300, 1]] }),
-    round("rpm", 515, 140, 60, { kind: "dial", label: "ИТА", unit: "% ×10", min: 0, max: 110, majorStep: 20, minorStep: 5, labelDivisor: 10, needles: ["1", "2"], bands: [{ from: 103, to: 110, color: RED }] }),
-    round("egt-l", 445, 210, 55, { kind: "dial", label: "1", unit: "×100°C", min: 200, max: 1000, majorStep: 200, minorStep: 50, labelDivisor: 100, bands: [{ from: 860, to: 900, color: YELLOW }, { from: 900, to: 1000, color: RED }] }),
-    round("egt-r", 505, 210, 55, { kind: "dial", label: "2", unit: "×100°C", min: 200, max: 1000, majorStep: 200, minorStep: 50, labelDivisor: 100, bands: [{ from: 860, to: 900, color: YELLOW }, { from: 900, to: 1000, color: RED }] }),
+    round("rpm", 515, 140, 55, { kind: "dial", label: "ИТА", unit: "% ×10", min: 0, max: 110, majorStep: 20, minorStep: 5, labelDivisor: 10, needles: ["1", "2"], bands: [{ from: 103, to: 110, color: RED }] }),
+    round("egt-l", 445, 210, 49, { kind: "dial", label: "1", unit: "×100°C", min: 200, max: 1000, majorStep: 200, minorStep: 50, labelDivisor: 100, bands: [{ from: 860, to: 900, color: YELLOW }, { from: 900, to: 1000, color: RED }] }),
+    round("egt-r", 505, 210, 49, { kind: "dial", label: "2", unit: "×100°C", min: 200, max: 1000, majorStep: 200, minorStep: 50, labelDivisor: 100, bands: [{ from: 860, to: 900, color: YELLOW }, { from: 900, to: 1000, color: RED }] }),
     rect("fuel", 570, 180, 32, 72, { kind: "tapes", title: "ТОПЛ", footer: "т", tapes: [{ label: "Σ", min: 0, max: 5000 }], marks: [0, 1000, 2000, 3000, 4000, 5000] }),
     rect("cabin", 435, 255, 55, 42, { kind: "tapes", title: "Нкаб O2 ΔP", footer: "not simulated", tapes: [{ label: "Н", min: 0, max: 1 }, { label: "O2", min: 0, max: 1 }, { label: "ΔP", min: 0, max: 1 }] }),
     rect("hydgas", 490, 255, 55, 42, { kind: "tapes", title: "ГИДРО  ГАЗ", footer: "кгс/см²", tapes: [
@@ -97,8 +98,8 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     // СПО-15 indicator (right side of the panel; position approximate).
     screenAt("spo15", "rwr", 650, 215, 0.1, 0.1),
     // Levers and switches (clickable; positions approximate, not from the photographs).
-    lever("gear-lever", SW.gear, ["UP", "DN"], [0.62, -0.46, 0.36], [0.04, 0.03, 0.08], "#c33"),
-    lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.7, -0.33, 0.64], [0.03, 0.06, 0.03], YELLOW),
+    { id: "gear-lever", kind: "cylinder", positionM: [0.60, -0.455, 0.38], sizeM: [0.0055, 0.060, 0], color: "#8f3830", binding: { kind: "switch", switchId: SW.gear, positions: ["UP", "DN"] } },
+    lever("emerg-gear", SW.emergencyGear, ["STOWED", "NOSE", "MAIN"], [0.68, -0.36, 0.62], [0.025, 0.045, 0.025], YELLOW),
     lever("flap-lever", SW.flaps, ["UP", "TAKEOFF", "LANDING"], [0.32, -0.42, 0.42], [0.05, 0.025, 0.05], "#ddd"),
     lever("airbrake", SW.speedbrake, ["RETRACT", "EXTEND"], [0.24, -0.33, 0.33], [0.02, 0.02, 0.02], "#3c7"),
     lever("sw-bat", SW.batGnd, ["ON", "OFF"], [0.48, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
@@ -106,9 +107,9 @@ export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
     lever("sw-acgen", SW.acGen, ["ON", "OFF"], [0.38, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     lever("sw-pto", SW.pto, ["ON", "OFF"], [0.33, 0.41, 0.43], [0.03, 0.02, 0.03], "#ddd"),
     // Live centre-stick shaft and twin-throttle levers are overlaid on the physical procedural assemblies.
-    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.016, 0.38, 0], rotationRad: [0, 0.12, 0], color: "#151815", binding: { kind: "stick" } },
-    { id: "throttle", kind: "box", positionM: [0.22, -0.385, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } },
-    { id: "throttle-2", kind: "box", positionM: [0.22, -0.35, 0.20], sizeM: [0.06, 0.03, 0.1], color: "#151815", binding: { kind: "throttle" } }
+    { id: "centre-stick", kind: "cylinder", positionM: [0.42, 0, 0.42], sizeM: [0.0095, 0.34, 0], rotationRad: [0, 0.12, 0], color: "#171b1a", binding: { kind: "stick" } },
+    { id: "throttle", kind: "box", positionM: [0.22, -0.35, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } },
+    { id: "throttle-2", kind: "box", positionM: [0.22, -0.42, 0.30], sizeM: [0.045, 0.022, 0.075], rotationRad: [0, 0, 0.18], color: "#151815", binding: { kind: "throttle" } }
   ]
 };
 

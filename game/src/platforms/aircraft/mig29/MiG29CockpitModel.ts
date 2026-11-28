@@ -125,6 +125,28 @@ function panelCylinder(b: Bucket, u: number, v: number, depth: number, radius: n
   cylinder(b, [point.x, point.y, point.z], radius, length, [normal.x, normal.y, normal.z], radial);
 }
 
+function panelBox(b: Bucket, u: number, v: number, width: number, height: number, depth: number, thickness: number): void {
+  const point = panelPoint(u, v, depth);
+  box(b, [point.x, point.y, point.z], [width, height, thickness], panelRotation(u));
+}
+
+function panelKeypad(getBucket: (surface: Surface) => Bucket, u: number, v: number, width: number, height: number, columns: number, rows: number): void {
+  panelBox(getBucket("black"), u, v, width, height, 0.012, 0.012);
+  const insetX = width * 0.13, insetY = height * 0.16;
+  const cellW = (width - insetX * 2) / columns;
+  const cellH = (height - insetY * 2) / rows;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const x = u - width / 2 + insetX + cellW * (col + 0.5);
+      const y = v - height / 2 + insetY + cellH * (row + 0.5);
+      const point = panelPoint(x, y, 0.022);
+      const accent = (row + col) % 7 === 0;
+      rounded(getBucket(accent ? "amber" : "panel"), [point.x, point.y, point.z],
+        [cellW * 0.58, cellH * 0.48, 0.007], 0.002, panelRotation(u));
+    }
+  }
+}
+
 function panelRing(b: Bucket, u: number, v: number, depth: number, radius: number, tube: number): void {
   const point = panelPoint(u, v, depth);
   const normal = panelNormal(u);
@@ -308,17 +330,32 @@ export function createMiG29CockpitShell(): THREE.Group {
     panelCylinder(b(amber ? "amber" : "warning"), u, v, 0.021, 0.0065, 0.004, 16);
   }
 
-  // Padded glare shield above the instrument panel; it must not cover the instrument faces.
-  rounded(b("black"), [0, -0.115, -0.82], [0.90, 0.075, 0.13], 0.025, [0.08, 0, 0]);
-  box(b("frame"), [0, -0.168, -0.79], [0.90, 0.018, 0.055], [0.08, 0, 0]);
-  box(b("warning"), [0, -0.168, -0.748], [0.20, 0.008, 0.008]);
+  // Additional instrument-control units: recessed keypads, signal-light banks and mechanical-state panel.
+  panelKeypad(b, -0.285, -0.145, 0.17, 0.105, 4, 3);
+  panelKeypad(b, -0.055, -0.157, 0.245, 0.085, 6, 2);
+  panelKeypad(b, 0.105, 0.112, 0.13, 0.060, 5, 2);
+  panelKeypad(b, -0.075, 0.118, 0.11, 0.080, 3, 3);
+  for (let i = 0; i < 7; i++) {
+    const u = -0.31 + i * 0.045;
+    panelCylinder(b("bezel"), u, -0.078, 0.016, 0.0065, 0.004, 12);
+    panelCylinder(b(i % 3 === 0 ? "warning" : "amber"), u, -0.078, 0.021, 0.0035, 0.003, 12);
+  }
 
-  // HUD: compact projector and paired supports, with a clear combiner—no central mast.
-  rounded(b("black"), [0, 0.075, -1.00], [0.23, 0.10, 0.15], 0.018);
-  box(b("frame"), [0, 0.018, -0.94], [0.30, 0.025, 0.09]);
+  // Padded glare shield: low-profile, soft-edged hood with a narrow forward lip.
+  rounded(b("black"), [0, -0.103, -0.82], [0.84, 0.036, 0.105], 0.010, [0.06, 0, 0]);
+  box(b("frame"), [0, -0.131, -0.784], [0.82, 0.008, 0.026], [0.06, 0, 0]);
+  for (const u of [-0.31, -0.23, -0.15, -0.07, 0.07, 0.15, 0.23, 0.31]) {
+    const point = panelPoint(u, -0.16, 0.016);
+    cylinder(b("amber"), [point.x, point.y, point.z], 0.003, 0.003, panelNormal(u).toArray() as Vec3, 10);
+  }
+
+  // HUD projector assembly above the glare shield; paired supports frame a thin combiner.
+  rounded(b("black"), [0, 0.075, -1.00], [0.205, 0.082, 0.135], 0.012);
+  box(b("frame"), [0, 0.026, -0.94], [0.28, 0.022, 0.075]);
+  rounded(b("bezel"), [0, 0.119, -1.015], [0.16, 0.018, 0.025], 0.005);
   for (const side of [-1, 1] as const) {
-    box(b("metal"), [side * 0.108, 0.115, -1.035], [0.012, 0.18, 0.018], [0.05, side * 0.06, 0]);
-    cylinder(b("bezel"), [side * 0.14, 0.015, -0.92], 0.010, 0.022, [0, 1, 0], 16);
+    box(b("metal"), [side * 0.105, 0.115, -1.035], [0.010, 0.17, 0.014], [0.04, side * 0.05, 0]);
+    cylinder(b("bezel"), [side * 0.13, 0.015, -0.92], 0.009, 0.018, [0, 1, 0], 16);
   }
   const combiner = new THREE.BufferGeometry();
   combiner.setAttribute("position", new THREE.Float32BufferAttribute([
@@ -335,56 +372,71 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (let i = 0; i < combiner.getIndex()!.count; i++) b("hud").indices.push(combiner.getIndex()!.getX(i));
   combiner.dispose();
 
-  // Side consoles: narrow raised housings with distinct sloped control surfaces—not solid walls.
+  // Side consoles: compact raised control shelves integrated into the sidewalls.
+  // The deck is lower and narrower than the earlier slab geometry so the central panel remains clear.
   for (const side of [-1, 1] as const) {
-    const x = side * 0.36;
-    rounded(b("console"), [x, -0.455, 0.12], [0.235, 0.135, 1.26], 0.025, [side * 0.04, 0, side * 0.045]);
-    rounded(b("panel"), [x, -0.378, 0.12], [0.222, 0.022, 1.20], 0.008, [side * 0.04, 0, side * 0.045]);
-    box(b("frame"), [side * 0.485, -0.48, 0.12], [0.028, 0.16, 1.25], [0, 0, side * 0.04]);
+    const x = side * 0.385;
+    rounded(b("console"), [x, -0.505, -0.08], [0.195, 0.105, 1.48], 0.016, [side * 0.055, 0, side * 0.045]);
+    rounded(b("panel"), [x, -0.438, -0.08], [0.183, 0.018, 1.42], 0.006, [side * 0.055, 0, side * 0.045]);
+    box(b("frame"), [side * 0.492, -0.505, -0.08], [0.018, 0.12, 1.46], [0, 0, side * 0.04]);
 
+    // Switch rows stay in the forward portion of the side deck, between the instrument panel and the eye point.
     const rows = side < 0
-      ? [-0.40, -0.17, 0.07, 0.32, 0.56]
-      : [-0.36, -0.10, 0.16, 0.42, 0.63];
-    const columns = side < 0 ? [-0.065, 0.005, 0.070] : [-0.052, 0.052];
+      ? [-0.72, -0.60, -0.53, -0.12, -0.025]
+      : [-0.69, -0.55, -0.41, -0.27, -0.13];
+    const columns = side < 0 ? [-0.050, 0, 0.050] : [-0.046, 0.046];
     for (let row = 0; row < rows.length; row++) {
+      const z = rows[row]!;
+      // Individual recessed switch strips keep the panel from reading as an empty flat slab.
+      rounded(b("black"), [x, -0.425, z], [side < 0 ? 0.155 : 0.125, 0.010, 0.105], 0.005);
       for (let col = 0; col < columns.length; col++) {
         const xx = x + columns[col]!;
-        const z = rows[row]!;
         const kind = (row + col) % 4 === 0 ? "knob" : (row + col) % 3 === 0 ? "button" : "toggle";
-        addToggle(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.368, z, kind, row === 0);
+        addToggle(b(kind === "button" && row % 2 === 0 ? "amber" : "metal"), xx, -0.420, z, kind, row === 0);
       }
     }
 
-    // A few guarded controls, instrument windows and placards break up the dense switch fields.
-    const plaques = side < 0 ? [-0.27, 0.40] : [-0.24, 0.34, 0.59];
+    // Separate guarded selector plates and warning lamps along the aft edge of the visible deck.
+    const plaques = side < 0 ? [-0.10, -0.01] : [-0.17, -0.04];
     for (const z of plaques) {
-      rounded(b("black"), [x, -0.357, z], [0.14, 0.014, 0.095], 0.006);
-      box(b("bezel"), [x, -0.346, z + 0.052], [0.15, 0.009, 0.008]);
-      for (const dx of [-0.045, 0, 0.045]) addToggle(b("amber"), x + dx, -0.343, z, "button");
+      rounded(b("black"), [x, -0.424, z], [0.15, 0.010, 0.075], 0.005);
+      box(b("bezel"), [x, -0.415, z + 0.041], [0.15, 0.008, 0.006]);
+      for (const dx of [-0.045, 0, 0.045]) addToggle(b("amber"), x + dx, -0.414, z, "button");
     }
 
     if (side > 0) {
-      rounded(b("black"), [x, -0.34, 0.11], [0.18, 0.028, 0.34], 0.012);
-      for (const z of [-0.01, 0.07, 0.15, 0.23]) {
-        rounded(b("panel"), [x, -0.319, z], [0.16, 0.012, 0.052], 0.004);
-        for (const dx of [-0.044, 0, 0.044]) addToggle(b("metal"), x + dx, -0.311, z, "button");
+      // Starboard breaker / information panel: recessed switch bank within the forward field of view.
+      rounded(b("black"), [x, -0.416, -0.33], [0.155, 0.020, 0.30], 0.008);
+      for (const z of [-0.45, -0.39, -0.33, -0.27, -0.21]) {
+        rounded(b("panel"), [x, -0.400, z], [0.136, 0.010, 0.040], 0.003);
+        for (const dx of [-0.038, 0, 0.038]) addToggle(b("bezel"), x + dx, -0.394, z, "button");
+      }
+      for (let i = 0; i < 7; i++) {
+        const z = -0.74 + i * 0.085;
+        box(b("black"), [side * 0.425, -0.422, z], [0.035, 0.010, 0.064]);
+        for (const dx of [-0.008, 0.008]) addToggle(b("amber"), side * 0.425 + dx, -0.416, z, "button");
       }
     }
   }
 
-  // Left-console twin throttle quadrant: physical base and guard rails around the live levers.
-  rounded(b("black"), [-0.36, -0.285, -0.27], [0.18, 0.065, 0.39], 0.018, [0.08, 0, 0]);
-  rounded(b("bezel"), [-0.36, -0.248, -0.27], [0.16, 0.016, 0.36], 0.006);
-  for (const x of [-0.405, -0.365]) {
-    cylinder(b("metal"), [x, -0.20, -0.29], 0.012, 0.085, [0, 1, 0], 16);
-    rounded(b("rubber"), [x, -0.145, -0.29], [0.028, 0.06, 0.045], 0.008, [0.10, 0, 0]);
+  // Left-console twin-throttle quadrant: shallow raised base and two separate grips.
+  rounded(b("black"), [-0.385, -0.405, -0.34], [0.155, 0.040, 0.34], 0.012, [0.06, 0, 0]);
+  rounded(b("bezel"), [-0.385, -0.380, -0.34], [0.14, 0.012, 0.31], 0.005);
+  for (const x of [-0.420, -0.350]) {
+    cylinder(b("metal"), [x, -0.335, -0.31], 0.009, 0.085, [0, 1, 0], 16);
+    rounded(b("rubber"), [x, -0.285, -0.31], [0.023, 0.055, 0.035], 0.007, [0.10, 0, 0]);
+    box(b("bezel"), [x, -0.251, -0.31], [0.018, 0.012, 0.03]);
   }
 
-  // Centre control column: small flexible boot and ergonomic grip; keep the sightline open.
-  rounded(b("rubber"), [0, -0.748, -0.36], [0.135, 0.028, 0.17], 0.035);
-  rounded(b("rubber"), [0, -0.285, -0.405], [0.050, 0.095, 0.050], 0.018, [0.16, 0, 0]);
-  cylinder(b("warning"), [0, -0.229, -0.420], 0.008, 0.009, [0, 1, 0], 12);
-  for (const x of [-0.018, 0.018]) cylinder(b("amber"), [x, -0.239, -0.438], 0.0035, 0.006, [0, 1, 0], 8);
+  // Centre control column: small ergonomic grip with modest trigger bosses, leaving the gauges visible.
+  rounded(b("rubber"), [0, -0.748, -0.36], [0.12, 0.024, 0.15], 0.026);
+  rounded(b("rubber"), [0, -0.275, -0.405], [0.056, 0.034, 0.040], 0.011, [0.12, 0, 0]);
+  rounded(b("frame"), [0, -0.253, -0.412], [0.036, 0.008, 0.032], 0.003, [0.12, 0, 0]);
+  cylinder(b("warning"), [0, -0.252, -0.421], 0.005, 0.006, [0, 1, 0], 12);
+  for (const x of [-0.022, 0.022]) {
+    cylinder(b("metal"), [x, -0.272, -0.428], 0.0028, 0.009, [0, 0, 1], 8);
+    cylinder(b("amber"), [x, -0.263, -0.438], 0.0025, 0.004, [0, 1, 0], 8);
+  }
 
   // Rudder pedals and footwells are below the main field of view.
   for (const side of [-1, 1] as const) {
@@ -395,6 +447,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     cylinder(b("metal"), [x, -0.69, -0.32], 0.010, 0.42, [0, 0, 1], 12);
   }
 
+  // Gear handle mounting plate and small red selector grip on the port forward console.
+  rounded(b("black"), [-0.455, -0.432, -0.60], [0.075, 0.014, 0.090], 0.008);
+  cylinder(b("metal"), [-0.455, -0.392, -0.60], 0.0055, 0.055, [0, 1, 0], 12);
+  rounded(b("warning"), [-0.455, -0.357, -0.60], [0.025, 0.018, 0.030], 0.006);
   // K-36 family seat: behind the control column, with distinct back pan, head pad and harness.
   for (const side of [-1, 1] as const) {
     const x = side * 0.245;
@@ -415,10 +471,10 @@ export function createMiG29CockpitShell(): THREE.Group {
     torus(b("warning"), [side * 0.10, -0.70, 0.23], 0.055, 0.009, [0, 0, 1], 24);
   }
 
-  // Canopy side rails, front windshield bow and aft arch are slender structural members.
+  // Canopy side rails sit below the design eye and stay narrow at the edges of the sight picture.
   for (const side of [-1, 1] as const) {
-    rounded(b("frame"), [side * 0.515, 0.085, -0.11], [0.035, 0.035, 2.12], 0.012);
-    rounded(b("rubber"), [side * 0.495, 0.108, -0.11], [0.012, 0.012, 2.04], 0.004);
+    rounded(b("panel"), [side * 0.520, -0.045, -0.11], [0.010, 0.012, 1.96], 0.003);
+    rounded(b("rubber"), [side * 0.509, -0.036, -0.11], [0.005, 0.005, 1.90], 0.002);
   }
   canopySurface(b("glass"));
   for (const z of [-1.12, 0.98]) {
@@ -431,7 +487,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     for (let i = 0; i < points.length - 1; i++) {
       const delta = points[i + 1]!.clone().sub(points[i]!);
       const mid = points[i]!.clone().add(points[i + 1]!).multiplyScalar(0.5);
-      cylinder(b("frame"), [mid.x, mid.y, mid.z], 0.0065, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
+      cylinder(b("metal"), [mid.x, mid.y, mid.z], 0.0048, delta.length() + 0.003, [delta.x, delta.y, delta.z], 8);
     }
   }
 

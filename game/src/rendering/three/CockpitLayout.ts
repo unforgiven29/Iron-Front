@@ -37,6 +37,8 @@ export interface CockpitLayout {
   readonly parts: readonly CockpitPart[];
   /** Vertical field of view, degrees. */
   readonly fieldOfViewDeg: number;
+  /** Fixed pilot-view pitch trim in radians; negative angles look slightly down. */
+  readonly cameraPitchOffsetRad?: number;
   /** Optional aircraft-specific procedural shell, returned in cockpit-camera coordinates. */
   readonly buildShell?: () => Object3D;
   /**

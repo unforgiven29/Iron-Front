@@ -205,7 +205,7 @@ export class ThreeCockpitView {
       this.camera.quaternion.setFromEuler(look);
     } else {
       this.camera.position.set(0, 0, 0);
-      this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch + shake[0]!, this.lookYaw + shake[1]!, 0, "YXZ"));
+      this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch + (this.layout.cameraPitchOffsetRad ?? 0) + shake[0]!, this.lookYaw + shake[1]!, 0, "YXZ"));
     }
     this.rig.updateMatrixWorld(true);
     const eyeWorld = ext ? [0, 0, 0] as const : rotateVector(q, this.layout.eyeFromCgM as Vector3);
