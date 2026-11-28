@@ -81,8 +81,8 @@ const PHOTO_ORIGIN_Y = 190;
 const PANEL_SECTIONS: readonly PanelSection[] = [
   { part: "panel-port-outer", minU: -0.52, maxU: -0.30, yawRad: 0.54, topV: -0.20, bottomV: 0.16 },
   { part: "panel-port-inner", minU: -0.30, maxU: -0.13, yawRad: 0.25, topV: -0.24, bottomV: 0.19 },
-  { part: "panel-center", minU: -0.13, maxU: 0.107, yawRad: 0, topV: -0.25, bottomV: 0.19 },
-  { part: "panel-starboard", minU: 0.107, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
+  { part: "panel-center", minU: -0.13, maxU: 0.114, yawRad: 0, topV: -0.25, bottomV: 0.19 },
+  { part: "panel-starboard", minU: 0.114, maxU: 0.52, yawRad: -0.36, topV: -0.23, bottomV: 0.17 }
 ];
 
 const emptyBucket = (): Bucket => ({ positions: [], normals: [], indices: [] });
@@ -430,7 +430,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   const rectangularMounts: readonly [number, number, number, number][] = [
     [570, 180, 32, 72],
     [435, 255, 50, 42],
-    [490, 255, 50, 42],
+    [500, 255, 48, 42],
     [555, 255, 55, 42],
     [600, 95, 108, 92],
     [650, 215, 72, 72]
@@ -445,6 +445,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   const panelOpenings = [...circularOpenings, ...rectangularOpenings];
 
   // Four separate front-panel plates with true through-openings for the future equipment.
+  const assignedPanelCutouts: (PanelOpening & { readonly panelPart: string })[] = [];
   for (const section of PANEL_SECTIONS) {
     const gap = 0.003;
     const containedOpenings = panelOpenings.filter((opening) => {
@@ -456,6 +457,7 @@ export function createMiG29CockpitShell(): THREE.Group {
         && opening.v + halfHeight <= section.bottomV - gap;
     });
     panelSegment(b(section.part), section, containedOpenings);
+    for (const opening of containedOpenings) assignedPanelCutouts.push({ ...opening, panelPart: section.part });
   }
 
   // Recessed blank backing surfaces sit behind the actual openings, not on top of the panel face.
@@ -585,6 +587,7 @@ export function createMiG29CockpitShell(): THREE.Group {
   shell.userData.visualMode = "neutral-structural-blockout";
   shell.userData.controlsIncluded = false;
   shell.userData.frontCanopyBowIncluded = false;
+  shell.userData.panelCutouts = assignedPanelCutouts;
   shell.userData.panelSections = PANEL_SECTIONS.map((section) => ({
     name: section.part,
     minU: section.minU,
