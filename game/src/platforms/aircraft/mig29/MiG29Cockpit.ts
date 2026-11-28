@@ -13,7 +13,6 @@
  */
 import type { CockpitLayout } from "../../../rendering/three/CockpitLayout.js";
 import type { AircraftSnapshot } from "../common/FixedWingAircraft.js";
-import { MIG29_HYDRAULICS as H } from "./MiG29Data.js";
 import { createMiG29CockpitShell } from "./MiG29CockpitModel.js";
 
 export const MIG29_COCKPIT_LAYOUT: CockpitLayout = {
@@ -58,6 +57,5 @@ export const MIG29_COCKPIT_INSTRUMENTS: Readonly<Record<string, (s: AircraftSnap
   fuel: (s) => (powered(s, "dc") ? [s.fuelKg] : [NAN]),
   cabin: () => [NAN, NAN, NAN],
   hydgas: (s) => (powered(s, "ac36") ? [hyd(s, "main"), hyd(s, "booster"), gas(s, "main"), gas(s, "emergency")] : [NAN, NAN, NAN, NAN]),
-  ramps: (s) => (powered(s, "ac36") ? [(s.inlets?.["left"]?.rampExtension ?? NAN) * 100, (s.inlets?.["right"]?.rampExtension ?? NAN) * 100] : [NAN, NAN]),
-  hydraulicPressureCautionReferencePa: () => [H.lowPressurePa.value]
+  ramps: (s) => (powered(s, "ac36") ? [(s.inlets?.["left"]?.rampExtension ?? NAN) * 100, (s.inlets?.["right"]?.rampExtension ?? NAN) * 100] : [NAN, NAN])
 };
