@@ -31,6 +31,8 @@ type ShellPart =
 type PanelOpening =
   | { readonly kind: "circle"; readonly u: number; readonly v: number; readonly radius: number }
   | { readonly kind: "rectangle"; readonly u: number; readonly v: number; readonly width: number; readonly height: number };
+type CircularPanelOpening = Extract<PanelOpening, { readonly kind: "circle" }>;
+type RectangularPanelOpening = Extract<PanelOpening, { readonly kind: "rectangle" }>;
 
 interface PanelSection {
   readonly part: ShellPart;
@@ -421,7 +423,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     [340, 140, 54], [330, 215, 50], [440, 145, 56], [515, 140, 54],
     [445, 210, 50], [505, 210, 50]
   ];
-  const circularOpenings: PanelOpening[] = gaugeMounts.map(([px, py, diameterPx]) => ({
+  const circularOpenings: CircularPanelOpening[] = gaugeMounts.map(([px, py, diameterPx]) => ({
     kind: "circle",
     u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
     v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
@@ -435,7 +437,7 @@ export function createMiG29CockpitShell(): THREE.Group {
     [600, 95, 108, 92],
     [650, 215, 72, 72]
   ];
-  const rectangularOpenings: PanelOpening[] = rectangularMounts.map(([px, py, widthPx, heightPx]) => ({
+  const rectangularOpenings: RectangularPanelOpening[] = rectangularMounts.map(([px, py, widthPx, heightPx]) => ({
     kind: "rectangle",
     u: (px - PHOTO_ORIGIN_X) * PHOTO_SCALE,
     v: (py - PHOTO_ORIGIN_Y) * PHOTO_SCALE,
@@ -449,8 +451,8 @@ export function createMiG29CockpitShell(): THREE.Group {
   for (const section of PANEL_SECTIONS) {
     const gap = 0.003;
     const containedOpenings = panelOpenings.filter((opening) => {
-      const halfWidth = opening.kind === "circle" ? opening.radius : opening.width / 2;
-      const halfHeight = opening.kind === "circle" ? opening.radius : opening.height / 2;
+      const halfWidth = "radius" in opening ? opening.radius : opening.width / 2;
+      const halfHeight = "radius" in opening ? opening.radius : opening.height / 2;
       return opening.u - halfWidth >= section.minU + gap
         && opening.u + halfWidth <= section.maxU - gap
         && opening.v - halfHeight >= section.topV + gap
