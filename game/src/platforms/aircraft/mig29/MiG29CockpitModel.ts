@@ -331,10 +331,10 @@ export function createMiG29CockpitShell(): THREE.Group {
   }
 
   // Additional instrument-control units: recessed keypads, signal-light banks and mechanical-state panel.
-  panelKeypad(b("black"), -0.285, -0.145, 0.17, 0.105, 4, 3);
-  panelKeypad(b("black"), -0.055, -0.157, 0.245, 0.085, 6, 2);
-  panelKeypad(b("black"), 0.105, 0.112, 0.13, 0.060, 5, 2);
-  panelKeypad(b("black"), -0.075, 0.118, 0.11, 0.080, 3, 3);
+  panelKeypad(b, -0.285, -0.145, 0.17, 0.105, 4, 3);
+  panelKeypad(b, -0.055, -0.157, 0.245, 0.085, 6, 2);
+  panelKeypad(b, 0.105, 0.112, 0.13, 0.060, 5, 2);
+  panelKeypad(b, -0.075, 0.118, 0.11, 0.080, 3, 3);
   for (let i = 0; i < 7; i++) {
     const u = -0.31 + i * 0.045;
     panelCylinder(b("bezel"), u, -0.078, 0.016, 0.0065, 0.004, 12);
