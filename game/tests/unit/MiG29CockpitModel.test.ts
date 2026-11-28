@@ -145,8 +145,16 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     const canopy = shell.getObjectByName("mig29-cockpit-canopy-glazing");
     expect(canopy).toBeInstanceOf(THREE.Mesh);
     expect(((canopy as THREE.Mesh).material as THREE.Material).transparent).toBe(true);
+    expect(shell.getObjectByName("mig29-cockpit-glare-brow")).toBeInstanceOf(THREE.Mesh);
+    expect(shell.getObjectByName("mig29-cockpit-hud-support")).toBeInstanceOf(THREE.Mesh);
     expect(shell.getObjectByName("mig29-cockpit-hud")).toBeUndefined();
-    expect(shell.getObjectByName("mig29-cockpit-glare-shield")).toBeInstanceOf(THREE.Mesh);
+    const brow = shell.getObjectByName("mig29-cockpit-glare-brow") as THREE.Mesh;
+    const browSize = new THREE.Box3().setFromObject(brow).getSize(new THREE.Vector3());
+    expect(browSize.y).toBeLessThan(0.02);
+    expect(browSize.z).toBeLessThan(0.04);
+    const hudSupport = shell.getObjectByName("mig29-cockpit-hud-support") as THREE.Mesh;
+    const hudSize = new THREE.Box3().setFromObject(hudSupport).getSize(new THREE.Vector3());
+    expect(hudSize.y).toBeLessThan(0.12);
     expect(shell.userData.frontCanopyBowIncluded).toBe(false);
   });
 
@@ -161,7 +169,8 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
       "mig29-cockpit-panel-starboard",
       "mig29-cockpit-panel-support",
       "mig29-cockpit-panel-recess",
-      "mig29-cockpit-glare-shield",
+      "mig29-cockpit-glare-brow",
+      "mig29-cockpit-hud-support",
       "mig29-cockpit-port-console",
       "mig29-cockpit-starboard-console",
       "mig29-cockpit-central-pedestal",
