@@ -495,11 +495,11 @@ export function createMiG29CockpitShell(): THREE.Group {
   box(b("glare-brow"), [0, -0.118, -0.744], [0.82, 0.003, 0.007], [-0.045, 0, 0]);
 
   // HUD support is a small mounting bracket only; no combiner, screen, symbology or controls.
-  rounded(b("hud-support"), [0, -0.075, -0.855], [0.150, 0.026, 0.040], 0.005);
+  rounded(b("hud-support"), [0, -0.150, -0.800], [0.150, 0.026, 0.040], 0.005);
   for (const side of [-1, 1] as const) {
-    box(b("hud-support"), [side * 0.070, -0.042, -0.875], [0.005, 0.052, 0.007], [0.035, side * 0.03, 0]);
+    box(b("hud-support"), [side * 0.070, -0.105, -0.820], [0.005, 0.052, 0.007], [0.035, side * 0.03, 0]);
   }
-  box(b("hud-support"), [0, -0.010, -0.872], [0.135, 0.006, 0.007]);
+  box(b("hud-support"), [0, -0.075, -0.817], [0.135, 0.006, 0.007]);
 
   // Each side console sits outboard of the front instrument panel and runs forward
   // alongside it. The deck, sloping wall and upright inner face are one connected assembly.
