@@ -211,3 +211,23 @@ The shell-only cockpit has been revised after comparing cockpit photographs and 
 - Research register and evidence limitations are in game/modules/planes/MiG-29A/docs/cockpit/RECONSTRUCTION_SPEC.md. Useful new leads include the DCS 9-12 manual's four-panel/vertical-plus-horizontal-console description, the GAF T.O. 1F-MIG29-1 diagrams, RAND R-4000-RC Plate 1, the Ukraine 2010 cockpit photo and the ARC Air MiG-29 walkaround.
 - Owner code and tests: game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts and game/tests/unit/MiG29CockpitModel.test.ts. The geometry remains provisional; no measured or certified 1:1 product 9.13 claim is justified.
 
+
+
+### MiG-29 cockpit full proportion pass (28 November 2026)
+
+A browser screenshot of the previous shell was inspected; the old render showed an undersized flat front panel, oversized raised side rails/console slabs, an exposed forward canopy hoop and too much outside view. The current branch replaces that blockout with:
+
+- A narrow tapered tub and shaped sidewalls; the previous long rectangular side rails are gone.
+- A wider/taller four-plate front panel with independent face normals, slight vertical-shape differences and a lower support casing.
+- Thin glare shield and reduced HUD support frame.
+- Narrow, low-profile side-console decks with separate raised upright inner faces integrated into the tub.
+- No forward canopy hoop; slim side rails and an aft bow remain. Canopy tint is nearly invisible.
+- A 60° vertical cockpit FOV and a slightly greater downward pilot-view pitch to improve 16:9 framing.
+- Still a neutral grey structural blockout only: no instrument faces, screens, labels, switches, knobs, buttons, levers, stick, throttle, pedals, seat cushions or harnesses.
+
+Geometry remains provisional family-level reconstruction, not a dimensionally verified 1:1 product 9.13 cockpit. The screenshot comparison and validation run are tracked in PR #79.
+
+
+
+A further visual refinement after reviewing the final CI screenshot: the gauge/display positions are now actual shallow-depth mounting recesses with dark neutral-grey blank interiors rather than same-grey surface rings; the glare-shield brow and HUD support were thinned; side-console surfaces were raised slightly into the sightline. No display faces or controls were added. Latest geometry validation includes a test that recess material remains monochrome and darker than the panel shell, and that the console frame reaches the pilot view.
+

@@ -13,6 +13,7 @@ const fly = (a: FixedWingAircraft, s: number) => { for (let i = 0; i < Math.roun
 describe("MiG-29 cockpit", () => {
   it("starts as a structural-only frame with no rendered instrument or control parts", () => {
     expect(MIG29_COCKPIT_LAYOUT.parts).toEqual([]);
+    expect(MIG29_COCKPIT_LAYOUT.fieldOfViewDeg).toBe(60);
     expect(MIG29_COCKPIT_INSTRUMENTS.ias).toBeDefined();
 
     // Aircraft-owned switch definitions remain intact; the cockpit currently has no hit targets.
