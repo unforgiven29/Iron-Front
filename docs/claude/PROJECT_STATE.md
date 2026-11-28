@@ -197,3 +197,17 @@ The rebuilt cockpit interior and subsequent composition-polish pass are merged i
 - Geometry is still a reference-guided family-level approximation. No measured or certified 1:1 product 9.13 claim is justified; exact dimensions, eye datum and Soviet 9.13 equipment fit remain unverified.
 - Owner code: game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts and MiG29Cockpit.ts. Validation: game/tests/unit/MiG29CockpitModel.test.ts, MiG29Cockpit.test.ts, and the MiG-29 blockout browser smoke test in game/tests/browser/app-shell.spec.ts.
 
+
+
+### MiG-29 cockpit panel-angle refinement (27 November 2026)
+
+The shell-only cockpit has been revised after comparing cockpit photographs and manuals:
+
+- The front panel is split into four separately addressable structural plates: port outer, port inner, centre and starboard. The faces have stepped inward yaw rather than sharing one continuous plane.
+- Both side-console decks now slope inward toward the pilot and include separate blank upright inner faces, matching the documented horizontal-plus-vertical console construction.
+- A blank lower central pedestal frame is included.
+- No instruments, screens, labels, switches, knobs, buttons, levers, stick, throttle, pedals, seat padding or harnesses have been added. The cockpit remains monochrome and the MiG-29 cockpit layout has an empty parts list.
+- Angle values are visual estimates only: port outer +0.52 rad, port inner +0.28 rad, centre 0 rad, starboard −0.40 rad; console deck inward slope 0.23 rad and upright-face rake 0.16 rad. They are not published product 9.13 dimensions.
+- Research register and evidence limitations are in game/modules/planes/MiG-29A/docs/cockpit/RECONSTRUCTION_SPEC.md. Useful new leads include the DCS 9-12 manual's four-panel/vertical-plus-horizontal-console description, the GAF T.O. 1F-MIG29-1 diagrams, RAND R-4000-RC Plate 1, the Ukraine 2010 cockpit photo and the ARC Air MiG-29 walkaround.
+- Owner code and tests: game/src/platforms/aircraft/mig29/MiG29CockpitModel.ts and game/tests/unit/MiG29CockpitModel.test.ts. The geometry remains provisional; no measured or certified 1:1 product 9.13 claim is justified.
+

@@ -13,7 +13,7 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     expect(shell.name).toBe("mig29-9-13-cockpit-shell-frame");
     expect(shell.userData.visualMode).toBe("neutral-structural-blockout");
     expect(shell.userData.controlsIncluded).toBe(false);
-    expect(meshes.length).toBeGreaterThanOrEqual(7);
+    expect(meshes.length).toBeGreaterThanOrEqual(10);
 
     const bounds = new THREE.Box3().setFromObject(shell);
     const size = bounds.getSize(new THREE.Vector3());
@@ -45,22 +45,57 @@ describe("MiG-29 neutral cockpit shell geometry", () => {
     }
   });
 
-  it("keeps clear, neutral canopy glazing as a separate transparent shell part", () => {
+  it("builds four separately addressable and differently angled front-panel sections", () => {
+    const shell = createMiG29CockpitShell();
+    const expected: readonly [string, number][] = [
+      ["mig29-cockpit-panel-port-outer", 0.52],
+      ["mig29-cockpit-panel-port-inner", 0.28],
+      ["mig29-cockpit-panel-center", 0],
+      ["mig29-cockpit-panel-starboard", -0.40]
+    ];
+    const sections = shell.userData.panelSections as readonly { name: string; yawRad: number }[];
+    expect(sections).toHaveLength(4);
+
+    for (const [name, angle] of expected) {
+      const panel = shell.getObjectByName(name) as THREE.Mesh | undefined;
+      expect(panel).toBeInstanceOf(THREE.Mesh);
+      expect(panel?.userData.panelYawRad).toBeCloseTo(angle, 6);
+    }
+    expect(new Set(sections.map((section) => section.yawRad)).size).toBe(4);
+  });
+
+  it("has sloped console decks and distinct blank upright console faces", () => {
+    const shell = createMiG29CockpitShell();
+    const port = shell.getObjectByName("mig29-cockpit-port-console");
+    const starboard = shell.getObjectByName("mig29-cockpit-starboard-console");
+    expect(port).toBeInstanceOf(THREE.Mesh);
+    expect(starboard).toBeInstanceOf(THREE.Mesh);
+    expect((port as THREE.Mesh).geometry.getAttribute("position").count).toBeGreaterThan(100);
+    expect((starboard as THREE.Mesh).geometry.getAttribute("position").count).toBeGreaterThan(100);
+  });
+
+  it("keeps neutral, transparent canopy glazing separate from the HUD support frame", () => {
     const shell = createMiG29CockpitShell();
     const canopy = shell.getObjectByName("mig29-cockpit-canopy-glazing");
     expect(canopy).toBeInstanceOf(THREE.Mesh);
     expect(((canopy as THREE.Mesh).material as THREE.Material).transparent).toBe(true);
     expect(shell.getObjectByName("mig29-cockpit-hud")).toBeUndefined();
+    expect(shell.getObjectByName("mig29-cockpit-glare-shield")).toBeInstanceOf(THREE.Mesh);
   });
 
-  it("keeps only the major empty cockpit assemblies separately addressable", () => {
+  it("keeps the major structural assemblies separately addressable", () => {
     const shell = createMiG29CockpitShell();
     const names = shell.children.map((child) => child.name);
     for (const name of [
       "mig29-cockpit-tub",
-      "mig29-cockpit-panel",
+      "mig29-cockpit-panel-port-outer",
+      "mig29-cockpit-panel-port-inner",
+      "mig29-cockpit-panel-center",
+      "mig29-cockpit-panel-starboard",
+      "mig29-cockpit-glare-shield",
       "mig29-cockpit-port-console",
       "mig29-cockpit-starboard-console",
+      "mig29-cockpit-central-pedestal",
       "mig29-cockpit-seat-frame",
       "mig29-cockpit-canopy-frame",
       "mig29-cockpit-canopy-glazing"
